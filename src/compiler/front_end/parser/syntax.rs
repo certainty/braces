@@ -13,6 +13,7 @@ pub enum Syntax {
 pub enum SelfEvaluating {
     FixNum(i64),
     Bool(bool),
+    Symbol(String),
 }
 
 pub fn fixnum(value: i64) -> Syntax {
@@ -21,4 +22,8 @@ pub fn fixnum(value: i64) -> Syntax {
 
 pub fn boolean(value: bool) -> Syntax {
     Syntax::SelfEvaluatingSyntax(SelfEvaluating::Bool(value))
+}
+
+pub fn symbol(value: &str) -> Syntax {
+    Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from(value)))
 }

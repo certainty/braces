@@ -1,15 +1,43 @@
+// https://small.r7rs.org/attachment/r7rs.pdf
+
 program = { SOI ~ datum* ~ EOI }
 datum = _{ simple_datum | compound_datum }
 
 
-simple_datum = _{ number | bool } 
-number = { ASCII_DIGIT+ }
+simple_datum = _{ number | bool | symbol } 
+number =  { ASCII_DIGIT+ }
 bool   = _{ BOOL_TRUE | BOOL_FALSE }
+symbol = _{ IDENTIFIER | DELIMITED_IDENTIFIER | PECULIAR_IDENTIFIER }
 
+// compounds
 compound_datum = _{ proper_list }
 proper_list = { L_PAREN ~ datum* ~ R_PAREN }
 
+IDENTIFIER = { INITIAL ~ SUBSEQUENT* }
+DELIMITED_IDENTIFIER = { VERTICAL_LINE ~ SYMBOL_ELEMENT* ~ VERTICAL_LINE }
+PECULIAR_IDENTIFIER = { EXPLICIT_SIGN | EXPLICIT_SIGN ~ SIGN_SUBSEQUENT ~ SUBSEQUENT* | EXPLICIT_SIGN ~ "." ~ DOT_SUBSEQUENT | "." ~ DOT_SUBSEQUENT ~ SUBSEQUENT* }
+
+INITIAL = _{ LETTER | SPECIAL_INITIAL }
+SYMBOL_ELEMENT = _{ INLINE_HEX_ESCAPE | MNEMONIC_ESCAPE | !("|" | "\\") ~ ANY }
+
+LETTER = _{ ASCII_ALPHA }
+SPECIAL_INITIAL = _{ "!" | "$" | "%" | "&" | "*" | "/" | ":" | "<" | "=" | ">" | "?" | "^" | "_" | "~" }
+SUBSEQUENT = _{ INITIAL | DIGIT | SPECIAL_SUBSEQUENT }
+SPECIAL_SUBSEQUENT = _{ EXPLICIT_SIGN | "." | "@" }
+EXPLICIT_SIGN = _{ "+" | "-" }
+
+DOT_SUBSEQUENT = _{ SIGN_SUBSEQUENT | "." }
+SIGN_SUBSEQUENT = _{ INITIAL | EXPLICIT_SIGN | "@" }
+
+
 L_PAREN = _{ "(" }
 R_PAREN = _{ ")" }
+
 BOOL_TRUE = { "#true" | "#t" }
 BOOL_FALSE = { "#false" | "#f" }
+VERTICAL_LINE = _{ "|" }
+
+INLINE_HEX_ESCAPE = _{ "\\x" ~ HEX_SCALAR_VALUE }
+HEX_SCALAR_VALUE = _{ ASCII_HEX_DIGIT+ }
+MNEMONIC_ESCAPE = _{ "\\" ~ ("a" | "b" | "t" | "n" | "r") }
+DIGIT = _{ ASCII_DIGIT }

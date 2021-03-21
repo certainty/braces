@@ -56,6 +56,9 @@ fn to_ast(pair: &Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
         },
         lowlevel::Rule::BOOL_TRUE => Ok(syntax::boolean(true)),
         lowlevel::Rule::BOOL_FALSE => Ok(syntax::boolean(false)),
+        lowlevel::Rule::IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
+        lowlevel::Rule::DELIMITED_IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
+        lowlevel::Rule::PECULIAR_IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
         _ => Err(ReaderError::UnsupportedSyntax),
     }
 }
@@ -83,6 +86,14 @@ mod tests {
         assert_eq!(
             Syntax::SelfEvaluatingSyntax(SelfEvaluating::Bool(true)),
             read("#true").unwrap()
+        )
+    }
+
+    #[test]
+    pub fn test_read_symbol() {
+        assert_eq!(
+            read("foo").unwrap(),
+            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from("foo")))
         )
     }
 
