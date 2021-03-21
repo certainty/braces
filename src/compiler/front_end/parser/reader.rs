@@ -57,7 +57,10 @@ fn to_ast(pair: &Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
         lowlevel::Rule::BOOL_TRUE => Ok(syntax::boolean(true)),
         lowlevel::Rule::BOOL_FALSE => Ok(syntax::boolean(false)),
         lowlevel::Rule::IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
-        lowlevel::Rule::DELIMITED_IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
+        lowlevel::Rule::DELIMITED_IDENTIFIER => {
+            let s = pair.as_str();
+            Ok(syntax::symbol(&s[1..s.len() - 1]))
+        }
         lowlevel::Rule::PECULIAR_IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
         _ => Err(ReaderError::UnsupportedSyntax),
     }
