@@ -68,7 +68,15 @@ fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
             let elements: Result<Vec<syntax::Syntax>> = pair.into_inner().map(to_ast).collect();
             Ok(syntax::proper_list(elements?))
         }
-        lowlevel::Rule::improper_list => todo!(),
+        lowlevel::Rule::improper_list => {
+            let mut elements = pair.into_inner();
+            let head = elements.next().unwrap();
+            let tail = to_ast(elements.next().unwrap())?;
+            let head_elements: Result<Vec<syntax::Syntax>> =
+                head.into_inner().map(to_ast).collect();
+
+            Ok(syntax::improper_list(head_elements?, tail))
+        }
         _ => Err(ReaderError::UnsupportedSyntax),
     }
 }
@@ -79,41 +87,38 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn test_read_number() {
+    pub fn test_bug_parsing_numbers() {
         assert_eq!(
-            Syntax::SelfEvaluatingSyntax(SelfEvaluating::FixNum(42)),
-            read("42").unwrap()
+            read("(10 10 10)").unwrap(),
+            syntax::proper_list(vec![
+                syntax::fixnum(10),
+                syntax::fixnum(10),
+                syntax::fixnum(10)
+            ])
         )
+    }
+
+    #[test]
+    pub fn test_read_number() {
+        assert_eq!(read("42").unwrap(), syntax::fixnum(42))
     }
 
     #[test]
     pub fn test_read_bool_true() {
-        assert_eq!(
-            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Bool(true)),
-            read("#t").unwrap()
-        );
-
-        assert_eq!(
-            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Bool(true)),
-            read("#true").unwrap()
-        )
+        assert_eq!(read("#t").unwrap(), syntax::boolean(true));
+        assert_eq!(read("#true").unwrap(), syntax::boolean(true))
     }
 
     #[test]
     pub fn test_read_symbol() {
-        assert_eq!(
-            read("foo").unwrap(),
-            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from("foo")))
-        )
+        assert_eq!(read("foo").unwrap(), syntax::symbol("foo"))
     }
 
     #[test]
     pub fn test_read_delimited_symbol() {
         assert_eq!(
             read("|complicated symbol foo|").unwrap(),
-            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from(
-                "complicated symbol foo"
-            )))
+            syntax::symbol("complicated symbol foo")
         )
     }
 
@@ -121,31 +126,36 @@ mod tests {
     pub fn test_read_vector() {
         assert_eq!(
             read("#(10 #t)").unwrap(),
-            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Vector(vec![
-                syntax::fixnum(10),
-                syntax::boolean(true)
-            ]))
+            syntax::vector(vec![syntax::fixnum(10), syntax::boolean(true)])
         );
 
-        assert_eq!(
-            read("#()").unwrap(),
-            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Vector(vec![]))
-        )
+        assert_eq!(read("#()").unwrap(), syntax::vector(vec![]))
     }
 
     #[test]
     pub fn test_read_proper_list() {
         assert_eq!(
             read("(10 foo)").unwrap(),
-            Syntax::ProperList(vec![syntax::fixnum(10), syntax::symbol("foo")])
+            syntax::proper_list(vec![syntax::fixnum(10), syntax::symbol("foo")])
         );
 
         assert_eq!(
             read("((10 foo))").unwrap(),
-            Syntax::ProperList(vec![Syntax::ProperList(vec![
+            syntax::proper_list(vec![syntax::proper_list(vec![
                 syntax::fixnum(10),
                 syntax::symbol("foo")
             ])])
+        )
+    }
+
+    #[test]
+    pub fn test_read_improper_list() {
+        assert_eq!(
+            read("(10 10 . foo)").unwrap(),
+            syntax::improper_list(
+                vec![syntax::fixnum(10), syntax::fixnum(10)],
+                syntax::symbol("foo")
+            )
         )
     }
 

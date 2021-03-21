@@ -5,7 +5,7 @@ datum = _{ simple_datum | compound_datum }
 
 
 simple_datum = _{ number | bool | symbol } 
-number =  { ASCII_DIGIT+ }
+number =  ${ ASCII_DIGIT+ }
 bool   = _{ BOOL_TRUE | BOOL_FALSE }
 symbol = _{ IDENTIFIER | DELIMITED_IDENTIFIER | PECULIAR_IDENTIFIER }
 

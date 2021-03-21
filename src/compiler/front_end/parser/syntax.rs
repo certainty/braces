@@ -8,7 +8,7 @@
 pub enum Syntax {
     SelfEvaluatingSyntax(SelfEvaluating),
     ProperList(Vec<Syntax>),
-    ImproperList(Box<Syntax>, Vec<Syntax>),
+    ImproperList(Vec<Syntax>, Box<Syntax>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -39,6 +39,6 @@ pub fn proper_list(value: Vec<Syntax>) -> Syntax {
     Syntax::ProperList(value)
 }
 
-pub fn improper_list(head: Syntax, tail: Vec<Syntax>) -> Syntax {
-    Syntax::ImproperList(Box::new(head), tail)
+pub fn improper_list(head: Vec<Syntax>, tail: Syntax) -> Syntax {
+    Syntax::ImproperList(head, Box::new(tail))
 }
