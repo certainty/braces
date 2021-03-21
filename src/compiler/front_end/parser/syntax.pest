@@ -1,0 +1,12 @@
+program = { SOI ~ datum* ~ EOI }
+datum = _{ simple_datum | compound_datum }
+
+
+simple_datum = _{ number } 
+number = { ASCII_DIGIT+ }
+
+compound_datum = _{ proper_list }
+proper_list = { L_PAREN ~ datum* ~ R_PAREN }
+
+L_PAREN = _{ "(" }
+R_PAREN = _{ ")" }
