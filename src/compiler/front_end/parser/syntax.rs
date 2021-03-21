@@ -7,6 +7,8 @@
 #[derive(PartialEq, Debug)]
 pub enum Syntax {
     SelfEvaluatingSyntax(SelfEvaluating),
+    ProperList(Vec<Syntax>),
+    ImproperList(Box<Syntax>, Vec<Syntax>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -14,6 +16,7 @@ pub enum SelfEvaluating {
     FixNum(i64),
     Bool(bool),
     Symbol(String),
+    Vector(Vec<Syntax>),
 }
 
 pub fn fixnum(value: i64) -> Syntax {
@@ -26,4 +29,8 @@ pub fn boolean(value: bool) -> Syntax {
 
 pub fn symbol(value: &str) -> Syntax {
     Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from(value).to_lowercase()))
+}
+
+pub fn vector(value: Vec<Syntax>) -> Syntax {
+    Syntax::SelfEvaluatingSyntax(SelfEvaluating::Vector(value))
 }

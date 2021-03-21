@@ -3,8 +3,6 @@ use super::source;
 use super::syntax;
 use pest::iterators::Pair;
 use pest::iterators::Pairs;
-use pest::Parser;
-use std::io;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -29,7 +27,7 @@ pub fn read_datum<T: source::Source>(input: &mut T) -> Result<syntax::Syntax> {
     input.read_to_string(&mut buffer)?;
 
     match lowlevel::parse_datum(&buffer) {
-        Ok(mut parsed) => to_ast(&parsed.next().unwrap()),
+        Ok(mut parsed) => to_ast(parsed.next().unwrap()),
         Err(_e) => Err(ReaderError::ParseError),
     }
 }
@@ -45,10 +43,10 @@ pub fn read_program<T: source::Source>(input: &mut T) -> Result<Vec<syntax::Synt
 }
 
 fn to_ast_seq(pairs: &mut Pairs<lowlevel::Rule>) -> Result<Vec<syntax::Syntax>> {
-    pairs.map(|p| to_ast(&p)).collect()
+    pairs.map(to_ast).collect()
 }
 
-fn to_ast(pair: &Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
+fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
     match pair.as_rule() {
         lowlevel::Rule::number => match pair.as_str().parse() {
             Ok(num) => Ok(syntax::fixnum(num)),
@@ -62,6 +60,12 @@ fn to_ast(pair: &Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
             Ok(syntax::symbol(&s[1..s.len() - 1]))
         }
         lowlevel::Rule::PECULIAR_IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
+        lowlevel::Rule::vector => {
+            let elements: Result<Vec<syntax::Syntax>> = pair.into_inner().map(to_ast).collect();
+            Ok(syntax::vector(elements?))
+        }
+        lowlevel::Rule::proper_list => todo!(),
+        lowlevel::Rule::improper_list => todo!(),
         _ => Err(ReaderError::UnsupportedSyntax),
     }
 }
@@ -107,6 +111,17 @@ mod tests {
             Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from(
                 "complicated symbol foo"
             )))
+        )
+    }
+
+    #[test]
+    pub fn test_read_vector() {
+        assert_eq!(
+            read("#(10 #t)").unwrap(),
+            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Vector(vec![
+                syntax::fixnum(10),
+                syntax::boolean(true)
+            ]))
         )
     }
 

@@ -10,34 +10,56 @@ bool   = _{ BOOL_TRUE | BOOL_FALSE }
 symbol = _{ IDENTIFIER | DELIMITED_IDENTIFIER | PECULIAR_IDENTIFIER }
 
 // compounds
-compound_datum = _{ proper_list }
-proper_list = { L_PAREN ~ datum* ~ R_PAREN }
+compound_datum = _{ proper_list | improper_list | vector | abbreviation }
+proper_list    = { L_PAREN ~ datum* ~ R_PAREN }
 
-IDENTIFIER = { INITIAL ~ SUBSEQUENT* }
+improper_list  = { L_PAREN ~ improper_head ~ "." ~ improper_tail ~ R_PAREN }
+improper_head  = { datum+ }
+improper_tail  = { datum } 
+
+vector = { SHARP_L_PAREN ~ datum* ~ R_PAREN }
+
+abbreviation            = { abbrev_prefix ~ datum }
+abbrev_prefix           = { abbrev_quote | abbrev_quasi_quote | abbrev_unquote | abbrev_unquote_splicing }
+abbrev_quote            = _{ "'" }
+abbrev_quasi_quote      = _{ "`" }
+abbrev_unquote          = _{ "," }
+abbrev_unquote_splicing = _{ ",@" }
+
+
+// Numbers
+
+
+// Common Tokens
+
+IDENTIFIER           = { INITIAL ~ SUBSEQUENT* }
 DELIMITED_IDENTIFIER = { VERTICAL_LINE ~ SYMBOL_ELEMENT* ~ VERTICAL_LINE }
-PECULIAR_IDENTIFIER = { EXPLICIT_SIGN | EXPLICIT_SIGN ~ SIGN_SUBSEQUENT ~ SUBSEQUENT* | EXPLICIT_SIGN ~ "." ~ DOT_SUBSEQUENT | "." ~ DOT_SUBSEQUENT ~ SUBSEQUENT* }
+PECULIAR_IDENTIFIER  = { EXPLICIT_SIGN | EXPLICIT_SIGN ~ SIGN_SUBSEQUENT ~ SUBSEQUENT* | EXPLICIT_SIGN ~ "." ~ DOT_SUBSEQUENT | "." ~ DOT_SUBSEQUENT ~ SUBSEQUENT* }
 
-INITIAL = _{ LETTER | SPECIAL_INITIAL }
+INITIAL        = _{ LETTER | SPECIAL_INITIAL }
 SYMBOL_ELEMENT = _{ INLINE_HEX_ESCAPE | MNEMONIC_ESCAPE | !("|" | "\\") ~ ANY }
 
-LETTER = _{ ASCII_ALPHA }
-SPECIAL_INITIAL = _{ "!" | "$" | "%" | "&" | "*" | "/" | ":" | "<" | "=" | ">" | "?" | "^" | "_" | "~" }
-SUBSEQUENT = _{ INITIAL | DIGIT | SPECIAL_SUBSEQUENT }
+SPECIAL_INITIAL    = _{ "!" | "$" | "%" | "&" | "*" | "/" | ":" | "<" | "=" | ">" | "?" | "^" | "_" | "~" }
+SUBSEQUENT         = _{ INITIAL | DIGIT | SPECIAL_SUBSEQUENT }
 SPECIAL_SUBSEQUENT = _{ EXPLICIT_SIGN | "." | "@" }
-EXPLICIT_SIGN = _{ "+" | "-" }
+DOT_SUBSEQUENT     = _{ SIGN_SUBSEQUENT | "." }
+SIGN_SUBSEQUENT    = _{ INITIAL | EXPLICIT_SIGN | "@" }
+EXPLICIT_SIGN      = _{ "+" | "-" }
 
-DOT_SUBSEQUENT = _{ SIGN_SUBSEQUENT | "." }
-SIGN_SUBSEQUENT = _{ INITIAL | EXPLICIT_SIGN | "@" }
 
-
-L_PAREN = _{ "(" }
-R_PAREN = _{ ")" }
-
-BOOL_TRUE = { "#true" | "#t" }
+BOOL_TRUE  = { "#true" | "#t" }
 BOOL_FALSE = { "#false" | "#f" }
-VERTICAL_LINE = _{ "|" }
 
 INLINE_HEX_ESCAPE = _{ "\\x" ~ HEX_SCALAR_VALUE }
-HEX_SCALAR_VALUE = _{ ASCII_HEX_DIGIT+ }
-MNEMONIC_ESCAPE = _{ "\\" ~ ("a" | "b" | "t" | "n" | "r") }
-DIGIT = _{ ASCII_DIGIT }
+HEX_SCALAR_VALUE  = _{ ASCII_HEX_DIGIT+ }
+MNEMONIC_ESCAPE   = _{ "\\" ~ ("a" | "b" | "t" | "n" | "r") }
+
+LETTER = _{ ASCII_ALPHA }
+DIGIT  = _{ ASCII_DIGIT }
+
+L_PAREN       = _{ "(" }
+R_PAREN       = _{ ")" }
+SHARP_L_PAREN = _{ "#(" }
+VERTICAL_LINE = _{ "|" }
+
+WHITESPACE = _{ " " | "\t" }
