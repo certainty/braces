@@ -9,3 +9,7 @@ pub struct Implementation;
 pub fn parse_datum(input: &str) -> Result<Pairs<Rule>, Error<Rule>> {
     Implementation::parse(Rule::datum, input)
 }
+
+pub fn parse_program(input: &str) -> Result<Pairs<Rule>, Error<Rule>> {
+    Implementation::parse(Rule::program, input)
+}

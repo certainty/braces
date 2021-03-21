@@ -12,8 +12,13 @@ pub enum Syntax {
 #[derive(PartialEq, Debug)]
 pub enum SelfEvaluating {
     FixNum(i64),
+    Bool(bool),
 }
 
 pub fn fixnum(value: i64) -> Syntax {
     Syntax::SelfEvaluatingSyntax(SelfEvaluating::FixNum(value))
+}
+
+pub fn boolean(value: bool) -> Syntax {
+    Syntax::SelfEvaluatingSyntax(SelfEvaluating::Bool(value))
 }

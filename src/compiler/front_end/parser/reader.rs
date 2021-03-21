@@ -34,12 +34,28 @@ pub fn read_datum<T: source::Source>(input: &mut T) -> Result<syntax::Syntax> {
     }
 }
 
+pub fn read_program<T: source::Source>(input: &mut T) -> Result<Vec<syntax::Syntax>> {
+    let mut buffer = String::new();
+    input.read_to_string(&mut buffer)?;
+
+    match lowlevel::parse_program(&buffer) {
+        Ok(mut parsed) => to_ast_seq(&mut parsed),
+        Err(_e) => Err(ReaderError::ParseError),
+    }
+}
+
+fn to_ast_seq(pairs: &mut Pairs<lowlevel::Rule>) -> Result<Vec<syntax::Syntax>> {
+    pairs.map(|p| to_ast(&p)).collect()
+}
+
 fn to_ast(pair: &Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
     match pair.as_rule() {
         lowlevel::Rule::number => match pair.as_str().parse() {
             Ok(num) => Ok(syntax::fixnum(num)),
             Err(_) => Err(ReaderError::ParseError),
         },
+        lowlevel::Rule::BOOL_TRUE => Ok(syntax::boolean(true)),
+        lowlevel::Rule::BOOL_FALSE => Ok(syntax::boolean(false)),
         _ => Err(ReaderError::UnsupportedSyntax),
     }
 }
@@ -54,6 +70,19 @@ mod tests {
         assert_eq!(
             Syntax::SelfEvaluatingSyntax(SelfEvaluating::FixNum(42)),
             read("42").unwrap()
+        )
+    }
+
+    #[test]
+    pub fn test_read_bool_true() {
+        assert_eq!(
+            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Bool(true)),
+            read("#t").unwrap()
+        );
+
+        assert_eq!(
+            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Bool(true)),
+            read("#true").unwrap()
         )
     }
 
