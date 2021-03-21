@@ -27,5 +27,17 @@ fn parse_single(datum: syntax::Syntax) -> Result<expression::Expression> {
 
 #[cfg(test)]
 mod tests {
+    use super::expression::Expression;
     use super::*;
+
+    #[test]
+    fn test_literal_number() {
+        assert_matches!(run_parser("23545").unwrap(), Expression::Literal(_))
+    }
+
+    fn run_parser(inp: &str) -> Result<expression::Expression> {
+        let mut source: source::StringSource = inp.into();
+
+        parse(&mut source)
+    }
 }
