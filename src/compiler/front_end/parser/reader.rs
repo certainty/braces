@@ -64,7 +64,10 @@ fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
             let elements: Result<Vec<syntax::Syntax>> = pair.into_inner().map(to_ast).collect();
             Ok(syntax::vector(elements?))
         }
-        lowlevel::Rule::proper_list => todo!(),
+        lowlevel::Rule::proper_list => {
+            let elements: Result<Vec<syntax::Syntax>> = pair.into_inner().map(to_ast).collect();
+            Ok(syntax::proper_list(elements?))
+        }
         lowlevel::Rule::improper_list => todo!(),
         _ => Err(ReaderError::UnsupportedSyntax),
     }
@@ -122,6 +125,27 @@ mod tests {
                 syntax::fixnum(10),
                 syntax::boolean(true)
             ]))
+        );
+
+        assert_eq!(
+            read("#()").unwrap(),
+            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Vector(vec![]))
+        )
+    }
+
+    #[test]
+    pub fn test_read_proper_list() {
+        assert_eq!(
+            read("(10 foo)").unwrap(),
+            Syntax::ProperList(vec![syntax::fixnum(10), syntax::symbol("foo")])
+        );
+
+        assert_eq!(
+            read("((10 foo))").unwrap(),
+            Syntax::ProperList(vec![Syntax::ProperList(vec![
+                syntax::fixnum(10),
+                syntax::symbol("foo")
+            ])])
         )
     }
 

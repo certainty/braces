@@ -34,3 +34,11 @@ pub fn symbol(value: &str) -> Syntax {
 pub fn vector(value: Vec<Syntax>) -> Syntax {
     Syntax::SelfEvaluatingSyntax(SelfEvaluating::Vector(value))
 }
+
+pub fn proper_list(value: Vec<Syntax>) -> Syntax {
+    Syntax::ProperList(value)
+}
+
+pub fn improper_list(head: Syntax, tail: Vec<Syntax>) -> Syntax {
+    Syntax::ImproperList(Box::new(head), tail)
+}
