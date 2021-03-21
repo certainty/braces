@@ -97,6 +97,16 @@ mod tests {
         )
     }
 
+    #[test]
+    pub fn test_read_delimited_symbol() {
+        assert_eq!(
+            read("|complicated symbol foo|").unwrap(),
+            Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from(
+                "complicated symbol foo"
+            )))
+        )
+    }
+
     fn read(inp: &str) -> Result<syntax::Syntax> {
         let mut source: source::StringSource = inp.into();
         read_datum(&mut source)

@@ -25,5 +25,5 @@ pub fn boolean(value: bool) -> Syntax {
 }
 
 pub fn symbol(value: &str) -> Syntax {
-    Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from(value)))
+    Syntax::SelfEvaluatingSyntax(SelfEvaluating::Symbol(String::from(value).to_lowercase()))
 }
