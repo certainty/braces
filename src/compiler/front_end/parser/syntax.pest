@@ -26,15 +26,28 @@ abbrev_quasi_quote      = _{ "`" }
 abbrev_unquote          = _{ "," }
 abbrev_unquote_splicing = _{ ",@" }
 
+// Whitespace
+
+WHITESPACE   = _{ INTRALINE_WS | LINE_ENDING }
+INTRALINE_WS = _{ " " | "\t" }
+LINE_ENDING  = _{ "\r\n" | "\n" | "\r" }
+
+// Comments
+COMMENT        = _{ LINE_COMMENT | NESTED_COMMENT }
+LINE_COMMENT   = _{ ";" ~ ANY* ~ LINE_ENDING }
+NESTED_COMMENT = _{ "#|" ~ ANY* ~ "|#" }
+
+DIRECTIVE = { "#!fold-case" | "#!no-fold-case" } 
+
 
 // Numbers
 
 
 // Common Tokens
 
-IDENTIFIER           = { INITIAL ~ SUBSEQUENT* }
-DELIMITED_IDENTIFIER = { VERTICAL_LINE ~ SYMBOL_ELEMENT* ~ VERTICAL_LINE }
-PECULIAR_IDENTIFIER  = { EXPLICIT_SIGN | EXPLICIT_SIGN ~ SIGN_SUBSEQUENT ~ SUBSEQUENT* | EXPLICIT_SIGN ~ "." ~ DOT_SUBSEQUENT | "." ~ DOT_SUBSEQUENT ~ SUBSEQUENT* }
+IDENTIFIER           = @{ INITIAL ~ SUBSEQUENT* }
+DELIMITED_IDENTIFIER = @{ VERTICAL_LINE ~ SYMBOL_ELEMENT* ~ VERTICAL_LINE }
+PECULIAR_IDENTIFIER  = @{ EXPLICIT_SIGN | EXPLICIT_SIGN ~ SIGN_SUBSEQUENT ~ SUBSEQUENT* | EXPLICIT_SIGN ~ "." ~ DOT_SUBSEQUENT | "." ~ DOT_SUBSEQUENT ~ SUBSEQUENT* }
 
 INITIAL        = _{ LETTER | SPECIAL_INITIAL }
 SYMBOL_ELEMENT = _{ INLINE_HEX_ESCAPE | MNEMONIC_ESCAPE | !("|" | "\\") ~ ANY }
@@ -61,5 +74,3 @@ L_PAREN       = _{ "(" }
 R_PAREN       = _{ ")" }
 SHARP_L_PAREN = _{ "#(" }
 VERTICAL_LINE = _{ "|" }
-
-WHITESPACE = _{ " " | "\t" }

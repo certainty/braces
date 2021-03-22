@@ -71,11 +71,11 @@ fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
         lowlevel::Rule::improper_list => {
             let mut elements = pair.into_inner();
             let head = elements.next().unwrap();
-            let tail = to_ast(elements.next().unwrap())?;
-            let head_elements: Result<Vec<syntax::Syntax>> =
-                head.into_inner().map(to_ast).collect();
+            let tail = elements.next().unwrap();
+            let head_elements: Result<Vec<syntax::Syntax>> = head.into_inner().map(to_ast).collect();
+            let tail_element = to_ast(tail.into_inner().next().unwrap());
 
-            Ok(syntax::improper_list(head_elements?, tail))
+            Ok(syntax::improper_list(head_elements?, tail_element?))
         }
         _ => Err(ReaderError::UnsupportedSyntax),
     }
