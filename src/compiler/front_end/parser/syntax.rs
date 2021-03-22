@@ -17,6 +17,11 @@ pub enum SelfEvaluating {
     Bool(bool),
     Symbol(String),
     Vector(Vec<Syntax>),
+    Void
+}
+
+pub fn void() -> Syntax {
+    Syntax::SelfEvaluatingSyntax(SelfEvaluating::Void)
 }
 
 pub fn fixnum(value: i64) -> Syntax {

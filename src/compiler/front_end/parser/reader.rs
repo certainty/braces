@@ -5,8 +5,12 @@ use pest::iterators::Pair;
 use pest::iterators::Pairs;
 use thiserror::Error;
 
+// TODO: clean this up - too many unclear error variants
 #[derive(Error, Debug)]
 pub enum ReaderError {
+    #[error("Generic reader error")]
+    Generic(String),
+
     #[error("Read error")]
     ReadError { source: std::io::Error },
 
@@ -14,7 +18,7 @@ pub enum ReaderError {
     IoError(#[from] std::io::Error),
 
     #[error("Parse Error")]
-    ParseError, //TODO: enrich error type
+    ParseError(#[from] pest::error::Error<lowlevel::Rule>), 
 
     #[error("Unsupported Syntax")]
     UnsupportedSyntax,
@@ -26,9 +30,10 @@ pub fn read_datum<T: source::Source>(input: &mut T) -> Result<syntax::Syntax> {
     let mut buffer = String::new();
     input.read_to_string(&mut buffer)?;
 
-    match lowlevel::parse_datum(&buffer) {
-        Ok(mut parsed) => to_ast(parsed.next().unwrap()),
-        Err(_e) => Err(ReaderError::ParseError),
+    let mut parsed = lowlevel::parse_datum(&buffer)?; 
+    match parsed.next() {
+        Some(datum) => to_ast(datum),
+        None => Ok(syntax::void())
     }
 }
 
@@ -36,10 +41,9 @@ pub fn read_program<T: source::Source>(input: &mut T) -> Result<Vec<syntax::Synt
     let mut buffer = String::new();
     input.read_to_string(&mut buffer)?;
 
-    match lowlevel::parse_program(&buffer) {
-        Ok(mut parsed) => to_ast_seq(&mut parsed),
-        Err(_e) => Err(ReaderError::ParseError),
-    }
+    let mut program = lowlevel::parse_datum(&buffer)?;
+    let ast = to_ast_seq(&mut program)?;
+    Ok(ast)
 }
 
 fn to_ast_seq(pairs: &mut Pairs<lowlevel::Rule>) -> Result<Vec<syntax::Syntax>> {
@@ -50,7 +54,7 @@ fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
     match pair.as_rule() {
         lowlevel::Rule::number => match pair.as_str().parse() {
             Ok(num) => Ok(syntax::fixnum(num)),
-            Err(_) => Err(ReaderError::ParseError),
+            Err(_e) => Err(ReaderError::Generic(String::from("Couldn't parse fixnum"))),
         },
         lowlevel::Rule::BOOL_TRUE => Ok(syntax::boolean(true)),
         lowlevel::Rule::BOOL_FALSE => Ok(syntax::boolean(false)),
@@ -100,7 +104,7 @@ mod tests {
 
     #[test]
     pub fn test_read_number() {
-        assert_eq!(read("42").unwrap(), syntax::fixnum(42))
+        assert_eq!(read("42").unwrap(), syntax::fixnum(42));
     }
 
     #[test]
@@ -156,6 +160,14 @@ mod tests {
                 vec![syntax::fixnum(10), syntax::fixnum(10)],
                 syntax::symbol("foo")
             )
+        )
+    }
+
+    #[test]
+    pub fn test_read_comments() {
+        assert_eq!(
+            read(";just a test").unwrap(),
+            syntax::vector(vec![syntax::fixnum(10)])
         )
     }
 

@@ -34,11 +34,10 @@ LINE_ENDING  = _{ "\r\n" | "\n" | "\r" }
 
 // Comments
 COMMENT        = _{ LINE_COMMENT | NESTED_COMMENT }
-LINE_COMMENT   = _{ ";" ~ ANY* ~ LINE_ENDING }
-NESTED_COMMENT = _{ "#|" ~ ANY* ~ "|#" }
+LINE_COMMENT   = _{ ";" ~ (!LINE_ENDING ~ ANY)* ~ LINE_ENDING }
+NESTED_COMMENT = _{ "#|" ~ (!"|#" ~ ANY)* ~ "|#" }
 
 DIRECTIVE = { "#!fold-case" | "#!no-fold-case" } 
-
 
 // Numbers
 
@@ -65,7 +64,7 @@ BOOL_FALSE = { "#false" | "#f" }
 
 INLINE_HEX_ESCAPE = _{ "\\x" ~ HEX_SCALAR_VALUE }
 HEX_SCALAR_VALUE  = _{ ASCII_HEX_DIGIT+ }
-MNEMONIC_ESCAPE   = _{ "\\" ~ ("a" | "b" | "t" | "n" | "r") }
+MNEMONIC_ESCAPE   = @{ "\\" ~ ("a" | "b" | "t" | "n" | "r") }
 
 LETTER = _{ ASCII_ALPHA }
 DIGIT  = _{ ASCII_DIGIT }
