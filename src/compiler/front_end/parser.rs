@@ -22,9 +22,13 @@ pub enum ParseError {
 
 type Result<T> = std::result::Result<T, ParseError>;
 
-pub fn parse<T: source::Source>(source: &mut T) -> Result<expression::Expression> {
+pub fn parse<T: source::Source>(source: &mut T) -> Result<Option<expression::Expression>> {
     let ast = reader::read_datum(source)?;
-    parse_single(ast)
+
+    match ast {
+        Some(datum) => parse_single(datum).map(Some),
+        None => Ok(None),
+    }
 }
 
 /// Convert syntax into expressions
@@ -42,10 +46,10 @@ mod tests {
 
     #[test]
     fn test_literal_number() {
-        assert_matches!(run_parser("23545").unwrap(), Expression::Literal(_))
+        assert_matches!(run_parser("23545").unwrap(), Some(Expression::Literal(_)))
     }
 
-    fn run_parser(inp: &str) -> Result<expression::Expression> {
+    fn run_parser(inp: &str) -> Result<Option<expression::Expression>> {
         let mut source: source::StringSource = inp.into();
 
         parse(&mut source)
