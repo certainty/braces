@@ -163,16 +163,19 @@ mod tests {
         )
     }
 
-    //#[test]
-    // seems to be a bug since the same pest grammar works
-    // for this case on the home page
-    /*
+    #[test]
     pub fn test_read_comments() {
+        assert_eq!(
+            read("#(10);just a test\n\n").unwrap(),
+            Some(syntax::vector(vec![syntax::fixnum(10)]))
+        )
+
+        /*
         assert_eq!(
             read(";just a test\n\n#(foo)").unwrap(),
             Some(syntax::vector(vec![syntax::fixnum(10)]))
-        )
-    }*/
+        )*/
+    }
 
     fn read(inp: &str) -> Result<Option<syntax::Syntax>> {
         let mut source: source::StringSource = inp.into();

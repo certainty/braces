@@ -4,6 +4,8 @@
  * form the `Expressions`.
  */
 
+// TODO: add position tracking - can be extracted from the pest spans
+
 #[derive(PartialEq, Debug)]
 pub enum Syntax {
     SelfEvaluatingSyntax(SelfEvaluating),
@@ -17,11 +19,6 @@ pub enum SelfEvaluating {
     Bool(bool),
     Symbol(String),
     Vector(Vec<Syntax>),
-    Void
-}
-
-pub fn void() -> Syntax {
-    Syntax::SelfEvaluatingSyntax(SelfEvaluating::Void)
 }
 
 pub fn fixnum(value: i64) -> Syntax {
