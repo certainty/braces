@@ -45,7 +45,7 @@ impl<'a> Disassembler<'a> {
         constant_address: byte_code::ConstAddressType,
     ) -> usize {
         println!(
-            "{} {:04}  '{}'",
+            "{:<16} {:04}  '{}'",
             name, constant_address, self.chunk.constants[constant_address as usize]
         );
 
