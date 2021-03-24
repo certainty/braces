@@ -24,7 +24,8 @@ install: build
 	$(CARGO) install
 
 run: build
-	$(CARGO) run repl
+	$(CARGO) run --bin vm
+
 
 test: build
 	$(CARGO) test -- --nocapture
