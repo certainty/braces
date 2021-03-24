@@ -4,9 +4,11 @@ use braces::vm::disassembler::disassemble;
 
 fn main() {
     let mut chunk = Chunk::new();
-    chunk.write_opcode(OpCode::Return);
-    let const_addr = chunk.write_constant(42);
-    chunk.write_opcode(OpCode::Const(const_addr));
 
-    disassemble(&chunk, "test chunk")
+    let const_addr = chunk.write_constant(42);
+    let start = chunk.write_opcode(OpCode::Const(const_addr));
+    let end = chunk.write_opcode(OpCode::Return);
+
+    chunk.write_line(start, end, 123);
+    disassemble(&chunk, "test chunk");
 }

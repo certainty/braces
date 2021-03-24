@@ -22,8 +22,13 @@ impl<'a> Disassembler<'a> {
         }
     }
 
+    // TODO: fix
     fn disassemble_instruction(&self, address: usize) -> usize {
-        print!("{:04} ", address);
+        if address > 0 && self.chunk.lines[address] == self.chunk.lines[address - 1] {
+            print!("   | ")
+        } else {
+            print!("{:04} ", address);
+        }
 
         match self.chunk.code[address] {
             OpCode::Return => self.disassemble_simple("OP_RETURN", address),
