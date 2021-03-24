@@ -1,7 +1,9 @@
 // https://small.r7rs.org/attachment/r7rs.pdf
 
-program = { SOI ~ datum* ~ EOI }
+program = _{ SOI ~ datum* ~ SILENT_EOI }
 datum = _{ simple_datum | compound_datum }
+
+SILENT_EOI = _{ !ANY }
 
 
 simple_datum = _{ number | bool | symbol } 

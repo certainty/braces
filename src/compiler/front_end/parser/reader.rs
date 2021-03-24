@@ -21,7 +21,7 @@ pub enum ReaderError {
     ParseError(#[from] pest::error::Error<lowlevel::Rule>),
 
     #[error("Unsupported Syntax")]
-    UnsupportedSyntax,
+    UnsupportedSyntax(String),
 }
 
 type Result<T> = std::result::Result<T, ReaderError>;
@@ -35,7 +35,7 @@ pub fn read_program<T: source::Source>(input: &mut T) -> Result<Vec<syntax::Synt
     let mut buffer = String::new();
     input.read_to_string(&mut buffer)?;
 
-    let mut program = lowlevel::parse_datum(&buffer)?;
+    let mut program = lowlevel::parse_program(&buffer)?;
     let ast = to_ast_seq(&mut program)?;
     Ok(ast)
 }
@@ -76,7 +76,10 @@ fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
 
             Ok(syntax::improper_list(head_elements?, tail_element?))
         }
-        _ => Err(ReaderError::UnsupportedSyntax),
+        synt => Err(ReaderError::UnsupportedSyntax(String::from(&format!(
+            "{:?}",
+            synt
+        )))),
     }
 }
 
@@ -168,13 +171,12 @@ mod tests {
         assert_eq!(
             read("#(10);just a test\n\n").unwrap(),
             Some(syntax::vector(vec![syntax::fixnum(10)]))
-        )
+        );
 
-        /*
         assert_eq!(
-            read(";just a test\n\n#(foo)").unwrap(),
+            read(";just a test\n\n#(10)").unwrap(),
             Some(syntax::vector(vec![syntax::fixnum(10)]))
-        )*/
+        )
     }
 
     fn read(inp: &str) -> Result<Option<syntax::Syntax>> {
