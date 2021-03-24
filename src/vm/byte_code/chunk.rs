@@ -1,11 +1,11 @@
 use super::*;
 use std::cmp::Ordering;
 
-type Value = u64;
-type LineNumber = u64;
-type AddressType = usize;
+pub(crate) type Value = u64;
+pub(crate) type LineNumber = u64;
+pub(crate) type AddressType = usize;
 // start address, end address, line number
-type LineInfo = (AddressType, AddressType, LineNumber);
+pub(crate) type LineInfo = (AddressType, AddressType, LineNumber);
 
 pub struct Chunk {
     pub(crate) lines: Vec<LineInfo>,

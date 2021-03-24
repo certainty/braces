@@ -1,5 +1,5 @@
 use super::byte_code;
-use super::byte_code::chunk::Chunk;
+use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::OpCode;
 
 pub fn disassemble(chunk: &Chunk, context: &str) {
@@ -22,7 +22,7 @@ impl<'a> Disassembler<'a> {
         }
     }
 
-    fn disassemble_instruction(&self, address: usize) -> usize {
+    pub(crate) fn disassemble_instruction(&self, address: usize) -> usize {
         if let Some((begin, _, _)) = self.chunk.find_line(address) {
             if address > 0 && begin <= address - 1 {
                 print!("   | ")
@@ -49,7 +49,7 @@ impl<'a> Disassembler<'a> {
     fn disassemble_constant(
         &self,
         name: &str,
-        address: usize,
+        address: AddressType,
         constant_address: byte_code::ConstAddressType,
     ) -> usize {
         println!(
