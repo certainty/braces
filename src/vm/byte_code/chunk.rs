@@ -17,7 +17,7 @@ impl Chunk {
 
     pub fn write_constant(&mut self, value: Value) -> ConstAddressType {
         self.constants.push(value);
-        (self.constants.len() - 1) as ConstAddressType
+        (self.constants.len() - 1) as u16
     }
 
     pub fn write_opcode(&mut self, op_code: OpCode) {
