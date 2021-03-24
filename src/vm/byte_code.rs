@@ -1,6 +1,9 @@
 pub mod chunk;
 
-type OpCode = u8;
+pub type ConstAddressType = u16;
 
-pub const OP_RETURN: OpCode = 0;
-pub const OP_CONSTANT: OpCode = 1;
+#[repr(u8)]
+pub enum OpCode {
+    Return,
+    Const(ConstAddressType),
+}
