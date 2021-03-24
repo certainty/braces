@@ -1,6 +1,7 @@
 use braces::vm::byte_code::chunk::Chunk;
 use braces::vm::byte_code::OpCode;
 use braces::vm::disassembler::disassemble;
+use braces::vm::stack_vm::StackVM;
 
 fn main() {
     let mut chunk = Chunk::new();
@@ -11,4 +12,5 @@ fn main() {
 
     chunk.write_line(start, end, 123);
     disassemble(&chunk, "test chunk");
+    StackVM::interprete(&chunk).unwrap();
 }
