@@ -22,10 +22,13 @@ impl<'a> Disassembler<'a> {
         }
     }
 
-    // TODO: fix
     fn disassemble_instruction(&self, address: usize) -> usize {
-        if address > 0 && self.chunk.lines[address] == self.chunk.lines[address - 1] {
-            print!("   | ")
+        if let Some((begin, _, _)) = self.chunk.find_line(address) {
+            if address > 0 && begin <= address - 1 {
+                print!("   | ")
+            } else {
+                print!("{:04} ", address);
+            }
         } else {
             print!("{:04} ", address);
         }
