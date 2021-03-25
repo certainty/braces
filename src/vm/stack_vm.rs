@@ -1,4 +1,5 @@
-use super::byte_code::chunk;
+use super::byte_code::{chunk, OpCode};
+use log;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -23,7 +24,24 @@ impl<'a> StackVM<'a> {
         .run()
     }
 
-    fn run(&self) -> Result<(), VmError> {
+    fn run(&mut self) -> Result<(), VmError> {
+        loop {
+            match self.read_op_code() {
+                &OpCode::Return => break,
+                &OpCode::Const(addr) => {
+                    let val = self.chunk.read_constant(addr);
+                    println!("{:?}", val);
+                }
+                _ => return Err(VmError::RuntimeError),
+            }
+        }
+
         Ok(())
+    }
+
+    fn read_op_code(&mut self) -> &OpCode {
+        let code = self.chunk.read_opcode(self.ip);
+        self.ip = self.ip + 1;
+        code
     }
 }

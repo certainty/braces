@@ -1,36 +1,43 @@
 use super::byte_code;
 use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::OpCode;
+use std::io::Write;
 
 pub fn disassemble(chunk: &Chunk, context: &str) {
-    let disass = Disassembler { chunk };
+    let mut disass = Disassembler {
+        chunk,
+        out: &mut std::io::stdout(),
+    };
     disass.disassemble(context)
 }
 
-struct Disassembler<'a> {
+struct Disassembler<'a, Out: Write> {
     chunk: &'a Chunk,
+    out: &'a mut Out,
 }
 
-impl<'a> Disassembler<'a> {
-    fn disassemble(&self, context: &str) {
+impl<'a, Out: Write> Disassembler<'a, Out> {
+    fn disassemble(&mut self, context: &str) {
         let mut address: usize = 0;
 
-        println!("== {} ==", context);
+        self.out
+            .write_fmt(format_args!("== {} ==", context))
+            .unwrap();
 
         while address < self.chunk.code.len() {
             address = self.disassemble_instruction(address);
         }
     }
 
-    pub(crate) fn disassemble_instruction(&self, address: usize) -> usize {
+    pub(crate) fn disassemble_instruction(&mut self, address: usize) -> usize {
         if let Some((begin, _, _)) = self.chunk.find_line(address) {
             if address > 0 && begin <= address - 1 {
-                print!("   | ")
+                self.out.write_all("   | ".as_bytes()).unwrap();
             } else {
-                print!("{:04} ", address);
+                self.out.write_fmt(format_args!("{:04} ", address)).unwrap();
             }
         } else {
-            print!("{:04} ", address);
+            self.out.write_fmt(format_args!("{:04} ", address)).unwrap();
         }
 
         match self.chunk.code[address] {
@@ -41,21 +48,23 @@ impl<'a> Disassembler<'a> {
         }
     }
 
-    fn disassemble_simple(&self, name: &str, address: usize) -> usize {
-        println!("{}", name);
+    fn disassemble_simple(&mut self, name: &str, address: usize) -> usize {
+        self.out.write_all(name.as_bytes()).unwrap();
         address + 1
     }
 
     fn disassemble_constant(
-        &self,
+        &mut self,
         name: &str,
         address: AddressType,
         constant_address: byte_code::ConstAddressType,
     ) -> usize {
-        println!(
-            "{:<16} {:04}  '{}'",
-            name, constant_address, self.chunk.constants[constant_address as usize]
-        );
+        self.out
+            .write_fmt(format_args!(
+                "{:<16} {:04}  '{}'",
+                name, constant_address, self.chunk.constants[constant_address as usize]
+            ))
+            .unwrap();
 
         address + 1
     }
