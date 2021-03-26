@@ -14,6 +14,11 @@ pub mod source;
 mod syntax;
 use thiserror::Error;
 
+#[derive(PartialEq, Debug)]
+pub struct Location {
+    line: usize,
+}
+
 #[derive(Error, Debug)]
 pub enum ParseError {
     #[error(transparent)]
@@ -34,7 +39,7 @@ pub fn parse<T: source::Source>(source: &mut T) -> Result<Option<expression::Exp
 /// Convert syntax into expressions
 fn parse_single(datum: syntax::Syntax) -> Result<expression::Expression> {
     match datum {
-        syntax::Syntax::SelfEvaluatingSyntax(syn) => Ok(expression::Expression::Literal(syn)),
+        syntax::Syntax::SelfEvaluatingSyntax(syn, _loc) => Ok(expression::Expression::Literal(syn)),
         _ => panic!("Unsupported syntax"),
     }
 }

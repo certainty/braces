@@ -1,6 +1,7 @@
 use super::lowlevel;
 use super::source;
 use super::syntax;
+use super::Location;
 use pest::iterators::Pair;
 use pest::iterators::Pairs;
 use thiserror::Error;
@@ -45,26 +46,28 @@ fn to_ast_seq(pairs: &mut Pairs<lowlevel::Rule>) -> Result<Vec<syntax::Syntax>> 
 }
 
 fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
+    let loc = location(&pair);
+
     match pair.as_rule() {
         lowlevel::Rule::number => match pair.as_str().parse() {
-            Ok(num) => Ok(syntax::fixnum(num)),
+            Ok(num) => Ok(syntax::fixnum(num, loc)),
             Err(_e) => Err(ReaderError::Generic(String::from("Couldn't parse fixnum"))),
         },
-        lowlevel::Rule::BOOL_TRUE => Ok(syntax::boolean(true)),
-        lowlevel::Rule::BOOL_FALSE => Ok(syntax::boolean(false)),
-        lowlevel::Rule::IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
+        lowlevel::Rule::BOOL_TRUE => Ok(syntax::boolean(true, loc)),
+        lowlevel::Rule::BOOL_FALSE => Ok(syntax::boolean(false, loc)),
+        lowlevel::Rule::IDENTIFIER => Ok(syntax::symbol(pair.as_str(), loc)),
         lowlevel::Rule::DELIMITED_IDENTIFIER => {
             let s = pair.as_str();
-            Ok(syntax::symbol(&s[1..s.len() - 1]))
+            Ok(syntax::symbol(&s[1..s.len() - 1], loc))
         }
-        lowlevel::Rule::PECULIAR_IDENTIFIER => Ok(syntax::symbol(pair.as_str())),
+        lowlevel::Rule::PECULIAR_IDENTIFIER => Ok(syntax::symbol(pair.as_str(), loc)),
         lowlevel::Rule::vector => {
             let elements: Result<Vec<syntax::Syntax>> = pair.into_inner().map(to_ast).collect();
-            Ok(syntax::vector(elements?))
+            Ok(syntax::vector(elements?, loc))
         }
         lowlevel::Rule::proper_list => {
             let elements: Result<Vec<syntax::Syntax>> = pair.into_inner().map(to_ast).collect();
-            Ok(syntax::proper_list(elements?))
+            Ok(syntax::proper_list(elements?, loc))
         }
         lowlevel::Rule::improper_list => {
             let mut elements = pair.into_inner();
@@ -74,12 +77,18 @@ fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
                 head.into_inner().map(to_ast).collect();
             let tail_element = to_ast(tail.into_inner().next().unwrap());
 
-            Ok(syntax::improper_list(head_elements?, tail_element?))
+            Ok(syntax::improper_list(head_elements?, tail_element?, loc))
         }
         synt => Err(ReaderError::UnsupportedSyntax(String::from(&format!(
             "{:?}",
             synt
         )))),
+    }
+}
+
+fn location(pair: &Pair<lowlevel::Rule>) -> Location {
+    Location {
+        line: pair.as_span().start(),
     }
 }
 
