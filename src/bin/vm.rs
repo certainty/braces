@@ -11,6 +11,6 @@ fn main() {
     let end = chunk.write_opcode(OpCode::Return);
 
     chunk.write_line(start, end, 123);
-    disassemble(&chunk, "test chunk");
-    StackVM::interprete(&chunk).unwrap();
+    disassemble(&mut std::io::stdout(), &chunk, "test chunk");
+    //StackVM::interprete(&chunk).unwrap();
 }
