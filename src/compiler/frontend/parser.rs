@@ -7,10 +7,10 @@
 /// As scheme supports quoted data, the parser has to conditionally disable "evaluation"
 /// which is straight forward todo. This is one reason why we re-use the underlying low
 /// level parser in the reader.
-mod expression;
+pub mod expression;
 mod lowlevel;
-mod reader;
-mod source;
+pub mod reader;
+pub mod source;
 mod syntax;
 use thiserror::Error;
 

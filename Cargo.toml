@@ -10,8 +10,12 @@ edition = "2018"
 name="braces"
 path="src/lib.rs"
 
+[features]
+debug_vm = []
+
 [dependencies]
 # utils
+log="0.4"
 env_logger = "0.8"
 pretty_env_logger = "0.4"
 thiserror = "1.0"
@@ -21,8 +25,9 @@ anyhow = "1.0"
 pest = "2.1"
 pest_derive = "2.1"
 
-# compiler
+# compiler / interpreter
 clap-v3 = "3.0.0-beta.1"
+rustyline = "8.0.0"
 
 [dev-dependencies]
 matches = "0.1"
