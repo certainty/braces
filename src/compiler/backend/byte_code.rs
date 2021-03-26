@@ -1,12 +1,15 @@
-use braces::vm::byte_code::chunk::Chunk;
-use braces::vm::byte_code::OpCode;
-use braces::vm::disassembler::disassemble;
-use braces::vm::stack_vm::StackVM;
+use crate::compiler::frontend::parser::expression;
+use crate::vm::byte_code::chunk;
+use crate::vm::byte_code::OpCode;
+use thiserror::Error;
 
-fn main() {
-    pretty_env_logger::init();
-    let mut chunk = Chunk::new();
+#[derive(Error, Debug)]
+pub enum GenerationError {}
 
+type Result<T> = std::result::Result<T, GenerationError>;
+
+pub fn generate(ast: &expression::Expression) -> Result<chunk::Chunk> {
+    let mut chunk = chunk::Chunk::new();
     // line 123
     let const_addr_lhs = chunk.write_constant(42);
     let const_addr_rhs = chunk.write_constant(50);
@@ -20,8 +23,5 @@ fn main() {
     let ln = chunk.write_opcode(OpCode::Exit);
     chunk.write_line(ln, ln, 124);
 
-    disassemble(&mut std::io::stdout(), &chunk, "test chunk");
-
-    println!("\nrunning VM with the code above");
-    StackVM::interprete(&chunk).unwrap();
+    Ok(chunk)
 }

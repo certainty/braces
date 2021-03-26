@@ -27,10 +27,10 @@ install: build
 	$(CARGO) install
 
 run: 
-	$(CARGO) run --bin vm
+	$(CARGO) run --bin bracesi
 
 debug_run: 
-	$(CARGO) run --features debug_vm --bin vm 
+	$(CARGO) run --features debug_vm --bin bracesi 
 
 
 test: build
