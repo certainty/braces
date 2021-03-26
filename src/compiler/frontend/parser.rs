@@ -12,11 +12,18 @@ mod lowlevel;
 pub mod reader;
 pub mod source;
 mod syntax;
+use syntax::SelfEvaluating;
+use syntax::Syntax::*;
 use thiserror::Error;
 
 #[derive(PartialEq, Debug)]
 pub struct Location {
     line: usize,
+}
+
+#[derive(PartialEq, Debug)]
+pub struct SourceInformation {
+    location: Location,
 }
 
 #[derive(Error, Debug)]
@@ -39,9 +46,24 @@ pub fn parse<T: source::Source>(source: &mut T) -> Result<Option<expression::Exp
 /// Convert syntax into expressions
 fn parse_single(datum: syntax::Syntax) -> Result<expression::Expression> {
     match datum {
-        syntax::Syntax::SelfEvaluatingSyntax(syn, _loc) => Ok(expression::Expression::Literal(syn)),
+        SelfEvaluatingSyntax(SelfEvaluating::Symbol(sym), loc) => Ok(expression::variable(
+            expression::symbol(sym),
+            source_info(loc),
+        )),
+        SelfEvaluatingSyntax(syn, loc) => Ok(expression::literal(syn, source_info(loc))),
+        ProperList(elements, location) => match elements.first() {
+            Some(SelffEvaluating::Symbol("if")) => Ok(parseIf(elements, location)?),
+        },
         _ => panic!("Unsupported syntax"),
     }
+}
+
+fn parseIf(Vec<syntax::Syntax>, location: Location) -> Result<expression::Expression> {
+
+}
+
+fn source_info(location: Location) -> SourceInformation {
+    SourceInformation { location }
 }
 
 #[cfg(test)]
