@@ -1,9 +1,11 @@
+use super::byte_code::chunk::Value;
 use super::byte_code::{chunk, OpCode};
-use super::disassembler;
-use log;
-use std::io::Write;
-use std::str;
 use thiserror::Error;
+
+#[cfg(feature = "debug_vm")]
+use super::disassembler;
+
+const STACK_CAPACITY: usize = 255;
 
 #[derive(Error, Debug)]
 pub enum VmError {
@@ -13,56 +15,63 @@ pub enum VmError {
     CompileError,
 }
 
-struct TracingWriter;
-
-impl Write for TracingWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let s = str::from_utf8(buf).unwrap();
-        log::trace!("{}", s);
-        Ok(s.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
 pub struct StackVM<'a> {
-    chunk: &'a chunk::Chunk,
     ip: chunk::AddressType,
-    tracing_write: &'a mut TracingWriter,
+    stack: Vec<Value>,
+    chunk: &'a chunk::Chunk,
 }
 
 impl<'a> StackVM<'a> {
-    pub fn interprete(chunk: &'a chunk::Chunk) -> Result<(), VmError> {
+    pub fn interprete(chunk: &'a chunk::Chunk) -> Result<Option<Value>, VmError> {
         StackVM {
             chunk: &chunk,
             ip: 0,
-            tracing_write: &mut TracingWriter,
+            stack: Vec::with_capacity(STACK_CAPACITY),
         }
         .run()
     }
 
-    fn run(&mut self) -> Result<(), VmError> {
+    fn run(&mut self) -> Result<Option<Value>, VmError> {
         loop {
-            disassembler::disassemble_instruction(self.tracing_write, self.chunk, self.ip);
+            #[cfg(feature = "debug_vm")]
+            self.debug_cycle();
 
             match self.read_op_code() {
-                &OpCode::Return => break,
+                &OpCode::Exit => {
+                    let v = self.stack.pop();
+                    return Ok(v);
+                }
                 &OpCode::Const(addr) => {
                     let val = self.chunk.read_constant(addr);
-                    println!("{:?}", val);
+                    self.stack.push(val);
                 }
-                _ => return Err(VmError::RuntimeError),
+                &OpCode::FxAdd => {
+                    let lhs = self.stack.pop().unwrap();
+                    let rhs = self.stack.pop().unwrap();
+                    self.stack.push(lhs + rhs)
+                }
             }
         }
-
-        Ok(())
     }
 
     fn read_op_code(&mut self) -> &OpCode {
         let code = self.chunk.read_opcode(self.ip);
         self.ip = self.ip + 1;
         code
+    }
+
+    #[cfg(feature = "debug_vm")]
+    fn debug_cycle(&self) {
+        self.print_stack_trace();
+        disassembler::disassemble_instruction(&mut std::io::stdout(), self.chunk, self.ip);
+    }
+
+    #[cfg(feature = "debug_vm")]
+    fn print_stack_trace(&self) {
+        print!("     ");
+        for value in self.stack.iter() {
+            print!("[{}]", value);
+        }
+        println!("")
     }
 }

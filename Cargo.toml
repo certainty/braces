@@ -10,6 +10,9 @@ edition = "2018"
 name="braces"
 path="src/lib.rs"
 
+[features]
+debug_vm = []
+
 [dependencies]
 # utils
 log="0.4"

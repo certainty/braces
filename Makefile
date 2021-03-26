@@ -11,6 +11,9 @@ bench:
 build:
 	$(CARGO) build
 
+debug_build:
+	$(CARGO) build --features debug_vm
+
 check:
 	$(CARGO) check
 
@@ -23,8 +26,11 @@ doc:
 install: build
 	$(CARGO) install
 
-run: build
+run: 
 	$(CARGO) run --bin vm
+
+debug_run: 
+	$(CARGO) run --features debug_vm --bin vm 
 
 
 test: build

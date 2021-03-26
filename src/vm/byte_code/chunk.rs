@@ -46,12 +46,12 @@ impl Chunk {
 
     pub fn find_line(&self, address: AddressType) -> Option<LineInfo> {
         let index = self.lines.binary_search_by(|&(begin, end, _)| {
-            if address < begin {
-                Ordering::Less
-            } else if address > end {
-                Ordering::Greater
-            } else {
+            if begin <= address && end >= address {
                 Ordering::Equal
+            } else if end < address {
+                Ordering::Less
+            } else {
+                Ordering::Greater
             }
         });
 
@@ -59,5 +59,23 @@ impl Chunk {
             Ok(idx) => Some(self.lines[idx]),
             Err(_) => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Chunk;
+
+    #[test]
+    fn find_line_works() {
+        let mut chunk = Chunk::new();
+        chunk.write_line(0, 10, 123);
+        chunk.write_line(11, 20, 124);
+
+        assert_matches!(chunk.find_line(5), Some((0, 10, 123)));
+        assert_matches!(chunk.find_line(0), Some((0, 10, 123)));
+        assert_matches!(chunk.find_line(10), Some((0, 10, 123)));
+        assert_matches!(chunk.find_line(12), Some((11, 20, 124)));
+        assert_matches!(chunk.find_line(23), None);
     }
 }

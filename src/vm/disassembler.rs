@@ -26,15 +26,16 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
     }
 
     match chunk.code[address] {
-        OpCode::Return => disassemble_simple(out, "OP_RETURN", address),
+        OpCode::Exit => disassemble_simple(out, "OP_EXIT", address),
         OpCode::Const(const_address) => {
             disassemble_constant(out, chunk, "OP_CONSTANT", address, const_address)
         }
+        OpCode::FxAdd => disassemble_simple(out, "OP_FXADD", address),
     }
 }
 
 fn disassemble_simple<W: Write>(out: &mut W, name: &str, address: usize) -> usize {
-    out.write_all(name.as_bytes()).unwrap();
+    out.write_fmt(format_args!("{}\n", name)).unwrap();
     address + 1
 }
 

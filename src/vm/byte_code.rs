@@ -4,6 +4,7 @@ pub type ConstAddressType = u16;
 
 #[repr(u8)]
 pub enum OpCode {
-    Return,
+    Exit,
     Const(ConstAddressType),
+    FxAdd,
 }
