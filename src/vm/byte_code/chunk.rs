@@ -7,6 +7,7 @@ pub(crate) type AddressType = usize;
 // start address, end address, line number
 pub(crate) type LineInfo = (AddressType, AddressType, LineNumber);
 
+#[derive(Clone, Debug)]
 pub struct Chunk {
     pub(crate) lines: Vec<LineInfo>,
     pub(crate) constants: Vec<Value>,
@@ -22,6 +23,7 @@ impl Chunk {
         }
     }
 
+    // make this work when called multiple time with the same addresses
     pub fn write_line(&mut self, from: AddressType, to: AddressType, line: LineNumber) {
         self.lines.push((from, to, line));
     }
@@ -31,8 +33,8 @@ impl Chunk {
         (self.constants.len() - 1) as ConstAddressType
     }
 
-    pub fn read_constant(&self, addr: ConstAddressType) -> Value {
-        self.constants[addr as usize]
+    pub fn read_constant(&self, addr: ConstAddressType) -> &Value {
+        &self.constants[addr as usize]
     }
 
     pub fn write_opcode(&mut self, op_code: OpCode) -> AddressType {

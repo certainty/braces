@@ -26,13 +26,13 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
         out.write_fmt(format_args!("{:04} ", address)).unwrap();
     }
 
-    match chunk.code[address] {
-        OpCode::Halt => disassemble_simple(out, "OP_HALT", address),
-        OpCode::Const(const_address) => {
+    match &chunk.code[address] {
+        &OpCode::Halt => disassemble_simple(out, "OP_HALT", address),
+        &OpCode::Const(const_address) => {
             disassemble_constant(out, chunk, "OP_CONSTANT", address, const_address)
         }
-        OpCode::FxAdd => disassemble_simple(out, "OP_FXADD", address),
-        OpCode::Nop => disassemble_simple(out, "OP_NOP", address),
+        &OpCode::Nop => disassemble_simple(out, "OP_NOP", address),
+        &OpCode::Apply => disassemble_simple(out, "OP_APPLY", address),
     }
 }
 

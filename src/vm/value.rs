@@ -1,12 +1,41 @@
 pub mod numeric;
 use super::printer::Print;
+use crate::vm::byte_code::chunk;
 
 // Scheme values used at runtime by the VM
 // Every scheme expression eventually evaluates to a value of this kind
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Symbol(&'static String), // reference to interned string in symbol table
+    Procedure(Procedure),
+    BuiltinProcedure(BuiltinProcedure),
     Number(Numeric),
+}
+
+impl PartialEq for Value {
+    fn eq(&self, rhs: &Value) -> bool {
+        match (self, rhs) {
+            (Value::Symbol(ls), Value::Symbol(rs)) => ls == rs,
+            (Value::Procedure(_), Value::Procedure(_)) => false,
+            (Value::BuiltinProcedure(_), Value::BuiltinProcedure(_)) => false,
+            (Value::Number(ln), Value::Number(rn)) => ln == rn,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Value {}
+
+#[derive(Debug, Clone)]
+pub struct Procedure {
+    arity: u16,
+    chunk: &'static chunk::Chunk,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BuiltinProcedure {
+    FxAdd,
+    FxSub,
 }
 
 #[repr(transparent)]

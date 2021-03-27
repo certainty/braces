@@ -32,25 +32,33 @@ impl<'a> StackVM<'a> {
 
             match self.read_op_code() {
                 &OpCode::Halt => {
-                    let v = self.stack.pop();
-                    return Ok(v);
+                    return Ok(Some(self.pop()));
                 }
                 &OpCode::Const(addr) => {
                     let val = self.chunk.read_constant(addr);
-                    self.stack.push(val);
+                    self.stack.push(val.clone());
                 }
-                &OpCode::FxAdd => {
-                    let lhs = self.stack.pop().unwrap();
-                    let rhs = self.stack.pop().unwrap();
-                    let result = numeric::add(lhs, rhs)?;
-                    self.stack.push(Value::Number(result))
-                }
+                &OpCode::Apply => todo!(),
                 &OpCode::Nop => {
                     //this should never happen
                     panic!("BUG in the compiler detected");
                 }
             }
         }
+    }
+
+    fn pop(&mut self) -> Value {
+        self.stack.pop().unwrap()
+    }
+
+    fn pop_n(&mut self, size: usize) -> Vec<Value> {
+        let mut result: Vec<Value> = Vec::with_capacity(size);
+
+        for _ in 1..size {
+            result.push(self.pop());
+        }
+
+        result
     }
 
     fn read_op_code(&mut self) -> &OpCode {

@@ -59,11 +59,18 @@ fn emit_literal(
     Ok(())
 }
 
+// TODO: specialize for primitives
 fn emit_apply(
     chunk: &mut chunk::Chunk,
     operator: &expression::Expression,
     operands: &Vec<expression::Expression>,
     source: &SourceInformation,
 ) -> Result<()> {
+    for operand in operands {
+        emit_op_codes(chunk, &operand)?
+    }
+    emit_op_codes(chunk, &operator)?;
+    let caddr = chunk.write_opcode(OpCode::Apply);
+    chunk.write_line(caddr.into(), caddr.into(), source.location.line);
     Ok(())
 }
