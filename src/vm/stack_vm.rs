@@ -1,19 +1,13 @@
-use super::byte_code::chunk::Value;
 use super::byte_code::{chunk, OpCode};
-use thiserror::Error;
+use super::error::VmError;
+use super::printer;
+use super::value::numeric;
+use super::value::Value;
 
 #[cfg(feature = "debug_vm")]
 use super::disassembler;
 
 const STACK_CAPACITY: usize = 255;
-
-#[derive(Error, Debug)]
-pub enum VmError {
-    #[error("Failed to run")]
-    RuntimeError,
-    #[error("Failed to compile")]
-    CompileError,
-}
 
 pub struct StackVM<'a> {
     ip: chunk::AddressType,
@@ -37,7 +31,7 @@ impl<'a> StackVM<'a> {
             self.debug_cycle();
 
             match self.read_op_code() {
-                &OpCode::Exit => {
+                &OpCode::Halt => {
                     let v = self.stack.pop();
                     return Ok(v);
                 }
@@ -48,7 +42,8 @@ impl<'a> StackVM<'a> {
                 &OpCode::FxAdd => {
                     let lhs = self.stack.pop().unwrap();
                     let rhs = self.stack.pop().unwrap();
-                    self.stack.push(lhs + rhs)
+                    let result = numeric::add(lhs, rhs)?;
+                    self.stack.push(Value::Number(result))
                 }
             }
         }
@@ -70,7 +65,7 @@ impl<'a> StackVM<'a> {
     fn print_stack_trace(&self) {
         print!("     ");
         for value in self.stack.iter() {
-            print!("[{}]", value);
+            print!("[{}]", printer::print(value));
         }
         println!("")
     }

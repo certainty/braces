@@ -12,11 +12,12 @@ mod lowlevel;
 pub mod reader;
 pub mod source;
 mod syntax;
+use expression::Expression;
 use syntax::SelfEvaluating;
 use syntax::Syntax::*;
 use thiserror::Error;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Location {
     line: usize,
 }
@@ -28,6 +29,8 @@ pub struct SourceInformation {
 
 #[derive(Error, Debug)]
 pub enum ParseError {
+    #[error("ParseError")]
+    ParseError(String, SourceInformation),
     #[error(transparent)]
     ReaderError(#[from] reader::ReaderError),
 }
@@ -38,32 +41,59 @@ pub fn parse<T: source::Source>(source: &mut T) -> Result<Option<expression::Exp
     let ast = reader::read_datum(source)?;
 
     match ast {
-        Some(datum) => parse_single(datum).map(Some),
+        Some(datum) => parse_single(&datum).map(Some),
         None => Ok(None),
     }
 }
 
-/// Convert syntax into expressions
-fn parse_single(datum: syntax::Syntax) -> Result<expression::Expression> {
+// Parse syntax into scheme expressions
+fn parse_single(datum: &syntax::Syntax) -> Result<expression::Expression> {
     match datum {
-        SelfEvaluatingSyntax(SelfEvaluating::Symbol(sym), loc) => Ok(expression::variable(
-            expression::symbol(sym),
-            source_info(loc),
-        )),
-        SelfEvaluatingSyntax(syn, loc) => Ok(expression::literal(syn, source_info(loc))),
+        SelfEvaluatingSyntax(SelfEvaluating::Symbol(sym), loc) => {
+            Ok(expression::variable(sym, source_info(loc)))
+        }
+        SelfEvaluatingSyntax(syn, loc) => Ok(expression::literal(syn.clone(), source_info(loc))),
         ProperList(elements, location) => match elements.first() {
-            Some(SelffEvaluating::Symbol("if")) => Ok(parseIf(elements, location)?),
+            Some(SelfEvaluatingSyntax(SelfEvaluating::Symbol(op), _)) => match op.as_str() {
+                "if" => Ok(parse_if(&elements, location)?),
+                _ => Err(parse_error("Unsupported syntax", source_info(location))),
+            },
+            _ => Err(parse_error(
+                "Invalid empty list expression",
+                source_info(location),
+            )),
         },
         _ => panic!("Unsupported syntax"),
     }
 }
 
-fn parseIf(Vec<syntax::Syntax>, location: Location) -> Result<expression::Expression> {
-
+fn parse_error(message: &str, source: SourceInformation) -> ParseError {
+    ParseError::ParseError(message.into(), source)
 }
 
-fn source_info(location: Location) -> SourceInformation {
-    SourceInformation { location }
+fn parse_if(elements: &Vec<syntax::Syntax>, location: &Location) -> Result<expression::Expression> {
+    match &elements[..] {
+        [_, test, consequent] => Ok(Expression::If(
+            Box::new(parse_single(&test)?),
+            Box::new(parse_single(&consequent)?),
+            None,
+            source_info(&location),
+        )),
+
+        [_, test, consequent, alternate] => Ok(Expression::If(
+            Box::new(parse_single(&test)?),
+            Box::new(parse_single(&consequent)?),
+            Some(Box::new(parse_single(&alternate)?)),
+            source_info(&location),
+        )),
+        _ => Err(parse_error("Invalid if expression", source_info(&location))),
+    }
+}
+
+fn source_info(location: &Location) -> SourceInformation {
+    SourceInformation {
+        location: location.clone(),
+    }
 }
 
 #[cfg(test)]

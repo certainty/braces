@@ -24,8 +24,8 @@ pub enum Expression {
     Application(Box<Expression>, Vec<Expression>, SourceInformation),
 }
 
-pub fn variable(symbol: Symbol, source_info: SourceInformation) -> Expression {
-    Expression::Variable(Variable(symbol), source_info)
+pub fn variable(symbol: &str, source_info: SourceInformation) -> Expression {
+    Expression::Variable(Variable(self::symbol(symbol.into())), source_info)
 }
 
 pub fn symbol(str: String) -> Symbol {

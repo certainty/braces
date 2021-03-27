@@ -1,6 +1,7 @@
 use super::byte_code;
 use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::OpCode;
+use super::printer;
 use std::io::Write;
 
 pub fn disassemble<W: Write>(out: &mut W, chunk: &Chunk, context: &str) {
@@ -26,7 +27,7 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
     }
 
     match chunk.code[address] {
-        OpCode::Exit => disassemble_simple(out, "OP_EXIT", address),
+        OpCode::Halt => disassemble_simple(out, "OP_HALT", address),
         OpCode::Const(const_address) => {
             disassemble_constant(out, chunk, "OP_CONSTANT", address, const_address)
         }
@@ -48,7 +49,9 @@ fn disassemble_constant<W: Write>(
 ) -> usize {
     out.write_fmt(format_args!(
         "{:<16} {:04}  '{}'\n",
-        name, constant_address, chunk.constants[constant_address as usize]
+        name,
+        constant_address,
+        printer::print(&chunk.constants[constant_address as usize])
     ))
     .unwrap();
 

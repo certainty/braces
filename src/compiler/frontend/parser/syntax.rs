@@ -7,14 +7,14 @@ use super::Location;
 
 // TODO: add position tracking - can be extracted from the pest spans
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Syntax {
     SelfEvaluatingSyntax(SelfEvaluating, Location),
     ProperList(Vec<Syntax>, Location),
     ImproperList(Vec<Syntax>, Box<Syntax>, Location),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum SelfEvaluating {
     FixNum(i64),
     Bool(bool),

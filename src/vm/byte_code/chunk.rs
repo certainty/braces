@@ -1,7 +1,7 @@
 use super::*;
+use crate::vm::value::Value;
 use std::cmp::Ordering;
 
-pub(crate) type Value = u64;
 pub(crate) type LineNumber = u64;
 pub(crate) type AddressType = usize;
 // start address, end address, line number
