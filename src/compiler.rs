@@ -1,8 +1,9 @@
 pub mod backend;
 pub mod frontend;
+pub mod source;
+
 use super::vm::byte_code::chunk;
 use frontend::parser;
-use frontend::parser::source;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

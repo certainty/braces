@@ -94,7 +94,7 @@ fn location(pair: &Pair<lowlevel::Rule>) -> Location {
     //let end = span.end_pos();
     let (line, _) = start.line_col();
 
-    Location { line: line }
+    Location::new(line)
 }
 
 #[cfg(test)]
@@ -102,7 +102,7 @@ mod tests {
     use super::*;
 
     fn make_location(line: usize) -> Location {
-        Location { line }
+        Location::new(line)
     }
 
     #[test]

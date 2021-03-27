@@ -10,22 +10,15 @@
 pub mod expression;
 mod lowlevel;
 pub mod reader;
-pub mod source;
 mod syntax;
+
+use crate::compiler::source;
+use crate::compiler::source::{Location, SourceInformation};
+use crate::vm::value;
 use expression::Expression;
 use syntax::SelfEvaluating;
 use syntax::Syntax::*;
 use thiserror::Error;
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct Location {
-    line: usize,
-}
-
-#[derive(PartialEq, Debug)]
-pub struct SourceInformation {
-    location: Location,
-}
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -52,7 +45,7 @@ fn parse_single(datum: &syntax::Syntax) -> Result<expression::Expression> {
         SelfEvaluatingSyntax(SelfEvaluating::Symbol(sym), loc) => {
             Ok(expression::variable(sym, source_info(loc)))
         }
-        SelfEvaluatingSyntax(syn, loc) => Ok(expression::literal(syn.clone(), source_info(loc))),
+        SelfEvaluatingSyntax(syn, loc) => parse_literal(syn, loc),
         ProperList(elements, location) => match elements.first() {
             Some(SelfEvaluatingSyntax(SelfEvaluating::Symbol(op), _)) => match op.as_str() {
                 "if" => Ok(parse_if(&elements, location)?),
@@ -69,6 +62,15 @@ fn parse_single(datum: &syntax::Syntax) -> Result<expression::Expression> {
 
 fn parse_error(message: &str, source: SourceInformation) -> ParseError {
     ParseError::ParseError(message.into(), source)
+}
+
+fn parse_literal(syn: &SelfEvaluating, location: &Location) -> Result<expression::Expression> {
+    let value = match syn {
+        &SelfEvaluating::FixNum(num) => value::fixnum(num),
+        _ => panic!("Unsupported value"), //TODO: remove once we support everything
+    };
+
+    Ok(expression::literal(value, source_info(location)))
 }
 
 fn parse_if(elements: &Vec<syntax::Syntax>, location: &Location) -> Result<expression::Expression> {
@@ -91,9 +93,7 @@ fn parse_if(elements: &Vec<syntax::Syntax>, location: &Location) -> Result<expre
 }
 
 fn source_info(location: &Location) -> SourceInformation {
-    SourceInformation {
-        location: location.clone(),
-    }
+    SourceInformation::new(location.clone())
 }
 
 #[cfg(test)]
@@ -102,7 +102,7 @@ mod tests {
     use super::*;
 
     fn make_source_info(line: usize) -> SourceInformation {
-        source_info(&Location { line })
+        source_info(&Location::new(line))
     }
 
     #[test]

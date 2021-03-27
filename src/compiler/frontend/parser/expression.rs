@@ -1,18 +1,19 @@
 use super::{syntax, SourceInformation};
+use crate::vm::value::Value;
 
 #[repr(transparent)]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Symbol {
     inner: String,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Variable(pub Symbol);
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Expression {
     Variable(Variable, SourceInformation),
-    Literal(syntax::SelfEvaluating, SourceInformation),
+    Literal(Value, SourceInformation),
     Begin(Vec<Expression>, SourceInformation),
     Assign(Variable, Box<Expression>),
     If(
@@ -32,6 +33,6 @@ pub fn symbol(str: String) -> Symbol {
     Symbol { inner: str }
 }
 
-pub fn literal(syn: syntax::SelfEvaluating, source_info: SourceInformation) -> Expression {
-    Expression::Literal(syn, source_info)
+pub fn literal(value: Value, source_info: SourceInformation) -> Expression {
+    Expression::Literal(value, source_info)
 }

@@ -1,6 +1,28 @@
 use std::convert::From;
 use std::io;
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct Location {
+    line: usize,
+}
+
+impl Location {
+    pub fn new(line: usize) -> Location {
+        Location { line }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct SourceInformation {
+    location: Location,
+}
+
+impl SourceInformation {
+    pub fn new(location: Location) -> SourceInformation {
+        SourceInformation { location }
+    }
+}
+
 pub trait Source {
     fn read_to_string(&mut self, buf: &mut String) -> io::Result<()>;
 }

@@ -27,7 +27,7 @@ impl Chunk {
     }
 
     pub fn write_constant(&mut self, value: Value) -> ConstAddressType {
-        self.constants.push(value);
+        self.constants.push(value.clone());
         (self.constants.len() - 1) as ConstAddressType
     }
 

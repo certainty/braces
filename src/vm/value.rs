@@ -12,10 +12,10 @@ pub enum Value {
 #[repr(transparent)]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Numeric {
-    Fixnum(u64),
+    Fixnum(i64),
 }
 
-pub fn fixnum(val: u64) -> Value {
+pub fn fixnum(val: i64) -> Value {
     Value::Number(Numeric::Fixnum(val))
 }
 

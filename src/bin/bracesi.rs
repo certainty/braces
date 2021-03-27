@@ -1,7 +1,7 @@
 use braces::compiler;
 use braces::vm::disassembler::disassemble;
 use braces::vm::stack_vm::StackVM;
-use compiler::frontend::parser::source;
+use compiler::source;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
