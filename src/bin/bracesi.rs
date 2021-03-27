@@ -51,7 +51,7 @@ fn interprete(line: &str) -> stack_vm::Result<Option<value::Value>> {
     let mut source: source::StringSource = line.into();
     if let Some(chunk) = compiler::jit_compile(&mut source)? {
         disassemble(&mut std::io::stdout(), &chunk, "REPL");
-        StackVM::interprete(&chunk)
+        StackVM::interprete(chunk)
     } else {
         Ok(None)
     }

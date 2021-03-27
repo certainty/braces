@@ -1,26 +1,43 @@
 use super::byte_code::{chunk, OpCode};
 use super::disassembler;
+use super::environment;
 use super::error::VmError;
 use super::printer;
-use super::value::numeric;
+use super::value;
 use super::value::Value;
 
+const FRAMES_MAX: usize = 64;
 const STACK_CAPACITY: usize = 255;
+const STACK_MAX: usize = FRAMES_MAX + STACK_CAPACITY;
+
+pub struct CallFrame<'a> {
+    callable: &'a value::Procedure,
+    //    env: &'a environment::Environment,
+    ip: chunk::AddressType,
+}
 
 pub struct StackVM<'a> {
-    ip: chunk::AddressType,
+    frames: Vec<CallFrame<'a>>,
+    frame: CallFrame<'a>,
     stack: Vec<Value>,
-    chunk: &'a chunk::Chunk,
 }
 
 pub type Result<T> = std::result::Result<T, VmError>;
 
 impl<'a> StackVM<'a> {
-    pub fn interprete(chunk: &'a chunk::Chunk) -> Result<Option<Value>> {
-        StackVM {
-            chunk: &chunk,
+    pub fn interprete(chunk: chunk::Chunk) -> Result<Option<Value>> {
+        let frame = CallFrame {
+            callable: &value::Procedure {
+                arity: 0,
+                chunk: chunk,
+            },
             ip: 0,
+        };
+
+        StackVM {
             stack: Vec::with_capacity(STACK_CAPACITY),
+            frames: vec![],
+            frame: frame,
         }
         .run()
     }
@@ -35,7 +52,7 @@ impl<'a> StackVM<'a> {
                     return Ok(Some(self.pop()));
                 }
                 &OpCode::Const(addr) => {
-                    let val = self.chunk.read_constant(addr);
+                    let val = self.frame.callable.chunk.read_constant(addr);
                     self.stack.push(val.clone());
                 }
                 &OpCode::Apply => todo!(),
@@ -62,14 +79,18 @@ impl<'a> StackVM<'a> {
     }
 
     fn read_op_code(&mut self) -> &OpCode {
-        let code = self.chunk.read_opcode(self.ip);
-        self.ip = self.ip + 1;
+        let code = self.frame.callable.chunk.read_opcode(self.frame.ip);
+        self.frame.ip = self.frame.ip + 1;
         code
     }
 
     fn debug_cycle(&self) {
         self.print_stack_trace();
-        disassembler::disassemble_instruction(&mut std::io::stdout(), self.chunk, self.ip);
+        disassembler::disassemble_instruction(
+            &mut std::io::stdout(),
+            &self.frame.callable.chunk,
+            self.frame.ip,
+        );
     }
 
     fn print_stack_trace(&self) {

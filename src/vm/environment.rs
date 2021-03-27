@@ -1,6 +1,7 @@
 use super::value;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Environment {
     bindings: Vec<HashMap<value::Symbol, value::Value>>,
 }

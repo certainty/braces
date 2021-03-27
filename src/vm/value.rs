@@ -1,6 +1,7 @@
 pub mod numeric;
 use super::printer::Print;
 use crate::vm::byte_code::chunk;
+use crate::vm::environment;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -11,8 +12,7 @@ pub struct Symbol(pub String);
 #[derive(Debug, Clone)]
 pub enum Value {
     Symbol(Symbol),
-    Procedure(Procedure),
-    BuiltinProcedure(BuiltinProcedure),
+    Callable(Callable),
     Number(Numeric),
 }
 
@@ -20,8 +20,7 @@ impl PartialEq for Value {
     fn eq(&self, rhs: &Value) -> bool {
         match (self, rhs) {
             (Value::Symbol(ls), Value::Symbol(rs)) => ls == rs,
-            (Value::Procedure(_), Value::Procedure(_)) => false,
-            (Value::BuiltinProcedure(_), Value::BuiltinProcedure(_)) => false,
+            (Value::Callable(_), Value::Callable(_)) => false,
             (Value::Number(ln), Value::Number(rn)) => ln == rn,
             _ => false,
         }
@@ -30,17 +29,20 @@ impl PartialEq for Value {
 
 impl Eq for Value {}
 
+#[derive(Clone, Debug)]
+pub enum Callable {
+    Procedure(Procedure),
+    BuiltinProcedure(BuiltinProcedure),
+}
+
 #[derive(Debug, Clone)]
 pub struct Procedure {
-    arity: u16,
-    chunk: &'static chunk::Chunk,
+    pub arity: u16,
+    pub chunk: chunk::Chunk,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum BuiltinProcedure {
-    FxAdd,
-    FxSub,
-}
+pub struct BuiltinProcedure;
 
 #[repr(transparent)]
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
