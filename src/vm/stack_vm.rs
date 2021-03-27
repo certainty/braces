@@ -1,11 +1,9 @@
 use super::byte_code::{chunk, OpCode};
+use super::disassembler;
 use super::error::VmError;
 use super::printer;
 use super::value::numeric;
 use super::value::Value;
-
-#[cfg(feature = "debug_vm")]
-use super::disassembler;
 
 const STACK_CAPACITY: usize = 255;
 
@@ -55,13 +53,11 @@ impl<'a> StackVM<'a> {
         code
     }
 
-    #[cfg(feature = "debug_vm")]
     fn debug_cycle(&self) {
         self.print_stack_trace();
         disassembler::disassemble_instruction(&mut std::io::stdout(), self.chunk, self.ip);
     }
 
-    #[cfg(feature = "debug_vm")]
     fn print_stack_trace(&self) {
         print!("     ");
         for value in self.stack.iter() {

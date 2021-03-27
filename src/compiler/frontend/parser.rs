@@ -101,9 +101,16 @@ mod tests {
     use super::expression::Expression;
     use super::*;
 
+    fn make_source_info(line: usize) -> SourceInformation {
+        source_info(&Location { line })
+    }
+
     #[test]
     fn test_literal_number() {
-        assert_matches!(run_parser("23545").unwrap(), Some(Expression::Literal(_)))
+        assert_matches!(
+            run_parser("23545").unwrap(),
+            Some(Expression::Literal(_, _))
+        )
     }
 
     fn run_parser(inp: &str) -> Result<Option<expression::Expression>> {

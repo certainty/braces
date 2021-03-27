@@ -4,6 +4,7 @@ use super::syntax;
 use super::Location;
 use pest::iterators::Pair;
 use pest::iterators::Pairs;
+use pest::Position;
 use thiserror::Error;
 
 // TODO: clean this up - too many unclear error variants
@@ -86,49 +87,72 @@ fn to_ast(pair: Pair<lowlevel::Rule>) -> Result<syntax::Syntax> {
     }
 }
 
+// TODO: make location more useful than just the line
 fn location(pair: &Pair<lowlevel::Rule>) -> Location {
-    Location {
-        line: pair.as_span().start(),
-    }
+    let span = pair.as_span();
+    let start = span.start_pos();
+    //let end = span.end_pos();
+    let (line, _) = start.line_col();
+
+    Location { line: line }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn make_location(line: usize) -> Location {
+        Location { line }
+    }
+
     #[test]
     pub fn test_bug_parsing_numbers() {
         assert_eq!(
             read("(10 10 10)").unwrap(),
-            Some(syntax::proper_list(vec![
-                syntax::fixnum(10),
-                syntax::fixnum(10),
-                syntax::fixnum(10)
-            ]))
+            Some(syntax::proper_list(
+                vec![
+                    syntax::fixnum(10, make_location(1)),
+                    syntax::fixnum(10, make_location(1)),
+                    syntax::fixnum(10, make_location(1))
+                ],
+                make_location(1)
+            ))
         )
     }
 
     #[test]
     pub fn test_read_number() {
-        assert_eq!(read("42").unwrap(), Some(syntax::fixnum(42)));
+        assert_eq!(
+            read("42").unwrap(),
+            Some(syntax::fixnum(42, make_location(1)))
+        );
     }
 
     #[test]
     pub fn test_read_bool_true() {
-        assert_eq!(read("#t").unwrap(), Some(syntax::boolean(true)));
-        assert_eq!(read("#true").unwrap(), Some(syntax::boolean(true)))
+        assert_eq!(
+            read("#t").unwrap(),
+            Some(syntax::boolean(true, make_location(1)))
+        );
+        assert_eq!(
+            read("#true").unwrap(),
+            Some(syntax::boolean(true, make_location(1)))
+        )
     }
 
     #[test]
     pub fn test_read_symbol() {
-        assert_eq!(read("foo").unwrap(), Some(syntax::symbol("foo")))
+        assert_eq!(
+            read("foo").unwrap(),
+            Some(syntax::symbol("foo", make_location(1)))
+        )
     }
 
     #[test]
     pub fn test_read_delimited_symbol() {
         assert_eq!(
             read("|complicated symbol foo|").unwrap(),
-            Some(syntax::symbol("complicated symbol foo"))
+            Some(syntax::symbol("complicated symbol foo", make_location(1)))
         )
     }
 
@@ -136,31 +160,46 @@ mod tests {
     pub fn test_read_vector() {
         assert_eq!(
             read("#(10 #t)").unwrap(),
-            Some(syntax::vector(vec![
-                syntax::fixnum(10),
-                syntax::boolean(true)
-            ]))
+            Some(syntax::vector(
+                vec![
+                    syntax::fixnum(10, make_location(1)),
+                    syntax::boolean(true, make_location(1))
+                ],
+                make_location(1)
+            ))
         );
 
-        assert_eq!(read("#()").unwrap(), Some(syntax::vector(vec![])))
+        assert_eq!(
+            read("#()").unwrap(),
+            Some(syntax::vector(vec![], make_location(1)))
+        )
     }
 
     #[test]
     pub fn test_read_proper_list() {
         assert_eq!(
             read("(10 foo)").unwrap(),
-            Some(syntax::proper_list(vec![
-                syntax::fixnum(10),
-                syntax::symbol("foo")
-            ]))
+            Some(syntax::proper_list(
+                vec![
+                    syntax::fixnum(10, make_location(1)),
+                    syntax::symbol("foo", make_location(1))
+                ],
+                make_location(1)
+            ))
         );
 
         assert_eq!(
             read("((10 foo))").unwrap(),
-            Some(syntax::proper_list(vec![syntax::proper_list(vec![
-                syntax::fixnum(10),
-                syntax::symbol("foo")
-            ])]))
+            Some(syntax::proper_list(
+                vec![syntax::proper_list(
+                    vec![
+                        syntax::fixnum(10, make_location(1)),
+                        syntax::symbol("foo", make_location(1))
+                    ],
+                    make_location(1)
+                )],
+                make_location(1)
+            ))
         )
     }
 
@@ -169,8 +208,12 @@ mod tests {
         assert_eq!(
             read("(10 10 . foo)").unwrap(),
             Some(syntax::improper_list(
-                vec![syntax::fixnum(10), syntax::fixnum(10)],
-                syntax::symbol("foo")
+                vec![
+                    syntax::fixnum(10, make_location(1)),
+                    syntax::fixnum(10, make_location(1))
+                ],
+                syntax::symbol("foo", make_location(1)),
+                make_location(1)
             ))
         )
     }
@@ -179,12 +222,18 @@ mod tests {
     pub fn test_read_comments() {
         assert_eq!(
             read("#(10);just a test\n\n").unwrap(),
-            Some(syntax::vector(vec![syntax::fixnum(10)]))
+            Some(syntax::vector(
+                vec![syntax::fixnum(10, make_location(1))],
+                make_location(1)
+            ))
         );
 
         assert_eq!(
             read(";just a test\n\n#(10)").unwrap(),
-            Some(syntax::vector(vec![syntax::fixnum(10)]))
+            Some(syntax::vector(
+                vec![syntax::fixnum(10, make_location(3))],
+                make_location(3)
+            ))
         )
     }
 
