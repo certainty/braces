@@ -33,6 +33,11 @@ pub fn generate(ast: &expression::Expression) -> Result<chunk::Chunk> {
     chunk.write_line(ln, ln, 124); */
 }
 
+pub fn finalise(chunk: &mut chunk::Chunk) {
+    chunk.write_opcode(OpCode::Halt);
+    chunk.write_opcode(OpCode::Nop);
+}
+
 fn emit_op_codes(chunk: &mut chunk::Chunk, ast: &expression::Expression) -> Result<()> {
     match ast {
         expression::Expression::Literal(value, source) => emit_literal(chunk, *value, &source),
@@ -45,6 +50,8 @@ fn emit_literal(
     value: value::Value,
     source: &SourceInformation,
 ) -> Result<()> {
-    chunk.write_constant(value);
+    let addr = chunk.write_constant(value);
+    let caddr = chunk.write_opcode(OpCode::Const(addr));
+    chunk.write_line(caddr.into(), caddr.into(), source.location.line);
     Ok(())
 }

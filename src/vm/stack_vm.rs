@@ -13,8 +13,10 @@ pub struct StackVM<'a> {
     chunk: &'a chunk::Chunk,
 }
 
+pub type Result<T> = std::result::Result<T, VmError>;
+
 impl<'a> StackVM<'a> {
-    pub fn interprete(chunk: &'a chunk::Chunk) -> Result<Option<Value>, VmError> {
+    pub fn interprete(chunk: &'a chunk::Chunk) -> Result<Option<Value>> {
         StackVM {
             chunk: &chunk,
             ip: 0,
@@ -23,7 +25,7 @@ impl<'a> StackVM<'a> {
         .run()
     }
 
-    fn run(&mut self) -> Result<Option<Value>, VmError> {
+    fn run(&mut self) -> Result<Option<Value>> {
         loop {
             #[cfg(feature = "debug_vm")]
             self.debug_cycle();
@@ -42,6 +44,10 @@ impl<'a> StackVM<'a> {
                     let rhs = self.stack.pop().unwrap();
                     let result = numeric::add(lhs, rhs)?;
                     self.stack.push(Value::Number(result))
+                }
+                &OpCode::Nop => {
+                    //this should never happen
+                    panic!("BUG in the compiler detected");
                 }
             }
         }

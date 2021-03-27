@@ -1,3 +1,4 @@
+use crate::compiler;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -7,5 +8,5 @@ pub enum VmError {
     #[error("TypeError")]
     TypeError(String),
     #[error("Failed to compile")]
-    CompileError,
+    CompileError(#[from] compiler::CompileError),
 }

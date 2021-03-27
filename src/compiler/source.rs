@@ -3,7 +3,7 @@ use std::io;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Location {
-    line: usize,
+    pub line: usize,
 }
 
 impl Location {
@@ -14,7 +14,7 @@ impl Location {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct SourceInformation {
-    location: Location,
+    pub location: Location,
 }
 
 impl SourceInformation {

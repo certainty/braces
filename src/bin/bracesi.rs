@@ -1,6 +1,9 @@
 use braces::compiler;
 use braces::vm::disassembler::disassemble;
+use braces::vm::printer;
+use braces::vm::stack_vm;
 use braces::vm::stack_vm::StackVM;
+use braces::vm::value;
 use compiler::source;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -21,7 +24,11 @@ fn repl() {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                interprete(&line);
+                match interprete(&line) {
+                    Ok(Some(v)) => println!("{}", printer::print(&v)),
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Error: {}", e),
+                };
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -40,10 +47,12 @@ fn repl() {
     rl.save_history("history.txt").unwrap();
 }
 
-fn interprete(line: &str) {
+fn interprete(line: &str) -> stack_vm::Result<Option<value::Value>> {
     let mut source: source::StringSource = line.into();
-    if let Some(chunk) = compiler::jit_compile(&mut source).unwrap() {
+    if let Some(chunk) = compiler::jit_compile(&mut source)? {
         disassemble(&mut std::io::stdout(), &chunk, "test chunk");
-        StackVM::interprete(&chunk).unwrap();
+        StackVM::interprete(&chunk)
+    } else {
+        Ok(None)
     }
 }
