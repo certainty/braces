@@ -36,3 +36,11 @@ pub fn symbol(str: String) -> Symbol {
 pub fn literal(value: Value, source_info: SourceInformation) -> Expression {
     Expression::Literal(value, source_info)
 }
+
+pub fn application(
+    op: Expression,
+    operands: Vec<Expression>,
+    source_info: SourceInformation,
+) -> Expression {
+    Expression::Application(Box::new(op), operands, source_info)
+}

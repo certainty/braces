@@ -45,16 +45,15 @@ fn parse_single(datum: &syntax::Syntax) -> Result<expression::Expression> {
         SelfEvaluatingSyntax(SelfEvaluating::Symbol(sym), loc) => {
             Ok(expression::variable(sym, source_info(loc)))
         }
+
         SelfEvaluatingSyntax(syn, loc) => parse_literal(syn, loc),
+
         ProperList(elements, location) => match elements.first() {
             Some(SelfEvaluatingSyntax(SelfEvaluating::Symbol(op), _)) => match op.as_str() {
-                "if" => Ok(parse_if(&elements, location)?),
-                _ => Err(parse_error("Unsupported syntax", source_info(location))),
+                "if" => parse_if(&elements, location),
+                _ => parse_application(elements, location),
             },
-            _ => Err(parse_error(
-                "Invalid empty list expression",
-                source_info(location),
-            )),
+            _ => parse_application(&elements, location),
         },
         _ => panic!("Unsupported syntax"),
     }
@@ -92,6 +91,28 @@ fn parse_if(elements: &Vec<syntax::Syntax>, location: &Location) -> Result<expre
     }
 }
 
+fn parse_application(
+    elements: &Vec<syntax::Syntax>,
+    location: &Location,
+) -> Result<expression::Expression> {
+    match &elements[..] {
+        [operator, operands @ ..] => {
+            let parsed_operator = parse_single(&operator)?;
+            let parsed_operands: Vec<Expression> = operands
+                .iter()
+                .map(parse_single)
+                .collect::<Result<Vec<Expression>>>()?;
+
+            Ok(Expression::Application(
+                Box::new(parsed_operator),
+                parsed_operands,
+                source_info(&location),
+            ))
+        }
+        _ => Err(parse_error("Invalid application", source_info(&location))),
+    }
+}
+
 fn source_info(location: &Location) -> SourceInformation {
     SourceInformation::new(location.clone())
 }
@@ -110,6 +131,21 @@ mod tests {
         assert_matches!(
             run_parser("23545").unwrap(),
             Some(Expression::Literal(_, _))
+        )
+    }
+
+    #[test]
+    fn test_parse_application_simple() {
+        assert_eq!(
+            run_parser("(+ 1 2)").unwrap(),
+            Some(expression::application(
+                expression::variable("+", make_source_info(1)),
+                vec![
+                    expression::literal(value::fixnum(1), make_source_info(1)),
+                    expression::literal(value::fixnum(2), make_source_info(1))
+                ],
+                make_source_info(1)
+            ))
         )
     }
 

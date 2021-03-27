@@ -40,18 +40,30 @@ pub fn finalise(chunk: &mut chunk::Chunk) {
 
 fn emit_op_codes(chunk: &mut chunk::Chunk, ast: &expression::Expression) -> Result<()> {
     match ast {
-        expression::Expression::Literal(value, source) => emit_literal(chunk, *value, &source),
+        expression::Expression::Literal(value, source) => emit_literal(chunk, value, &source),
+        expression::Expression::Application(operator, operands, source) => {
+            emit_apply(chunk, operator, operands, &source)
+        }
         _ => Err(GenerationError::UnknownExpression((*ast).clone())),
     }
 }
 
 fn emit_literal(
     chunk: &mut chunk::Chunk,
-    value: value::Value,
+    value: &value::Value,
     source: &SourceInformation,
 ) -> Result<()> {
-    let addr = chunk.write_constant(value);
+    let addr = chunk.write_constant(value.clone());
     let caddr = chunk.write_opcode(OpCode::Const(addr));
     chunk.write_line(caddr.into(), caddr.into(), source.location.line);
+    Ok(())
+}
+
+fn emit_apply(
+    chunk: &mut chunk::Chunk,
+    operator: &expression::Expression,
+    operands: &Vec<expression::Expression>,
+    source: &SourceInformation,
+) -> Result<()> {
     Ok(())
 }
