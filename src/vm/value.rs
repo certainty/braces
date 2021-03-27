@@ -2,11 +2,15 @@ pub mod numeric;
 use super::printer::Print;
 use crate::vm::byte_code::chunk;
 
+#[repr(transparent)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Symbol(pub String);
+
 // Scheme values used at runtime by the VM
 // Every scheme expression eventually evaluates to a value of this kind
 #[derive(Debug, Clone)]
 pub enum Value {
-    Symbol(&'static String), // reference to interned string in symbol table
+    Symbol(Symbol),
     Procedure(Procedure),
     BuiltinProcedure(BuiltinProcedure),
     Number(Numeric),
@@ -48,8 +52,8 @@ pub fn fixnum(val: i64) -> Value {
     Value::Number(Numeric::Fixnum(val))
 }
 
-pub fn sym(val: &'static String) -> Value {
-    Value::Symbol(val)
+pub fn sym(val: String) -> Value {
+    Value::Symbol(Symbol(val))
 }
 
 impl Print for Value {
