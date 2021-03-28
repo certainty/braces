@@ -6,6 +6,7 @@ pub mod hash_map;
 pub mod printer;
 pub mod runtime;
 pub mod stack_vm;
+pub mod symbol_table;
 pub mod value;
 
 use stack_vm::VM;

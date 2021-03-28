@@ -1,7 +1,7 @@
 use super::Value;
 use crate::vm::byte_code::chunk;
-use crate::vm::environment;
 use crate::vm::printer::Print;
+use crate::vm::symbol_table;
 use std::fmt;
 use thiserror::Error;
 
@@ -46,7 +46,7 @@ impl<'a> PartialEq for ForeignLambda {
 impl<'a> Eq for ForeignLambda {}
 
 impl<'a> Print for ForeignLambda {
-    fn print(&self) -> Option<String> {
+    fn print(&self, _: &symbol_table::SymbolTable) -> Option<String> {
         Some(String::from("#<foreign-procedure>"))
     }
 }
@@ -76,7 +76,7 @@ impl PartialEq for Lambda {
 impl Eq for Lambda {}
 
 impl Print for Lambda {
-    fn print(&self) -> Option<String> {
+    fn print(&self, _: &symbol_table::SymbolTable) -> Option<String> {
         Some(String::from("#<procedure>"))
     }
 }

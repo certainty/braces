@@ -64,7 +64,7 @@ fn emit_literal(
 
 fn emit_variable(chunk: &mut chunk::Chunk, value: &str, source: &SourceInformation) -> Result<()> {
     let interned = chunk.intern_symbol(value.to_string());
-    let caddr = chunk.write_opcode(OpCode::Sym(interned));
+    let caddr = chunk.write_opcode(OpCode::Sym(interned.0));
     chunk.write_line(caddr.into(), caddr.into(), source.location.line);
     Ok(())
 }

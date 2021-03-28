@@ -1,5 +1,6 @@
 use crate::vm::hash_map;
 use crate::vm::printer::Print;
+use crate::vm::symbol_table;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -12,8 +13,11 @@ impl Symbol {
 }
 
 impl Print for Symbol {
-    fn print(&self) -> Option<String> {
-        // TODO: use symbol table to retrieve name
-        Some("#<symbol>".into())
+    fn print(&self, symbols: &symbol_table::SymbolTable) -> Option<String> {
+        if let Some(name) = symbols.name(&self) {
+            Some(name.clone())
+        } else {
+            Some("#<symbol>".into())
+        }
     }
 }

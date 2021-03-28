@@ -2,6 +2,7 @@ use super::byte_code;
 use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::OpCode;
 use super::printer;
+use crate::vm::value::symbol::Symbol;
 use std::io::Write;
 
 pub fn disassemble<W: Write>(out: &mut W, chunk: &Chunk, context: &str) {
@@ -32,7 +33,9 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
             disassemble_constant(out, chunk, "OP_CONSTANT", address, const_address)
         }
         &OpCode::Get => disassemble_simple(out, "OP_GET", address),
-        &OpCode::Sym(interned) => disassemble_symbol(out, chunk, "OP_SYM", address, interned),
+        &OpCode::Sym(interned) => {
+            disassemble_symbol(out, chunk, "OP_SYM", address, Symbol(interned))
+        }
         &OpCode::Nop => disassemble_simple(out, "OP_NOP", address),
         &OpCode::Apply => disassemble_simple(out, "OP_APPLY", address),
     }
@@ -48,13 +51,13 @@ fn disassemble_symbol<W: Write>(
     chunk: &Chunk,
     name: &str,
     address: AddressType,
-    interned: u64,
+    interned: Symbol,
 ) -> usize {
     out.write_fmt(format_args!(
         "{:<16} {:04}  '{}'\n",
         name,
-        interned,
-        chunk.symbols.get(&interned).unwrap_or(&String::from(""))
+        interned.0,
+        printer::print(&interned, &chunk.symbols)
     ))
     .unwrap();
 
@@ -72,7 +75,7 @@ fn disassemble_constant<W: Write>(
         "{:<16} {:04}  '{}'\n",
         name,
         constant_address,
-        printer::print(&chunk.constants[constant_address as usize])
+        printer::print(&chunk.constants[constant_address as usize], &chunk.symbols)
     ))
     .unwrap();
 

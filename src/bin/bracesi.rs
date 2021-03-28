@@ -21,7 +21,7 @@ fn repl(instance: &impl vm::BracesVM) {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 match instance.run_string(&line) {
-                    Ok(Some(v)) => println!("{}", printer::print(&v)),
+                    Ok(Some(v)) => println!("{:?}", &v),
                     Ok(_) => (),
                     Err(e) => eprintln!("Error: {}", e),
                 };

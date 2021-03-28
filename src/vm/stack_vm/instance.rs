@@ -134,7 +134,7 @@ impl<'a> Instance<'a> {
     fn print_stack_trace(&self) {
         print!("     ");
         for value in self.stack.iter() {
-            print!("[{}]", printer::print(value));
+            print!("[{}]", printer::print(value, &self.current_chunk.symbols));
         }
         println!("")
     }

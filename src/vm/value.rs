@@ -3,6 +3,7 @@ pub mod procedure;
 pub mod symbol;
 
 use super::printer::Print;
+use crate::vm::symbol_table;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
@@ -13,12 +14,12 @@ pub enum Value {
 }
 
 impl Print for Value {
-    fn print(&self) -> Option<String> {
+    fn print(&self, symbols: &symbol_table::SymbolTable) -> Option<String> {
         match self {
-            Value::Number(num) => num.print(),
-            Value::Symbol(sym) => sym.print(),
-            Value::ForeignProcedure(proc) => proc.print(),
-            Value::Procedure(proc) => proc.print(),
+            Value::Number(num) => num.print(symbols),
+            Value::Symbol(sym) => sym.print(symbols),
+            Value::ForeignProcedure(proc) => proc.print(symbols),
+            Value::Procedure(proc) => proc.print(symbols),
             _ => None,
         }
     }
