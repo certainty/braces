@@ -1,10 +1,10 @@
 use fasthash::city;
-use hashbrown;
+use rustc_hash::FxHashMap;
 
-pub type HashMap<K, V> = hashbrown::HashMap<K, V>;
+pub type HashMap<K, V> = FxHashMap<K, V>;
 
 pub fn new<K, V>() -> HashMap<K, V> {
-    HashMap::new()
+    FxHashMap::default()
 }
 
 pub fn hash(s: &str) -> u32 {

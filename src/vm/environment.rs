@@ -17,7 +17,7 @@ impl Environment {
     }
 
     pub fn push_scope(&mut self) -> &mut Self {
-        self.scopes.push(Bindings::new());
+        self.scopes.push(hash_map::new());
         self
     }
 
