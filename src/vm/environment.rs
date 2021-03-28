@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn test_get_empty() {
-        let sym = Symbol("test".into());
+        let sym = Symbol::intern("test");
         let env = Environment::empty();
 
         assert_eq!(env.get(&sym), None)
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_set_then_get() {
-        let sym = Symbol("test".into());
+        let sym = Symbol::intern("test");
         let mut env = Environment::empty();
 
         assert_eq!(env.get(&sym), None);
@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn test_get_scopes() {
-        let sym = Symbol("test".into());
+        let sym = Symbol::intern("test");
         let mut env = Environment::empty();
 
         env.set(&sym, value::fixnum(10));
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_get_from_outer_scope() {
-        let sym = Symbol("test".into());
+        let sym = Symbol::intern("test");
         let mut env = Environment::empty();
 
         env.set(&sym, value::fixnum(10));
