@@ -9,5 +9,6 @@ pub enum OpCode {
     Nop,
     Apply,
     Get,
+    Sym(u64),
     Const(ConstAddressType),
 }

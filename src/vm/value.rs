@@ -29,7 +29,7 @@ pub fn fixnum(val: i64) -> Value {
 }
 
 pub fn sym(val: String) -> Value {
-    Value::Symbol(symbol::Symbol(val))
+    Value::Symbol(symbol::Symbol::intern(val.as_str()))
 }
 
 pub fn foreign_lambda(arity: procedure::Arity, operation: procedure::ForeignLambdaFunc) -> Value {

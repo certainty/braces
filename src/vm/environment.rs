@@ -1,8 +1,8 @@
 use super::value::symbol::Symbol;
 use super::value::Value;
-use std::collections::HashMap;
+use crate::vm::hash_map;
 
-type Bindings = HashMap<Symbol, Value>;
+type Bindings = hash_map::HashMap<Symbol, Value>;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
@@ -12,7 +12,7 @@ pub struct Environment {
 impl Environment {
     pub fn empty() -> Self {
         Environment {
-            scopes: vec![Bindings::new()],
+            scopes: vec![hash_map::new()],
         }
     }
 

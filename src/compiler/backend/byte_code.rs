@@ -42,7 +42,7 @@ fn emit_op_codes(chunk: &mut chunk::Chunk, ast: &expression::Expression) -> Resu
     match ast {
         expression::Expression::Literal(value, source) => emit_literal(chunk, value, &source),
         expression::Expression::Variable(variable, source) => {
-            emit_literal(chunk, &value::Value::Symbol(variable.clone()), &source)
+            emit_variable(chunk, variable, &source)
         }
         expression::Expression::Application(operator, operands, source) => {
             emit_apply(chunk, operator, operands, &source)
@@ -58,6 +58,13 @@ fn emit_literal(
 ) -> Result<()> {
     let addr = chunk.write_constant(value.clone());
     let caddr = chunk.write_opcode(OpCode::Const(addr));
+    chunk.write_line(caddr.into(), caddr.into(), source.location.line);
+    Ok(())
+}
+
+fn emit_variable(chunk: &mut chunk::Chunk, value: &str, source: &SourceInformation) -> Result<()> {
+    let interned = chunk.intern_symbol(value.to_string());
+    let caddr = chunk.write_opcode(OpCode::Sym(interned));
     chunk.write_line(caddr.into(), caddr.into(), source.location.line);
     Ok(())
 }

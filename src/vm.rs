@@ -2,6 +2,7 @@ pub mod byte_code;
 pub mod disassembler;
 pub mod environment;
 pub mod error;
+pub mod hash_map;
 pub mod printer;
 pub mod runtime;
 pub mod stack_vm;

@@ -6,6 +6,7 @@ use crate::vm::error::VmError;
 use crate::vm::printer;
 use crate::vm::runtime;
 use crate::vm::value::procedure::{Arity, ForeignLambda};
+use crate::vm::value::symbol;
 use crate::vm::value::Value;
 
 const FRAMES_MAX: usize = 64;
@@ -49,6 +50,7 @@ impl<'a> Instance<'a> {
                 &OpCode::Get => {
                     self.run_get()?;
                 }
+                &OpCode::Sym(interned) => self.stack.push(Value::Symbol(symbol::Symbol(interned))),
                 &OpCode::Const(addr) => {
                     let val = self.current_chunk.read_constant(addr);
                     self.stack.push(val.clone());

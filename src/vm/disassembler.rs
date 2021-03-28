@@ -32,6 +32,7 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
             disassemble_constant(out, chunk, "OP_CONSTANT", address, const_address)
         }
         &OpCode::Get => disassemble_simple(out, "OP_GET", address),
+        &OpCode::Sym(interned) => disassemble_symbol(out, chunk, "OP_SYM", address, interned),
         &OpCode::Nop => disassemble_simple(out, "OP_NOP", address),
         &OpCode::Apply => disassemble_simple(out, "OP_APPLY", address),
     }
@@ -39,6 +40,24 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
 
 fn disassemble_simple<W: Write>(out: &mut W, name: &str, address: usize) -> usize {
     out.write_fmt(format_args!("{}\n", name)).unwrap();
+    address + 1
+}
+
+fn disassemble_symbol<W: Write>(
+    out: &mut W,
+    chunk: &Chunk,
+    name: &str,
+    address: AddressType,
+    interned: u64,
+) -> usize {
+    out.write_fmt(format_args!(
+        "{:<16} {:04}  '{}'\n",
+        name,
+        interned,
+        chunk.symbols.get(&interned).unwrap_or(&String::from(""))
+    ))
+    .unwrap();
+
     address + 1
 }
 

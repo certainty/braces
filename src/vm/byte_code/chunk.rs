@@ -1,4 +1,5 @@
 use super::*;
+use crate::vm::hash_map;
 use crate::vm::value::Value;
 use std::cmp::Ordering;
 
@@ -11,6 +12,7 @@ pub(crate) type LineInfo = (AddressType, AddressType, LineNumber);
 pub struct Chunk {
     pub(crate) lines: Vec<LineInfo>,
     pub(crate) constants: Vec<Value>,
+    pub(crate) symbols: hash_map::HashMap<u64, String>,
     pub(crate) code: Vec<OpCode>,
 }
 
@@ -19,6 +21,7 @@ impl Chunk {
         Chunk {
             code: vec![],
             constants: vec![],
+            symbols: hash_map::new(),
             lines: vec![],
         }
     }
@@ -31,6 +34,12 @@ impl Chunk {
     pub fn write_constant(&mut self, value: Value) -> ConstAddressType {
         self.constants.push(value.clone());
         (self.constants.len() - 1) as ConstAddressType
+    }
+
+    pub fn intern_symbol(&mut self, value: String) -> u64 {
+        let hsh = hash_map::hash(value.as_str());
+        self.symbols.insert(hsh, value);
+        hsh
     }
 
     pub fn read_constant(&self, addr: ConstAddressType) -> &Value {
