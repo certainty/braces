@@ -3,7 +3,7 @@ use crate::vm::value::symbol::Symbol;
 
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
-    symbols: hash_map::HashMap<u64, String>,
+    symbols: hash_map::HashMap<u32, String>,
 }
 
 impl SymbolTable {

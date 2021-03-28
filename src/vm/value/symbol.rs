@@ -4,7 +4,7 @@ use crate::vm::symbol_table;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Symbol(pub u64);
+pub struct Symbol(pub u32);
 
 impl Symbol {
     pub fn intern(s: &str) -> Symbol {
