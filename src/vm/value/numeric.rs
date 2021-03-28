@@ -1,13 +1,15 @@
-use super::{Numeric, Value};
-use crate::vm::error::VmError;
+use crate::vm::printer::Print;
 
-type Result<T> = std::result::Result<T, VmError>;
+#[repr(transparent)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Number {
+    Fixnum(i64),
+}
 
-pub fn add(lhs: Value, rhs: Value) -> Result<Numeric> {
-    match (lhs, rhs) {
-        (Value::Number(Numeric::Fixnum(lhs)), Value::Number(Numeric::Fixnum(rhs))) => {
-            Ok(Numeric::Fixnum(lhs + rhs))
+impl Print for Number {
+    fn print(&self) -> Option<String> {
+        match self {
+            Number::Fixnum(num) => Some(format!("{}", &num)),
         }
-        _ => Err(VmError::TypeError("Invalid operands for +".into())),
     }
 }

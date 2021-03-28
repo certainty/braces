@@ -3,41 +3,48 @@ use super::disassembler;
 use super::environment;
 use super::error::VmError;
 use super::printer;
-use super::value;
+use super::value::procedure;
 use super::value::Value;
 
 const FRAMES_MAX: usize = 64;
 const STACK_CAPACITY: usize = 255;
 const STACK_MAX: usize = FRAMES_MAX + STACK_CAPACITY;
 
-pub struct CallFrame<'a> {
-    callable: &'a value::Procedure,
-    //    env: &'a environment::Environment,
-    ip: chunk::AddressType,
+pub type Result<T> = std::result::Result<T, VmError>;
+
+pub struct CallFrame {
+    procedure: procedure::Lambda,
+    env: environment::Environment,
+}
+
+impl CallFrame {
+    pub fn root(chunk: chunk::Chunk, root_env: environment::Environment) -> Self {
+        Self {
+            procedure: procedure::Lambda::thunk(chunk),
+            env: root_env,
+        }
+    }
 }
 
 pub struct StackVM<'a> {
-    frames: Vec<CallFrame<'a>>,
-    frame: CallFrame<'a>,
+    ip: chunk::AddressType,
+    current_chunk: &'a chunk::Chunk,
+    top_frame: &'a CallFrame,
+    frames: Vec<CallFrame>,
     stack: Vec<Value>,
 }
 
-pub type Result<T> = std::result::Result<T, VmError>;
-
 impl<'a> StackVM<'a> {
     pub fn interprete(chunk: chunk::Chunk) -> Result<Option<Value>> {
-        let frame = CallFrame {
-            callable: &value::Procedure {
-                arity: 0,
-                chunk: chunk,
-            },
-            ip: 0,
-        };
+        let root_env = environment::Environment::empty();
+        let frame = CallFrame::root(chunk, root_env);
 
         StackVM {
             stack: Vec::with_capacity(STACK_CAPACITY),
             frames: vec![],
-            frame: frame,
+            current_chunk: &frame.procedure.chunk,
+            top_frame: &frame,
+            ip: 0,
         }
         .run()
     }
@@ -52,7 +59,7 @@ impl<'a> StackVM<'a> {
                     return Ok(Some(self.pop()));
                 }
                 &OpCode::Const(addr) => {
-                    let val = self.frame.callable.chunk.read_constant(addr);
+                    let val = self.current_chunk.read_constant(addr);
                     self.stack.push(val.clone());
                 }
                 &OpCode::Apply => todo!(),
@@ -79,18 +86,14 @@ impl<'a> StackVM<'a> {
     }
 
     fn read_op_code(&mut self) -> &OpCode {
-        let code = self.frame.callable.chunk.read_opcode(self.frame.ip);
-        self.frame.ip = self.frame.ip + 1;
+        let code = self.current_chunk.read_opcode(self.ip);
+        self.ip = self.ip + 1;
         code
     }
 
     fn debug_cycle(&self) {
         self.print_stack_trace();
-        disassembler::disassemble_instruction(
-            &mut std::io::stdout(),
-            &self.frame.callable.chunk,
-            self.frame.ip,
-        );
+        disassembler::disassemble_instruction(&mut std::io::stdout(), &self.current_chunk, self.ip);
     }
 
     fn print_stack_trace(&self) {

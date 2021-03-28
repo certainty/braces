@@ -1,4 +1,4 @@
-use super::{syntax, SourceInformation};
+use super::SourceInformation;
 use crate::vm::value::Value;
 
 #[repr(transparent)]

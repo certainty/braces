@@ -4,7 +4,6 @@ use super::syntax;
 use super::Location;
 use pest::iterators::Pair;
 use pest::iterators::Pairs;
-use pest::Position;
 use thiserror::Error;
 
 // TODO: clean this up - too many unclear error variants

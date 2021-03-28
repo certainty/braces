@@ -1,59 +1,57 @@
-use super::value;
+use super::value::symbol::Symbol;
+use super::value::Value;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+type Bindings = HashMap<Symbol, Value>;
+
+#[derive(Debug, Clone)]
 pub struct Environment {
-    bindings: Vec<HashMap<value::Symbol, value::Value>>,
+    scopes: Vec<Bindings>,
 }
 
 impl Environment {
-    pub fn empty() -> Environment {
+    pub fn empty() -> Self {
         Environment {
-            bindings: vec![HashMap::new()],
+            scopes: vec![Bindings::new()],
         }
     }
 
-    pub fn extend(&mut self) -> &mut Self {
-        self.bindings.push(HashMap::new());
+    pub fn push_scope(&mut self) -> &mut Self {
+        self.scopes.push(Bindings::new());
         self
     }
 
-    pub fn reduce(&mut self) -> &mut Self {
-        self.bindings.pop();
+    pub fn pop_scope(&mut self) -> &mut Self {
+        self.scopes.pop();
         self
     }
 
-    pub fn get(&self, sym: &value::Symbol) -> Option<&value::Value> {
-        for env in self.bindings.iter().rev() {
-            match env.get(sym) {
-                Some(found) => {
-                    return Some(found);
-                }
-                _ => (),
+    pub fn get(&self, sym: &Symbol) -> Option<&Value> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(value) = scope.get(sym) {
+                return Some(value);
             }
         }
         None
     }
 
-    pub fn set(&mut self, sym: &value::Symbol, val: value::Value) {
-        match self.bindings.last_mut() {
-            Some(b) => {
-                b.insert(sym.clone(), val);
-                ()
-            }
-            _ => (),
+    pub fn set(&mut self, sym: &Symbol, val: Value) -> &mut Self {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(sym.clone(), val);
         }
+        self
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::value;
     use super::*;
+    use crate::vm::value;
+    use crate::vm::value::symbol::Symbol;
 
     #[test]
     fn test_get_empty() {
-        let sym = value::Symbol("test".into());
+        let sym = Symbol("test".into());
         let env = Environment::empty();
 
         assert_eq!(env.get(&sym), None)
@@ -61,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_set_then_get() {
-        let sym = value::Symbol("test".into());
+        let sym = Symbol("test".into());
         let mut env = Environment::empty();
 
         assert_eq!(env.get(&sym), None);
@@ -72,26 +70,26 @@ mod tests {
 
     #[test]
     fn test_get_scopes() {
-        let sym = value::Symbol("test".into());
+        let sym = Symbol("test".into());
         let mut env = Environment::empty();
 
         env.set(&sym, value::fixnum(10));
-        env.extend().set(&sym, value::fixnum(12));
+        env.push_scope().set(&sym, value::fixnum(12));
 
         assert_eq!(env.get(&sym), Some(&value::fixnum(12)));
 
-        env.reduce();
+        env.pop_scope();
 
         assert_eq!(env.get(&sym), Some(&value::fixnum(10)));
     }
 
     #[test]
     fn test_get_from_outer_scope() {
-        let sym = value::Symbol("test".into());
+        let sym = Symbol("test".into());
         let mut env = Environment::empty();
 
         env.set(&sym, value::fixnum(10));
-        env.extend().extend();
+        env.push_scope().push_scope();
 
         assert_eq!(env.get(&sym), Some(&value::fixnum(10)));
     }
