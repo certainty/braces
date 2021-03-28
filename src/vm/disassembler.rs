@@ -31,6 +31,7 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
         &OpCode::Const(const_address) => {
             disassemble_constant(out, chunk, "OP_CONSTANT", address, const_address)
         }
+        &OpCode::Get => disassemble_simple(out, "OP_GET", address),
         &OpCode::Nop => disassemble_simple(out, "OP_NOP", address),
         &OpCode::Apply => disassemble_simple(out, "OP_APPLY", address),
     }

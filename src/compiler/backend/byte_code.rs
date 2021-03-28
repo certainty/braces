@@ -7,7 +7,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum GenerationError {
-    #[error("Unknown expression encountered")]
+    #[error("Unknown expression encountered: {0:?}")]
     UnknownExpression(expression::Expression),
 }
 
@@ -41,6 +41,9 @@ pub fn finalise(chunk: &mut chunk::Chunk) {
 fn emit_op_codes(chunk: &mut chunk::Chunk, ast: &expression::Expression) -> Result<()> {
     match ast {
         expression::Expression::Literal(value, source) => emit_literal(chunk, value, &source),
+        expression::Expression::Variable(variable, source) => {
+            emit_literal(chunk, &value::Value::Symbol(variable.clone()), &source)
+        }
         expression::Expression::Application(operator, operands, source) => {
             emit_apply(chunk, operator, operands, &source)
         }
@@ -70,7 +73,10 @@ fn emit_apply(
         emit_op_codes(chunk, &operand)?
     }
     emit_op_codes(chunk, &operator)?;
+
+    chunk.write_opcode(OpCode::Get);
     let caddr = chunk.write_opcode(OpCode::Apply);
+
     chunk.write_line(caddr.into(), caddr.into(), source.location.line);
     Ok(())
 }

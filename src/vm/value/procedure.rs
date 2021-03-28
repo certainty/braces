@@ -15,21 +15,16 @@ pub type LambdaResult = std::result::Result<Value, ApplicationError>;
 pub type ForeignLambdaArgs = Vec<Value>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Procedure {
-    Foreign(ForeignLambda),
-    Domestic(Lambda),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Arity {
     Fixed(u16),
-    Varying(u16),
+    //Varying(u16),
 }
+
+pub type ForeignLambdaFunc = fn(&ForeignLambdaArgs) -> LambdaResult;
 
 #[derive(Clone)]
 pub struct ForeignLambda {
     pub arity: Arity,
-    pub environment: environment::Environment,
     pub operation: fn(&ForeignLambdaArgs) -> LambdaResult,
 }
 

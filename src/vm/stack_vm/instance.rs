@@ -2,13 +2,17 @@ use super::call_frame::CallFrame;
 use super::VMResult;
 use crate::vm::byte_code::{chunk, OpCode};
 use crate::vm::disassembler;
-use crate::vm::environment;
+use crate::vm::error::VmError;
 use crate::vm::printer;
+use crate::vm::runtime;
+use crate::vm::value::procedure::{Arity, ForeignLambda};
 use crate::vm::value::Value;
 
 const FRAMES_MAX: usize = 64;
 const STACK_CAPACITY: usize = 255;
 const STACK_MAX: usize = FRAMES_MAX + STACK_CAPACITY;
+
+type Result<T> = std::result::Result<T, VmError>;
 
 pub struct Instance<'a> {
     ip: chunk::AddressType,
@@ -20,7 +24,7 @@ pub struct Instance<'a> {
 
 impl<'a> Instance<'a> {
     pub fn interprete(chunk: chunk::Chunk) -> VMResult {
-        let root_env = environment::Environment::empty();
+        let root_env = runtime::interactive_environment();
         let frame = CallFrame::root(chunk, root_env);
 
         Instance {
@@ -42,11 +46,16 @@ impl<'a> Instance<'a> {
                 &OpCode::Halt => {
                     return Ok(Some(self.pop()));
                 }
+                &OpCode::Get => {
+                    self.run_get()?;
+                }
                 &OpCode::Const(addr) => {
                     let val = self.current_chunk.read_constant(addr);
                     self.stack.push(val.clone());
                 }
-                &OpCode::Apply => todo!(),
+                &OpCode::Apply => {
+                    self.run_apply()?;
+                }
                 &OpCode::Nop => {
                     //this should never happen
                     panic!("BUG in the compiler detected");
@@ -62,11 +71,51 @@ impl<'a> Instance<'a> {
     fn pop_n(&mut self, size: usize) -> Vec<Value> {
         let mut result: Vec<Value> = Vec::with_capacity(size);
 
-        for _ in 1..size {
+        for _ in 0..size {
             result.push(self.pop());
         }
 
         result
+    }
+
+    fn run_get(&mut self) -> Result<()> {
+        match self.pop() {
+            Value::Symbol(sym) => match self.top_frame.env.get(&sym) {
+                Some(value) => {
+                    self.stack.push(value.clone());
+                    Ok(())
+                }
+                _ => Err(VmError::RuntimeError(format!(
+                    "Unbound variable `{:?}`",
+                    sym
+                ))),
+            },
+            _ => Err(VmError::RuntimeError("Not a symbol".to_string())),
+        }
+    }
+
+    fn run_apply(&mut self) -> Result<()> {
+        match &self.pop() {
+            Value::ForeignProcedure(foreign) => self.run_foreign_apply(&foreign),
+            _ => Ok(()),
+        }
+    }
+
+    fn run_foreign_apply(&mut self, foreign: &ForeignLambda) -> Result<()> {
+        let args = match foreign.arity {
+            Arity::Fixed(count) => self.pop_n(count.into()),
+        };
+
+        match (foreign.operation)(&args) {
+            Err(e) => Err(VmError::RuntimeError(format!(
+                "Error calling foreign lambda: {}",
+                e
+            ))),
+            Ok(value) => {
+                self.stack.push(value);
+                Ok(())
+            }
+        }
     }
 
     fn read_op_code(&mut self) -> &OpCode {

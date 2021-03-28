@@ -7,6 +7,6 @@ pub enum VmError {
     RuntimeError(String),
     #[error("TypeError")]
     TypeError(String),
-    #[error("Failed to compile")]
+    #[error(transparent)]
     CompileError(#[from] compiler::CompileError),
 }
