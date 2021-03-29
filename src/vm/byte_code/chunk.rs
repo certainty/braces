@@ -1,15 +1,18 @@
 use super::*;
+use crate::vm::value::symbol;
+use crate::vm::value::Value;
 use std::cmp::Ordering;
 
-pub(crate) type Value = u64;
-pub(crate) type LineNumber = u64;
+pub(crate) type LineNumber = usize;
 pub(crate) type AddressType = usize;
 // start address, end address, line number
 pub(crate) type LineInfo = (AddressType, AddressType, LineNumber);
 
+#[derive(Clone, Debug)]
 pub struct Chunk {
     pub(crate) lines: Vec<LineInfo>,
     pub(crate) constants: Vec<Value>,
+    pub(crate) symbols: symbol::SymbolTable,
     pub(crate) code: Vec<OpCode>,
 }
 
@@ -18,21 +21,27 @@ impl Chunk {
         Chunk {
             code: vec![],
             constants: vec![],
+            symbols: symbol::SymbolTable::new(),
             lines: vec![],
         }
     }
 
+    // make this work when called multiple time with the same addresses
     pub fn write_line(&mut self, from: AddressType, to: AddressType, line: LineNumber) {
         self.lines.push((from, to, line));
     }
 
-    pub fn write_constant(&mut self, value: Value) -> ConstAddressType {
-        self.constants.push(value);
+    pub fn add_constant(&mut self, value: Value) -> ConstAddressType {
+        self.constants.push(value.clone());
         (self.constants.len() - 1) as ConstAddressType
     }
 
-    pub fn read_constant(&self, addr: ConstAddressType) -> Value {
-        self.constants[addr as usize]
+    pub fn add_symbol(&mut self, value: String) -> symbol::InternedSymbol {
+        self.symbols.interned(value)
+    }
+
+    pub fn read_constant(&self, addr: ConstAddressType) -> &Value {
+        &self.constants[addr as usize]
     }
 
     pub fn write_opcode(&mut self, op_code: OpCode) -> AddressType {

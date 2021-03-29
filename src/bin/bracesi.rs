@@ -1,7 +1,5 @@
-use braces::compiler;
-use braces::vm::disassembler::disassemble;
-use braces::vm::stack_vm::StackVM;
-use compiler::frontend::parser::source;
+use braces::vm;
+use braces::vm::BracesVM;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -16,12 +14,18 @@ fn repl() {
         println!("No previous history.");
     }
 
+    let mut vm = vm::interactive();
+
     loop {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                interprete(&line);
+                match vm.run_string(&line) {
+                    Ok(Some(v)) => println!("{}", vm.print(v)),
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Error: {}", e),
+                };
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -38,12 +42,4 @@ fn repl() {
         }
     }
     rl.save_history("history.txt").unwrap();
-}
-
-fn interprete(line: &str) {
-    let mut source: source::StringSource = line.into();
-    if let Some(chunk) = compiler::jit_compile(&mut source).unwrap() {
-        disassemble(&mut std::io::stdout(), &chunk, "test chunk");
-        StackVM::interprete(&chunk).unwrap();
-    }
 }

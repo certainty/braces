@@ -1,8 +1,9 @@
 pub mod backend;
 pub mod frontend;
+pub mod source;
+
 use super::vm::byte_code::chunk;
 use frontend::parser;
-use frontend::parser::source;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -17,7 +18,8 @@ type Result<T> = std::result::Result<T, CompileError>;
 
 pub fn jit_compile<T: source::Source>(source: &mut T) -> Result<Option<chunk::Chunk>> {
     if let Some(ast) = parser::parse(source)? {
-        let chunk = backend::byte_code::generate(&ast)?;
+        let mut chunk = backend::byte_code::generate(&ast)?;
+        backend::byte_code::finalise(&mut chunk);
         Ok(Some(chunk))
     } else {
         Ok(None)

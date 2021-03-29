@@ -1,6 +1,33 @@
-use super::syntax;
+use super::SourceInformation;
+use crate::vm::value::Value;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Expression {
-    Literal(syntax::SelfEvaluating),
+    Variable(String, SourceInformation),
+    Literal(Value, SourceInformation),
+    Begin(Vec<Expression>, SourceInformation),
+    //Assign(Symbol, Box<Expression>),
+    If(
+        Box<Expression>,
+        Box<Expression>,
+        Option<Box<Expression>>,
+        SourceInformation,
+    ),
+    Application(Box<Expression>, Vec<Expression>, SourceInformation),
+}
+
+pub fn variable(symbol: &str, source_info: SourceInformation) -> Expression {
+    Expression::Variable(symbol.to_string(), source_info)
+}
+
+pub fn literal(value: Value, source_info: SourceInformation) -> Expression {
+    Expression::Literal(value, source_info)
+}
+
+pub fn application(
+    op: Expression,
+    operands: Vec<Expression>,
+    source_info: SourceInformation,
+) -> Expression {
+    Expression::Application(Box::new(op), operands, source_info)
 }

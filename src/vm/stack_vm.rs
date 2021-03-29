@@ -1,77 +1,67 @@
-use super::byte_code::chunk::Value;
-use super::byte_code::{chunk, OpCode};
-use thiserror::Error;
+pub mod call_frame;
+pub mod instance;
 
-#[cfg(feature = "debug_vm")]
-use super::disassembler;
+use super::{
+    environment::{self, Environment},
+    runtime,
+    value::symbol::SymbolTable,
+    BracesVM, VMResult,
+};
+use crate::compiler::jit_compile;
+use crate::compiler::source::StringSource;
+use crate::vm::disassembler::disassemble;
+use crate::vm::printer;
 
+const FRAMES_MAX: usize = 64;
 const STACK_CAPACITY: usize = 255;
+const STACK_MAX: usize = FRAMES_MAX + STACK_CAPACITY;
 
-#[derive(Error, Debug)]
-pub enum VmError {
-    #[error("Failed to run")]
-    RuntimeError,
-    #[error("Failed to compile")]
-    CompileError,
+// will be configurable later
+pub struct VM {
+    /// the environment to start the VM with
+    env: Environment,
+    symbols: SymbolTable,
+
+    /// Some limits for the VM
+    max_stack: usize,
+    max_frames: usize,
 }
 
-pub struct StackVM<'a> {
-    ip: chunk::AddressType,
-    stack: Vec<Value>,
-    chunk: &'a chunk::Chunk,
+impl VM {
+    pub fn interactive() -> Self {
+        let mut symbols = SymbolTable::new();
+        VM {
+            env: runtime::default_environment(&mut symbols),
+            symbols: symbols,
+            max_stack: STACK_MAX,
+            max_frames: FRAMES_MAX,
+        }
+    }
 }
 
-impl<'a> StackVM<'a> {
-    pub fn interprete(chunk: &'a chunk::Chunk) -> Result<Option<Value>, VmError> {
-        StackVM {
-            chunk: &chunk,
-            ip: 0,
-            stack: Vec::with_capacity(STACK_CAPACITY),
+impl Default for VM {
+    fn default() -> Self {
+        VM {
+            env: environment::Environment::empty(),
+            symbols: SymbolTable::new(),
+            max_stack: STACK_MAX,
+            max_frames: FRAMES_MAX,
         }
-        .run()
     }
+}
 
-    fn run(&mut self) -> Result<Option<Value>, VmError> {
-        loop {
-            #[cfg(feature = "debug_vm")]
-            self.debug_cycle();
-
-            match self.read_op_code() {
-                &OpCode::Exit => {
-                    let v = self.stack.pop();
-                    return Ok(v);
-                }
-                &OpCode::Const(addr) => {
-                    let val = self.chunk.read_constant(addr);
-                    self.stack.push(val);
-                }
-                &OpCode::FxAdd => {
-                    let lhs = self.stack.pop().unwrap();
-                    let rhs = self.stack.pop().unwrap();
-                    self.stack.push(lhs + rhs)
-                }
-            }
+impl BracesVM for VM {
+    fn run_string(&mut self, input: &String) -> VMResult {
+        let mut source: StringSource = StringSource::from(input.clone());
+        if let Some(chunk) = jit_compile(&mut source)? {
+            disassemble(&mut std::io::stdout(), &chunk, "REPL");
+            instance::Instance::interprete(chunk, &mut self.symbols, &mut self.env, self.max_stack)
+        } else {
+            Ok(None)
         }
     }
 
-    fn read_op_code(&mut self) -> &OpCode {
-        let code = self.chunk.read_opcode(self.ip);
-        self.ip = self.ip + 1;
-        code
-    }
-
-    #[cfg(feature = "debug_vm")]
-    fn debug_cycle(&self) {
-        self.print_stack_trace();
-        disassembler::disassemble_instruction(&mut std::io::stdout(), self.chunk, self.ip);
-    }
-
-    #[cfg(feature = "debug_vm")]
-    fn print_stack_trace(&self) {
-        print!("     ");
-        for value in self.stack.iter() {
-            print!("[{}]", value);
-        }
-        println!("")
+    fn print(&mut self, value: super::value::Value) -> String {
+        printer::print(&value, &self.symbols)
     }
 }
