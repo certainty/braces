@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn test_get_empty() {
-        let symbols = SymbolTable::new();
+        let mut symbols = SymbolTable::new();
         let sym = symbols.interned("test".into());
         let env = Environment::empty();
 
@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn test_set_then_get() {
-        let symbols = SymbolTable::new();
+        let mut symbols = SymbolTable::new();
         let sym = symbols.interned("test".into());
         let mut env = Environment::empty();
 
@@ -72,7 +72,7 @@ mod tests {
 
     #[test]
     fn test_get_scopes() {
-        let symbols = SymbolTable::new();
+        let mut symbols = SymbolTable::new();
         let sym = symbols.interned("test".into());
         let mut env = Environment::empty();
 
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn test_get_from_outer_scope() {
-        let symbols = SymbolTable::new();
+        let mut symbols = SymbolTable::new();
         let sym = symbols.interned("test".into());
         let mut env = Environment::empty();
 
