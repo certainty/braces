@@ -3,6 +3,7 @@ pub mod instance;
 
 use super::{
     environment::{self, Environment},
+    runtime,
     value::symbol::SymbolTable,
     BracesVM, VMResult,
 };
@@ -24,6 +25,18 @@ pub struct VM {
     /// Some limits for the VM
     max_stack: usize,
     max_frames: usize,
+}
+
+impl VM {
+    pub fn interactive() -> Self {
+        let mut symbols = SymbolTable::new();
+        VM {
+            env: runtime::default_environment(&mut symbols),
+            symbols: symbols,
+            max_stack: STACK_MAX,
+            max_frames: FRAMES_MAX,
+        }
+    }
 }
 
 impl Default for VM {

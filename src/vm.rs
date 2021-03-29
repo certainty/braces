@@ -22,3 +22,7 @@ pub trait BracesVM {
 pub fn default() -> impl BracesVM {
     VM::default()
 }
+
+pub fn interactive() -> impl BracesVM {
+    VM::interactive()
+}

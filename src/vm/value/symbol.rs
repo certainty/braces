@@ -61,7 +61,7 @@ impl Print for Symbol {
 impl Print for InternedSymbol {
     fn print(&self, symbols: &SymbolTable) -> Option<String> {
         if let Some(name) = symbols.get(self) {
-            Some(format!("#<symbol {} {}>", &name, self.0))
+            Some(format!("{}", &name))
         } else {
             Some(format!("#<symbol-anonymous {}>", self.0))
         }

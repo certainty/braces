@@ -14,7 +14,7 @@ fn repl() {
         println!("No previous history.");
     }
 
-    let mut vm = vm::default();
+    let mut vm = vm::interactive();
 
     loop {
         let readline = rl.readline(">> ");
@@ -22,7 +22,7 @@ fn repl() {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 match vm.run_string(&line) {
-                    Ok(Some(v)) => println!("{:?}", vm.print(v)),
+                    Ok(Some(v)) => println!("{}", vm.print(v)),
                     Ok(_) => (),
                     Err(e) => eprintln!("Error: {}", e),
                 };

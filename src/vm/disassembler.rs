@@ -69,7 +69,7 @@ fn disassemble_constant<W: Write>(
     constant_address: byte_code::ConstAddressType,
 ) -> usize {
     out.write_fmt(format_args!(
-        "{:<16} {:04}  '{}'\n",
+        "{:<16} {:04}        '{}'\n",
         name,
         constant_address,
         printer::print(&chunk.constants[constant_address as usize], &chunk.symbols)
