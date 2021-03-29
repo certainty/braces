@@ -6,7 +6,6 @@ pub mod hash_map;
 pub mod printer;
 pub mod runtime;
 pub mod stack_vm;
-pub mod symbol_table;
 pub mod value;
 
 use stack_vm::VM;
@@ -14,7 +13,10 @@ use stack_vm::VM;
 pub type VMResult = std::result::Result<Option<value::Value>, error::VmError>;
 
 pub trait BracesVM {
-    fn run_string(&self, source: &String) -> VMResult;
+    fn run_string(&mut self, source: &String) -> VMResult;
+    fn print(&mut self, value: value::Value) -> String;
+
+    // fn set(name, value)
 }
 
 pub fn default() -> impl BracesVM {

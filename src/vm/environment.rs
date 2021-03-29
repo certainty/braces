@@ -1,8 +1,8 @@
-use super::value::symbol::Symbol;
+use super::value::symbol::InternedSymbol;
 use super::value::Value;
 use crate::vm::hash_map;
 
-type Bindings = hash_map::HashMap<Symbol, Value>;
+type Bindings = hash_map::HashMap<InternedSymbol, Value>;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
@@ -26,7 +26,7 @@ impl Environment {
         self
     }
 
-    pub fn get(&self, sym: &Symbol) -> Option<&Value> {
+    pub fn get(&self, sym: &InternedSymbol) -> Option<&Value> {
         for scope in self.scopes.iter().rev() {
             if let Some(value) = scope.get(sym) {
                 return Some(value);
@@ -35,7 +35,7 @@ impl Environment {
         None
     }
 
-    pub fn set(&mut self, sym: &Symbol, val: Value) -> &mut Self {
+    pub fn set(&mut self, sym: &InternedSymbol, val: Value) -> &mut Self {
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(sym.clone(), val);
         }
@@ -47,11 +47,12 @@ impl Environment {
 mod tests {
     use super::*;
     use crate::vm::value;
-    use crate::vm::value::symbol::Symbol;
+    use crate::vm::value::symbol::SymbolTable;
 
     #[test]
     fn test_get_empty() {
-        let sym = Symbol::intern("test");
+        let symbols = SymbolTable::new();
+        let sym = symbols.interned("test".into());
         let env = Environment::empty();
 
         assert_eq!(env.get(&sym), None)
@@ -59,7 +60,8 @@ mod tests {
 
     #[test]
     fn test_set_then_get() {
-        let sym = Symbol::intern("test");
+        let symbols = SymbolTable::new();
+        let sym = symbols.interned("test".into());
         let mut env = Environment::empty();
 
         assert_eq!(env.get(&sym), None);
@@ -70,7 +72,8 @@ mod tests {
 
     #[test]
     fn test_get_scopes() {
-        let sym = Symbol::intern("test");
+        let symbols = SymbolTable::new();
+        let sym = symbols.interned("test".into());
         let mut env = Environment::empty();
 
         env.set(&sym, value::fixnum(10));
@@ -85,7 +88,8 @@ mod tests {
 
     #[test]
     fn test_get_from_outer_scope() {
-        let sym = Symbol::intern("test");
+        let symbols = SymbolTable::new();
+        let sym = symbols.interned("test".into());
         let mut env = Environment::empty();
 
         env.set(&sym, value::fixnum(10));

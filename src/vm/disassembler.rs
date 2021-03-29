@@ -1,8 +1,7 @@
-use super::byte_code;
 use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::OpCode;
 use super::printer;
-use crate::vm::value::symbol::Symbol;
+use super::{byte_code, value::symbol::InternedSymbol};
 use std::io::Write;
 
 pub fn disassemble<W: Write>(out: &mut W, chunk: &Chunk, context: &str) {
@@ -30,12 +29,10 @@ pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: us
     match &chunk.code[address] {
         &OpCode::Halt => disassemble_simple(out, "OP_HALT", address),
         &OpCode::Const(const_address) => {
-            disassemble_constant(out, chunk, "OP_CONSTANT", address, const_address)
+            disassemble_constant(out, chunk, "OP_CONST", address, const_address)
         }
         &OpCode::Get => disassemble_simple(out, "OP_GET", address),
-        &OpCode::Sym(interned) => {
-            disassemble_symbol(out, chunk, "OP_SYM", address, Symbol(interned))
-        }
+        &OpCode::Sym(interned) => disassemble_symbol(out, chunk, "OP_SYM", address, interned),
         &OpCode::Nop => disassemble_simple(out, "OP_NOP", address),
         &OpCode::Apply => disassemble_simple(out, "OP_APPLY", address),
     }
@@ -51,7 +48,7 @@ fn disassemble_symbol<W: Write>(
     chunk: &Chunk,
     name: &str,
     address: AddressType,
-    interned: Symbol,
+    interned: InternedSymbol,
 ) -> usize {
     out.write_fmt(format_args!(
         "{:<16} {:04}  '{}'\n",

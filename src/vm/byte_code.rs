@@ -1,5 +1,5 @@
 pub mod chunk;
-
+use super::value::symbol::InternedSymbol;
 pub type ConstAddressType = u16;
 
 #[repr(u8)]
@@ -9,6 +9,6 @@ pub enum OpCode {
     Nop,
     Apply,
     Get,
-    Sym(u32),
+    Sym(InternedSymbol),
     Const(ConstAddressType),
 }

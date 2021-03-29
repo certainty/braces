@@ -1,27 +1,28 @@
 use braces::vm;
-use braces::vm::printer;
+use braces::vm::BracesVM;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 fn main() {
     pretty_env_logger::init();
-    let vm = vm::default();
-    repl(&vm);
+    repl();
 }
 
-fn repl(instance: &impl vm::BracesVM) {
+fn repl() {
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
+
+    let mut vm = vm::default();
 
     loop {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                match instance.run_string(&line) {
-                    Ok(Some(v)) => println!("{:?}", &v),
+                match vm.run_string(&line) {
+                    Ok(Some(v)) => println!("{:?}", vm.print(v)),
                     Ok(_) => (),
                     Err(e) => eprintln!("Error: {}", e),
                 };

@@ -56,15 +56,15 @@ fn emit_literal(
     value: &value::Value,
     source: &SourceInformation,
 ) -> Result<()> {
-    let addr = chunk.write_constant(value.clone());
+    let addr = chunk.add_constant(value.clone());
     let caddr = chunk.write_opcode(OpCode::Const(addr));
     chunk.write_line(caddr.into(), caddr.into(), source.location.line);
     Ok(())
 }
 
 fn emit_variable(chunk: &mut chunk::Chunk, value: &str, source: &SourceInformation) -> Result<()> {
-    let interned = chunk.intern_symbol(value.to_string());
-    let caddr = chunk.write_opcode(OpCode::Sym(interned.0));
+    let interned = chunk.add_symbol(value.to_string());
+    let caddr = chunk.write_opcode(OpCode::Sym(interned));
     chunk.write_line(caddr.into(), caddr.into(), source.location.line);
     Ok(())
 }

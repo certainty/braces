@@ -3,14 +3,14 @@ use crate::vm::value;
 use crate::vm::value::numeric;
 use crate::vm::value::procedure;
 use crate::vm::value::procedure::Arity;
-use crate::vm::value::symbol;
+use crate::vm::value::symbol::SymbolTable;
 use crate::vm::value::Value;
 
-pub fn interactive_environment() -> environment::Environment {
+pub fn default_environment(symbols: &mut SymbolTable) -> environment::Environment {
     let mut env = environment::Environment::empty();
 
     env.set(
-        &symbol::Symbol::intern("+"),
+        &symbols.interned("+".into()),
         value::foreign_lambda(Arity::Fixed(2), fx_plus),
     );
     env

@@ -2,34 +2,34 @@ use super::call_frame::CallFrame;
 use super::VMResult;
 use crate::vm::byte_code::{chunk, OpCode};
 use crate::vm::disassembler;
+use crate::vm::environment::Environment;
 use crate::vm::error::VmError;
 use crate::vm::printer;
-use crate::vm::runtime;
 use crate::vm::value::procedure::{Arity, ForeignLambda};
 use crate::vm::value::symbol;
 use crate::vm::value::Value;
-
-const FRAMES_MAX: usize = 64;
-const STACK_CAPACITY: usize = 255;
-const STACK_MAX: usize = FRAMES_MAX + STACK_CAPACITY;
 
 type Result<T> = std::result::Result<T, VmError>;
 
 pub struct Instance<'a> {
     ip: chunk::AddressType,
     current_chunk: &'a chunk::Chunk,
-    top_frame: &'a CallFrame,
-    frames: Vec<CallFrame>,
+    top_frame: &'a CallFrame<'a>,
+    frames: Vec<CallFrame<'a>>,
     stack: Vec<Value>,
 }
 
 impl<'a> Instance<'a> {
-    pub fn interprete(chunk: chunk::Chunk) -> VMResult {
-        let root_env = runtime::interactive_environment();
-        let frame = CallFrame::root(chunk, root_env);
+    pub fn interprete(
+        chunk: chunk::Chunk,
+        symbols: &mut symbol::SymbolTable,
+        env: &mut Environment,
+        stack_size: usize,
+    ) -> VMResult {
+        let frame = CallFrame::root(chunk, env);
 
         Instance {
-            stack: Vec::with_capacity(STACK_CAPACITY),
+            stack: Vec::with_capacity(stack_size),
             frames: vec![],
             current_chunk: &frame.procedure.chunk,
             top_frame: &frame,
@@ -50,7 +50,9 @@ impl<'a> Instance<'a> {
                 &OpCode::Get => {
                     self.run_get()?;
                 }
-                &OpCode::Sym(interned) => self.stack.push(Value::Symbol(symbol::Symbol(interned))),
+                &OpCode::Sym(interned) => self
+                    .stack
+                    .push(Value::Symbol(symbol::Symbol::Interned(interned.clone()))),
                 &OpCode::Const(addr) => {
                     let val = self.current_chunk.read_constant(addr);
                     self.stack.push(val.clone());
@@ -82,7 +84,7 @@ impl<'a> Instance<'a> {
 
     fn run_get(&mut self) -> Result<()> {
         match self.pop() {
-            Value::Symbol(sym) => match self.top_frame.env.get(&sym) {
+            Value::Symbol(symbol::Symbol::Interned(sym)) => match self.top_frame.env.get(&sym) {
                 Some(value) => {
                     self.stack.push(value.clone());
                     Ok(())
