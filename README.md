@@ -13,6 +13,7 @@
 - [ ] Principled VM design 
     * account for interactive mode in the repl (also setting values which are visible across invocations)
     * account for the printer needing access to the symbol table 
+- [ ] Fix environment implementation. Set should also traverse scopes 
 - [ ] Clean up function calls 
     * make sure argument counts are checked and functions don't access data on the stack that they shouldn't
 - [ ] Bring the error reporting and error handling story up a notch 
