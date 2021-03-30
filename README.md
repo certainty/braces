@@ -5,9 +5,39 @@
 
 > Brace for impact
 
+## Next steps
+Make sure the following steps work in order 
+
+### Simple Values 
+```
+>> 3
+3
+
+>> 0x10
+10
+
+>> #\a 
+a
+
+>> #t
+#t
+
+>> #f
+#f
+```
+
+## Quoted values 
+
+## Definitions 
+
+## Conditional 
+
+## Lambda 
+
 
 ## TODO
 
+- [ ] add benchmarks to get an idea of performance regressions 
 - [ ] Compile lambdas
     * this will affect the way we represent compilations and should be done first
 - [ ] Principled VM design 
