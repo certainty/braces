@@ -5,4 +5,5 @@ use super::scheme::value::Value;
 #[derive(Debug, Clone)]
 pub enum Instruction {
     Const(Value),
+    Halt,
 }

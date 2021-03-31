@@ -32,7 +32,7 @@ impl Compiler {
         if let Some(ast) = Parser::parse(source)? {
             let mut code_gen = CodeGenerator::new();
             let chunk = code_gen.generate(&ast)?;
-            Ok(Some(chunk))
+            Ok(Some(chunk.clone()))
         } else {
             Ok(None)
         }
