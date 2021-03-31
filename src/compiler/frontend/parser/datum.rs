@@ -6,7 +6,7 @@ use pest::Parser;
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Datum {
     Boolean(bool, SourceLocation),
 }
@@ -82,9 +82,5 @@ mod tests {
 
     fn src(inp: &str) -> impl Source {
         StringSource::new(inp, "datum-parser-test")
-    }
-
-    fn parse(source: &mut impl Source) -> Result<Option<Datum>> {
-        Ok(Datum::parse(source)?)
     }
 }
