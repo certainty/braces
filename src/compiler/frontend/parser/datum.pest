@@ -1,0 +1,14 @@
+// Parse external representation of scheme data. This is also used by the scheme reader.
+// The parsing into expressions and programs happens at a higher livel to be able to support
+// better error messages and (eval)
+
+datum = _{ simple_datum }
+
+simple_datum = _{  bool } 
+
+bool = _{ BOOL_TRUE | BOOL_FALSE }
+
+// Tokens 
+
+BOOL_TRUE  = { "#true" | "#t" }
+BOOL_FALSE = { "#false" | "#f" }
