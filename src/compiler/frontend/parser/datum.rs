@@ -6,12 +6,13 @@ use pest::Parser;
 
 type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug, PartialEq)]
 pub enum Datum {
     Boolean(bool, SourceLocation),
 }
 
 impl Datum {
-    pub fn parse(source: &mut dyn Source) -> Result<Option<Datum>> {
+    pub fn parse(source: &mut impl Source) -> Result<Option<Datum>> {
         let source_type = source.source_type();
         let mut buffer = String::new();
         source.read_to_string(&mut buffer)?;
@@ -55,3 +56,35 @@ impl Datum {
 #[derive(Parser)]
 #[grammar = "compiler/frontend/parser/datum.pest"]
 struct DataParser;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compiler::source::{Source, StringSource};
+
+    #[test]
+    pub fn test_read_bool_true() {
+        let mut source = src("#t");
+        let source_type = source.source_type();
+
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::boolean(true, SourceLocation::new(source_type, 1, 1)))
+        );
+
+        source = src("#true");
+        let source_type = source.source_type();
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::boolean(true, SourceLocation::new(source_type, 1, 1)))
+        );
+    }
+
+    fn src(inp: &str) -> impl Source {
+        StringSource::new(inp, "datum-parser-test")
+    }
+
+    fn parse(source: &mut impl Source) -> Result<Option<Datum>> {
+        Ok(Datum::parse(source)?)
+    }
+}
