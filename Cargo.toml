@@ -5,6 +5,14 @@ authors = ["certainty <david.krentzlin@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# [[bench]]
+# name = "compiler"
+# harness = false
+
+# [[bench]]
+# name="vm"
+# harness = false
+
 
 [lib]
 name="braces"
@@ -34,3 +42,4 @@ rustc-hash = "1.1.0"
 
 [dev-dependencies]
 matches = "0.1"
+criterion = "0.3.4"
