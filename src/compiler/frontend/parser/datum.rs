@@ -55,6 +55,10 @@ impl Datum {
             Rule::BOOL_FALSE => Ok(Self::boolean(false, loc)),
             Rule::IDENTIFIER => Ok(Self::symbol(pair.as_str(), loc)),
             Rule::PECULIAR_IDENTIFIER => Ok(Self::symbol(pair.as_str(), loc)),
+            Rule::DELIMITED_IDENTIFIER => {
+                let s = pair.as_str();
+                Ok(Self::symbol(&s[1..s.len() - 1], loc))
+            }
             _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
         }
     }
@@ -126,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_read_symbol_peculiar() {
-        let mut source = src("...");
+        let mut source = src("");
         let source_type = source.source_type();
         let symbols = vec!["...", "+soup+", "+"];
 
@@ -141,6 +145,30 @@ mod tests {
                 ))
             );
         }
+    }
+
+    #[test]
+    fn test_read_symbol_delimited() {
+        let mut source = src("");
+        let source_type = source.source_type();
+
+        source = src("|two words|");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::symbol(
+                "two words",
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("|two\x20;words|");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::symbol(
+                "two\x20;words",
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
     }
 
     fn src(inp: &str) -> impl Source {
