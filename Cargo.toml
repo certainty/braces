@@ -18,6 +18,10 @@ edition = "2018"
 name="braces"
 path="src/lib.rs"
 
+[[bench]]
+name="compiler_benchmark"
+harness=false
+
 [features]
 debug_vm = []
 
