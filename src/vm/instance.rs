@@ -1,5 +1,6 @@
 use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::Instruction;
+use super::disassembler::Disassembler;
 use super::scheme::value::Value;
 use super::Error;
 
@@ -9,6 +10,7 @@ pub struct Instance<'a> {
     ip: AddressType,
     current_chunk: &'a Chunk,
     stack: Vec<Value>,
+    disassembler: Disassembler<std::io::Stdout>,
 }
 
 impl<'a> Instance<'a> {
@@ -17,6 +19,7 @@ impl<'a> Instance<'a> {
             stack: Vec::with_capacity(stack_size),
             current_chunk: &chunk,
             ip: 0,
+            disassembler: Disassembler::new(std::io::stdout()),
         }
         .run()
     }
@@ -46,9 +49,10 @@ impl<'a> Instance<'a> {
         instruction
     }
 
-    fn debug_cycle(&self) {
+    fn debug_cycle(&mut self) {
         self.print_stack();
-        //disassembler::disassemble_instruction(&mut std::io::stdout(), &self.current_chunk, self.ip);
+        self.disassembler
+            .disassemble_instruction(&self.current_chunk, self.ip);
     }
 
     fn print_stack(&self) {

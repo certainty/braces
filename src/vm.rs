@@ -1,4 +1,5 @@
 pub mod byte_code;
+pub mod disassembler;
 pub mod instance;
 pub mod scheme;
 
@@ -23,13 +24,16 @@ pub struct VM {
 }
 
 impl VM {
-    pub fn run_string(inp: &str) -> Result<Value> {
+    pub fn new() -> VM {
+        VM { stack_size: 256 }
+    }
+
+    pub fn run_string(&mut self, inp: &str) -> Result<Value> {
         let mut source = StringSource::new(inp, "run_string");
         let mut compiler = Compiler::new();
-        let mut vm = VM { stack_size: 256 };
 
         if let Some(chunk) = compiler.compile(&mut source)? {
-            vm.interprete(&chunk)
+            self.interprete(&chunk)
         } else {
             Ok(Value::Unspecified)
         }
