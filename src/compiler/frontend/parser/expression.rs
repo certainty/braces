@@ -2,6 +2,7 @@ use super::error::Error;
 use crate::compiler::frontend::parser::datum::Datum;
 use crate::compiler::source::Source;
 use crate::compiler::source_location::SourceLocation;
+use crate::vm::scheme::value::Value;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -12,13 +13,8 @@ pub enum Expression {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LiteralExpression {
-    SelfEvaluating(SelfEvaluatingExpression),
-    Quotation(Datum),
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum SelfEvaluatingExpression {
-    Boolean(bool),
+    SelfEvaluating(Value),
+    Quotation(Value),
 }
 
 impl Expression {
@@ -31,16 +27,13 @@ impl Expression {
         }
     }
 
-    pub fn boolean(value: bool, location: SourceLocation) -> Expression {
-        Expression::Literal(
-            LiteralExpression::SelfEvaluating(SelfEvaluatingExpression::Boolean(value)),
-            location,
-        )
+    pub fn constant(value: Value, location: SourceLocation) -> Expression {
+        Expression::Literal(LiteralExpression::SelfEvaluating(value), location)
     }
 
     fn parse_expression(datum: Datum) -> Result<Expression> {
-        match datum {
-            Datum::Boolean(val, loc) => Ok(Self::boolean(val, loc.clone())),
+        match datum.value {
+            val @ Value::Bool(_) => Ok(Self::constant(val, datum.source_location.clone())),
             _ => todo!(),
         }
     }
@@ -58,8 +51,8 @@ mod tests {
 
         assert_eq!(
             Expression::parse(&mut source).unwrap(),
-            Some(Expression::boolean(
-                true,
+            Some(Expression::constant(
+                Value::Bool(true),
                 SourceLocation::new(source_type, 1, 1)
             ))
         )

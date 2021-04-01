@@ -1,14 +1,16 @@
 use super::error::Error;
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
+use crate::vm::scheme::value::Value;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 
 type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Datum {
-    Boolean(bool, SourceLocation),
+pub struct Datum {
+    pub value: Value,
+    pub source_location: SourceLocation,
 }
 
 impl Datum {
@@ -27,7 +29,10 @@ impl Datum {
     }
 
     pub fn boolean(value: bool, source_location: SourceLocation) -> Datum {
-        Self::Boolean(value, source_location)
+        Datum {
+            value: Value::Bool(value),
+            source_location,
+        }
     }
 
     fn to_ast_seq(pairs: Pairs<Rule>, source_type: &SourceType) -> Result<Vec<Datum>> {

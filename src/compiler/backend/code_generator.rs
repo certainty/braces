@@ -1,8 +1,7 @@
-use crate::compiler::frontend::parser::expression::{
-    Expression, LiteralExpression, SelfEvaluatingExpression,
-};
+use crate::compiler::frontend::parser::expression::{Expression, LiteralExpression};
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;
+use crate::vm::scheme::value::Value;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -38,7 +37,7 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_constant(&mut self, expr: &SelfEvaluatingExpression) -> Result<()> {
+    fn emit_constant(&mut self, value: &Value) -> Result<()> {
         Ok(())
     }
 }
