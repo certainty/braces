@@ -4,11 +4,33 @@
 
 datum = _{ simple_datum }
 
-simple_datum = _{  bool } 
+simple_datum = _{  bool | symbol } 
 
-bool = _{ BOOL_TRUE | BOOL_FALSE }
+bool   = _{ BOOL_TRUE | BOOL_FALSE }
+symbol = _{ IDENTIFIER | DELIMITED_IDENTIFIER | PECULIAR_IDENTIFIER }
 
 // Tokens 
 
 BOOL_TRUE  = { "#true" | "#t" }
 BOOL_FALSE = { "#false" | "#f" }
+
+
+IDENTIFIER           = @{ INITIAL ~ SUBSEQUENT* }
+INITIAL              = _{ LETTER | SPECIAL_INITIAL }
+LETTER               = _{ ASCII_ALPHA }
+SPECIAL_INITIAL      = _{ "!" | "$" | "%" | "&" | "*" | "/" | ":" | "<" | "=" | ">" | "?" | "^" | "_" | "~" }
+SUBSEQUENT           = _{ INITIAL | DIGIT | SPECIAL_SUBSEQUENT }
+DIGIT                = _{ ASCII_DIGIT }
+SPECIAL_SUBSEQUENT   = _{ EXPLICIT_SIGN | "." | "@" }
+EXPLICIT_SIGN        = _{ "+" | "-" }
+
+DELIMITED_IDENTIFIER = @{ VERTICAL_LINE ~ SYMBOL_ELEMENT* ~ VERTICAL_LINE }
+VERTICAL_LINE        = _{ "|" }
+SYMBOL_ELEMENT       = _{ INLINE_HEX_ESCAPE | MNEMONIC_ESCAPE | !(VERTICAL_LINE | "\\") ~ ANY }
+INLINE_HEX_ESCAPE    = _{ "\\x" ~ HEX_SCALAR_VALUE }
+HEX_SCALAR_VALUE     = _{ ASCII_HEX_DIGIT+ }
+MNEMONIC_ESCAPE      = @{ "\\" ~ ("a" | "b" | "t" | "n" | "r") }
+
+PECULIAR_IDENTIFIER  = @{ EXPLICIT_SIGN ~ SIGN_SUBSEQUENT ~ SUBSEQUENT* | EXPLICIT_SIGN ~ "." ~ DOT_SUBSEQUENT | "." ~ DOT_SUBSEQUENT ~ SUBSEQUENT* | EXPLICIT_SIGN }
+SIGN_SUBSEQUENT      = _{ INITIAL | EXPLICIT_SIGN | "@" }
+DOT_SUBSEQUENT       = _{ SIGN_SUBSEQUENT | "." }

@@ -14,6 +14,7 @@ pub struct Datum {
 }
 
 impl Datum {
+    // parses the next available Datum from Source
     pub fn parse(source: &mut impl Source) -> Result<Option<Datum>> {
         let source_type = source.source_type();
         let mut buffer = String::new();
@@ -35,6 +36,13 @@ impl Datum {
         }
     }
 
+    pub fn symbol(value: &str, source_location: SourceLocation) -> Datum {
+        Datum {
+            value: Value::Symbol(value.to_string()),
+            source_location,
+        }
+    }
+
     fn to_ast_seq(pairs: Pairs<Rule>, source_type: &SourceType) -> Result<Vec<Datum>> {
         pairs.map(|p| Self::to_ast(&p, source_type)).collect()
     }
@@ -45,6 +53,8 @@ impl Datum {
         match pair.as_rule() {
             Rule::BOOL_TRUE => Ok(Self::boolean(true, loc)),
             Rule::BOOL_FALSE => Ok(Self::boolean(false, loc)),
+            Rule::IDENTIFIER => Ok(Self::symbol(pair.as_str(), loc)),
+            Rule::PECULIAR_IDENTIFIER => Ok(Self::symbol(pair.as_str(), loc)),
             _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
         }
     }
@@ -68,7 +78,7 @@ mod tests {
     use crate::compiler::source::{Source, StringSource};
 
     #[test]
-    pub fn test_read_bool_true() {
+    fn test_read_bool_true() {
         let mut source = src("#t");
         let source_type = source.source_type();
 
@@ -83,6 +93,54 @@ mod tests {
             Datum::parse(&mut source).unwrap(),
             Some(Datum::boolean(true, SourceLocation::new(source_type, 1, 1)))
         );
+    }
+
+    #[test]
+
+    fn test_read_symbol() {
+        let mut source = src("<=?");
+        let source_type = source.source_type();
+        let symbols = vec![
+            "<=?",
+            "->string",
+            "a34kTMNs",
+            "lambda",
+            "list->vector",
+            "q",
+            "V17a",
+            "the-word-recursion-has-many-meanings",
+        ];
+
+        for sym in symbols.iter() {
+            source = src(sym);
+
+            assert_eq!(
+                Datum::parse(&mut source).unwrap(),
+                Some(Datum::symbol(
+                    sym,
+                    SourceLocation::new(source_type.clone(), 1, 1)
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn test_read_symbol_peculiar() {
+        let mut source = src("...");
+        let source_type = source.source_type();
+        let symbols = vec!["...", "+soup+", "+"];
+
+        for sym in symbols.iter() {
+            source = src(sym);
+
+            assert_eq!(
+                Datum::parse(&mut source).unwrap(),
+                Some(Datum::symbol(
+                    sym,
+                    SourceLocation::new(source_type.clone(), 1, 1)
+                ))
+            );
+        }
     }
 
     fn src(inp: &str) -> impl Source {
