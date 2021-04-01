@@ -25,6 +25,7 @@ impl<'a> Instance<'a> {
     }
 
     fn run(&mut self) -> Result<Value> {
+        #[cfg(feature = "debug_vm")]
         self.disassembler
             .disassemble(self.current_chunk, "DEBUG DISASS");
 

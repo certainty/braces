@@ -9,7 +9,7 @@ use crate::compiler::Compiler;
 use byte_code::chunk::Chunk;
 use instance::Instance;
 use scheme::value::Value;
-use scheme::writer::{ExternalRepresentation, Writer};
+use scheme::writer::Writer;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -33,8 +33,8 @@ impl VM {
         }
     }
 
-    pub fn write<T: ExternalRepresentation>(&self, value: &T) -> String {
-        self.writer.write(value)
+    pub fn write(&self, value: &Value) -> String {
+        self.writer.external_representation(value).to_string()
     }
 
     pub fn run_string(&mut self, inp: &str) -> Result<Value> {
