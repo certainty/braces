@@ -30,7 +30,7 @@ impl Chunk {
         self.lines.push((from, to, line));
     }
 
-    pub fn add_constant(&mut self, value: Value) -> ConstAddressType {
+    pub fn add_constant(&mut self, value: &Value) -> ConstAddressType {
         self.constants.push(value.clone());
         (self.constants.len() - 1) as ConstAddressType
     }
@@ -44,7 +44,7 @@ impl Chunk {
         self.code.len() - 1
     }
 
-    pub fn read_intruction(&self, addr: AddressType) -> &Instruction {
+    pub fn read_instruction(&self, addr: AddressType) -> &Instruction {
         &self.code[addr]
     }
 

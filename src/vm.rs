@@ -1,11 +1,13 @@
 pub mod byte_code;
+pub mod instance;
 pub mod scheme;
 
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::Compiler;
 use byte_code::chunk::Chunk;
-use scheme::value;
+use instance::Instance;
+use scheme::value::Value;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -16,22 +18,24 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub struct VM {}
+pub struct VM {
+    stack_size: usize,
+}
 
 impl VM {
-    pub fn run_string(inp: &str) -> Result<value::Value> {
+    pub fn run_string(inp: &str) -> Result<Value> {
         let mut source = StringSource::new(inp, "run_string");
         let mut compiler = Compiler::new();
-        let mut vm = VM {};
+        let mut vm = VM { stack_size: 256 };
 
         if let Some(chunk) = compiler.compile(&mut source)? {
             vm.interprete(&chunk)
         } else {
-            Ok(value::Value::Unspecified)
+            Ok(Value::Unspecified)
         }
     }
 
-    fn interprete(&mut self, chunk: &Chunk) -> Result<value::Value> {
-        Ok(value::Value::Bool(true))
+    fn interprete(&mut self, chunk: &Chunk) -> Result<Value> {
+        Instance::interprete(chunk, self.stack_size)
     }
 }

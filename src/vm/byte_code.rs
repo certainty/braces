@@ -1,9 +1,9 @@
 pub mod chunk;
-use super::scheme::value::Value;
+use chunk::ConstAddressType;
 
 #[repr(u8)]
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    Const(Value),
+    Const(ConstAddressType),
     Halt,
 }
