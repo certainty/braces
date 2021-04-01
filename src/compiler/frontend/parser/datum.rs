@@ -127,6 +127,7 @@ mod tests {
 
         source = src("'#f");
         let source_type = source.source_type();
+
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
