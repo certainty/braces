@@ -9,6 +9,7 @@ use crate::compiler::Compiler;
 use byte_code::chunk::Chunk;
 use instance::Instance;
 use scheme::value::Value;
+use scheme::writer::{ExternalRepresentation, Writer};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,11 +22,19 @@ type Result<T> = std::result::Result<T, Error>;
 
 pub struct VM {
     stack_size: usize,
+    writer: Writer,
 }
 
 impl VM {
     pub fn new() -> VM {
-        VM { stack_size: 256 }
+        VM {
+            stack_size: 256,
+            writer: Writer {},
+        }
+    }
+
+    pub fn write<T: ExternalRepresentation>(&self, value: &T) -> String {
+        self.writer.write(value)
     }
 
     pub fn run_string(&mut self, inp: &str) -> Result<Value> {

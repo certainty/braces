@@ -21,7 +21,7 @@ fn repl() {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 match vm.run_string(&line) {
-                    Ok(v) => println!("{:?}", v),
+                    Ok(v) => println!("{}", vm.write(&v)),
                     Err(e) => eprintln!("Error: {}", e),
                 };
             }
