@@ -31,9 +31,26 @@ impl Expression {
         Expression::Literal(LiteralExpression::SelfEvaluating(value), location)
     }
 
+    pub fn quoted_value(value: Value, location: SourceLocation) -> Expression {
+        Expression::Literal(LiteralExpression::Quotation(value), location)
+    }
+
     fn parse_expression(datum: Datum) -> Result<Expression> {
         match datum.value {
             val @ Value::Bool(_) => Ok(Self::constant(val, datum.source_location.clone())),
+            Value::ProperList(elts) if elts.len() == 2 => {
+                let mut iter = elts.iter();
+                let head = iter.next().unwrap();
+                let value = iter.next().unwrap();
+
+                match &**head {
+                    Value::Symbol(sym) if sym == "quote" => Ok(Self::quoted_value(
+                        *value.clone(),
+                        datum.source_location.clone(),
+                    )),
+                    _ => todo!(),
+                }
+            }
             _ => todo!(),
         }
     }
