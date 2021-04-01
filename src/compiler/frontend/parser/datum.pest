@@ -13,11 +13,11 @@ symbol = _{ IDENTIFIER | DELIMITED_IDENTIFIER | PECULIAR_IDENTIFIER }
 compound_datum          = _{ proper_list | abbreviation }
 proper_list             = { L_PAREN ~ datum* ~ R_PAREN }
 abbreviation            = { abbrev_prefix ~ datum }
-abbrev_prefix           = { abbrev_quote | abbrev_quasi_quote | abbrev_unquote | abbrev_unquote_splicing }
-abbrev_quote            = _{ "'" }
-abbrev_quasi_quote      = _{ "`" }
-abbrev_unquote          = _{ "," }
-abbrev_unquote_splicing = _{ ",@" }
+abbrev_prefix           = _{ abbrev_quote | abbrev_quasi_quote | abbrev_unquote | abbrev_unquote_splicing }
+abbrev_quote            = { "'" }
+abbrev_quasi_quote      = { "`" }
+abbrev_unquote          = { "," }
+abbrev_unquote_splicing = { ",@" }
 
 /////////////////////////////////////
 // Tokens 

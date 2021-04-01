@@ -37,10 +37,10 @@ impl Datum {
     }
 
     fn to_ast_seq(pairs: Pairs<Rule>, source_type: &SourceType) -> Result<Vec<Datum>> {
-        pairs.map(|p| Self::to_ast(&p, source_type)).collect()
+        pairs.map(|p| Self::to_ast(p, source_type)).collect()
     }
 
-    fn to_ast(pair: &Pair<Rule>, source_type: &SourceType) -> Result<Datum> {
+    fn to_ast(pair: Pair<Rule>, source_type: &SourceType) -> Result<Datum> {
         let loc = Self::create_location(&pair, source_type);
 
         match pair.as_rule() {
@@ -56,6 +56,26 @@ impl Datum {
                     Value::Symbol(s[1..s.len() - 1].to_string()),
                     loc,
                 ))
+            }
+            Rule::abbreviation => {
+                let parts: Vec<Pair<Rule>> = pair.into_inner().collect();
+                match &parts[..] {
+                    [prefix, datum] => {
+                        let other_datum = Datum::to_ast(datum.clone(), source_type)?;
+                        println!("PARTS {:?}", prefix.as_rule());
+
+                        match prefix.as_rule() {
+                            Rule::abbrev_quote => {
+                                let elts = vec![Value::symbol("quote"), other_datum.value.clone()];
+                                Ok(Datum::new(Value::proper_list(&mut elts.iter()), loc))
+                            }
+                            _ => todo!(),
+                        }
+                    }
+                    _ => {
+                        Error::syntax_error("Expected (abbrev-prefix <datum>)", source_type.clone())
+                    }
+                }
             }
             _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
         }
@@ -101,13 +121,18 @@ mod tests {
                 SourceLocation::new(source_type, 1, 1)
             ))
         );
+    }
+
+    #[test]
+    fn test_read_quotation() {
+        let mut source = src("");
 
         source = src("'#f");
         let source_type = source.source_type();
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
-                Value::boolean(false),
+                Value::proper_list(&mut vec![Value::symbol("quote"), Value::boolean(false)].iter()),
                 SourceLocation::new(source_type, 1, 1)
             ))
         );
