@@ -14,6 +14,13 @@ pub struct Datum {
 }
 
 impl Datum {
+    pub fn new(value: Value, source_location: SourceLocation) -> Self {
+        Self {
+            value,
+            source_location,
+        }
+    }
+
     // parses the next available Datum from Source
     pub fn parse(source: &mut impl Source) -> Result<Option<Datum>> {
         let source_type = source.source_type();
@@ -29,20 +36,6 @@ impl Datum {
         }
     }
 
-    pub fn boolean(value: bool, source_location: SourceLocation) -> Datum {
-        Datum {
-            value: Value::Bool(value),
-            source_location,
-        }
-    }
-
-    pub fn symbol(value: &str, source_location: SourceLocation) -> Datum {
-        Datum {
-            value: Value::Symbol(value.to_string()),
-            source_location,
-        }
-    }
-
     fn to_ast_seq(pairs: Pairs<Rule>, source_type: &SourceType) -> Result<Vec<Datum>> {
         pairs.map(|p| Self::to_ast(&p, source_type)).collect()
     }
@@ -51,13 +44,18 @@ impl Datum {
         let loc = Self::create_location(&pair, source_type);
 
         match pair.as_rule() {
-            Rule::BOOL_TRUE => Ok(Self::boolean(true, loc)),
-            Rule::BOOL_FALSE => Ok(Self::boolean(false, loc)),
-            Rule::IDENTIFIER => Ok(Self::symbol(pair.as_str(), loc)),
-            Rule::PECULIAR_IDENTIFIER => Ok(Self::symbol(pair.as_str(), loc)),
+            Rule::BOOL_TRUE => Ok(Datum::new(Value::Bool(true), loc)),
+            Rule::BOOL_FALSE => Ok(Datum::new(Value::Bool(false), loc)),
+            Rule::IDENTIFIER => Ok(Datum::new(Value::Symbol(pair.as_str().to_string()), loc)),
+            Rule::PECULIAR_IDENTIFIER => {
+                Ok(Datum::new(Value::Symbol(pair.as_str().to_string()), loc))
+            }
             Rule::DELIMITED_IDENTIFIER => {
                 let s = pair.as_str();
-                Ok(Self::symbol(&s[1..s.len() - 1], loc))
+                Ok(Datum::new(
+                    Value::Symbol(s[1..s.len() - 1].to_string()),
+                    loc,
+                ))
             }
             _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
         }
@@ -88,14 +86,30 @@ mod tests {
 
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
-            Some(Datum::boolean(true, SourceLocation::new(source_type, 1, 1)))
+            Some(Datum::new(
+                Value::boolean(true),
+                SourceLocation::new(source_type, 1, 1)
+            ))
         );
 
         source = src("#true");
         let source_type = source.source_type();
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
-            Some(Datum::boolean(true, SourceLocation::new(source_type, 1, 1)))
+            Some(Datum::new(
+                Value::boolean(true),
+                SourceLocation::new(source_type, 1, 1)
+            ))
+        );
+
+        source = src("'#f");
+        let source_type = source.source_type();
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::boolean(false),
+                SourceLocation::new(source_type, 1, 1)
+            ))
         );
     }
 
@@ -120,8 +134,8 @@ mod tests {
 
             assert_eq!(
                 Datum::parse(&mut source).unwrap(),
-                Some(Datum::symbol(
-                    sym,
+                Some(Datum::new(
+                    Value::symbol(sym),
                     SourceLocation::new(source_type.clone(), 1, 1)
                 ))
             );
@@ -139,8 +153,8 @@ mod tests {
 
             assert_eq!(
                 Datum::parse(&mut source).unwrap(),
-                Some(Datum::symbol(
-                    sym,
+                Some(Datum::new(
+                    Value::symbol(sym),
                     SourceLocation::new(source_type.clone(), 1, 1)
                 ))
             );
@@ -155,8 +169,8 @@ mod tests {
         source = src("|two words|");
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
-            Some(Datum::symbol(
-                "two words",
+            Some(Datum::new(
+                Value::symbol("two words"),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
@@ -164,8 +178,8 @@ mod tests {
         source = src("|two\x20;words|");
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
-            Some(Datum::symbol(
-                "two\x20;words",
+            Some(Datum::new(
+                Value::symbol("two\x20;words"),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
