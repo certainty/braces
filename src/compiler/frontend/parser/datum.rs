@@ -62,8 +62,6 @@ impl Datum {
                 match &parts[..] {
                     [prefix, datum] => {
                         let other_datum = Datum::to_ast(datum.clone(), source_type)?;
-                        println!("PARTS {:?}", prefix.as_rule());
-
                         match prefix.as_rule() {
                             Rule::abbrev_quote => {
                                 let elts = vec![Value::symbol("quote"), other_datum.value.clone()];

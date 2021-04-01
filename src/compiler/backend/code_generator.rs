@@ -33,7 +33,9 @@ impl CodeGenerator {
             Expression::Literal(LiteralExpression::SelfEvaluating(constant), loc) => {
                 self.emit_constant(constant, loc)?
             }
-            Expression::Literal(LiteralExpression::Quotation(_datum), _loc) => todo!(),
+            Expression::Literal(LiteralExpression::Quotation(datum), loc) => {
+                self.emit_constant(datum, loc)?
+            }
         }
         Ok(())
     }
