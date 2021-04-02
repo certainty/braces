@@ -95,18 +95,18 @@ mod tests {
 
         assert_eq!(
             Expression::parse_one(&mut source).unwrap(),
-            Some(Expression::constant(
+            Some(Expression::quoted_value(
                 Value::Bool(true),
-                SourceLocation::new(source_type, 1, 1)
+                SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
 
-        source = src("(quote #t)");
+        source = src("'foo");
         assert_eq!(
             Expression::parse_one(&mut source).unwrap(),
-            Some(Expression::constant(
-                Value::Bool(true),
-                SourceLocation::new(source_type, 1, 1)
+            Some(Expression::quoted_value(
+                Value::symbol("foo"),
+                SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
     }

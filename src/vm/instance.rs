@@ -46,10 +46,6 @@ impl<'a> Instance<'a> {
         }
     }
 
-    fn unsafe_pop(&mut self) -> Value {
-        self.stack.pop().unwrap()
-    }
-
     fn next_instruction(&mut self) -> &Instruction {
         let instruction = self.current_chunk.read_instruction(self.ip);
         self.ip = self.ip + 1;

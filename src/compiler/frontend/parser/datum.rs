@@ -126,9 +126,7 @@ mod tests {
 
     #[test]
     fn test_read_quotation() {
-        let mut source = src("");
-
-        source = src("'#f");
+        let mut source = src("'#f");
         let source_type = source.source_type();
 
         assert_eq!(
@@ -141,7 +139,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_read_symbol() {
         let mut source = src("<=?");
         let source_type = source.source_type();
