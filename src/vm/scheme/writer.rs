@@ -46,7 +46,7 @@ mod tests {
     fn test_write_proper_list() {
         let writer = Writer;
         let elts = vec![Value::boolean(true), Value::boolean(false)];
-        let ls = Value::proper_list(&mut elts.iter());
+        let ls = Value::proper_list(elts);
 
         assert_eq!(writer.external_representation(&ls), "'(#t #f)");
     }

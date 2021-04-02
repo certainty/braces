@@ -1,10 +1,10 @@
-use std::collections::LinkedList;
+pub mod list;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     Bool(bool),
     Symbol(String),
-    ProperList(LinkedList<Box<Value>>),
+    ProperList(list::List),
     Unspecified,
 }
 
@@ -21,11 +21,8 @@ impl Value {
         Self::Symbol(name.to_string())
     }
 
-    pub fn proper_list<'a, I>(elts: &mut I) -> Value
-    where
-        I: Iterator<Item = &'a Value>,
-    {
-        let ls: LinkedList<Box<Value>> = elts.map(|e| Box::new(e.clone())).collect();
-        Self::ProperList(ls)
+    pub fn proper_list(vals: Vec<Value>) -> Value {
+        let ls: list::List = vals.into();
+        Value::ProperList(ls)
     }
 }

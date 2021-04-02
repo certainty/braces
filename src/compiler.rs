@@ -3,7 +3,6 @@ pub mod frontend;
 pub mod source;
 pub mod source_location;
 use crate::vm::byte_code::chunk;
-use crate::vm::byte_code::Instruction;
 use backend::code_generator;
 use backend::code_generator::CodeGenerator;
 use frontend::parser::Parser;
@@ -28,8 +27,11 @@ impl Compiler {
         Compiler {}
     }
 
-    pub fn compile<T: Source>(&mut self, source: &mut T) -> Result<Option<chunk::Chunk>> {
-        if let Some(ast) = Parser::parse(source)? {
+    pub fn compile_expression<T: Source>(
+        &mut self,
+        source: &mut T,
+    ) -> Result<Option<chunk::Chunk>> {
+        if let Some(ast) = Parser::parse_expression(source)? {
             let mut code_gen = CodeGenerator::new();
             let chunk = code_gen.generate(&ast)?;
             Ok(Some(chunk.clone()))

@@ -63,10 +63,13 @@ impl Datum {
                     [prefix, datum] => {
                         let other_datum = Datum::to_ast(datum.clone(), source_type)?;
                         match prefix.as_rule() {
-                            Rule::abbrev_quote => {
-                                let elts = vec![Value::symbol("quote"), other_datum.value.clone()];
-                                Ok(Datum::new(Value::proper_list(&mut elts.iter()), loc))
-                            }
+                            Rule::abbrev_quote => Ok(Datum::new(
+                                Value::proper_list(vec![
+                                    Value::symbol("quote"),
+                                    other_datum.value.clone(),
+                                ]),
+                                loc,
+                            )),
                             _ => todo!(),
                         }
                     }
@@ -131,7 +134,7 @@ mod tests {
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
-                Value::proper_list(&mut vec![Value::symbol("quote"), Value::boolean(false)].iter()),
+                Value::proper_list(vec![Value::symbol("quote"), Value::boolean(false)]),
                 SourceLocation::new(source_type, 1, 1)
             ))
         );

@@ -33,6 +33,9 @@ pretty_env_logger = "0.4"
 thiserror = "1.0"
 anyhow = "1.0"
 
+# values
+im = "15.0"
+
 # parser
 pest = "2.1"
 pest_derive = "2.1"

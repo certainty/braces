@@ -41,7 +41,7 @@ impl VM {
         let mut source = StringSource::new(inp, "run_string");
         let mut compiler = Compiler::new();
 
-        if let Some(chunk) = compiler.compile(&mut source)? {
+        if let Some(chunk) = compiler.compile_expression(&mut source)? {
             self.interprete(&chunk)
         } else {
             Ok(Value::Unspecified)

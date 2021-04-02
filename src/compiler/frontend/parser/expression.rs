@@ -2,6 +2,7 @@ use super::error::Error;
 use crate::compiler::frontend::parser::datum::Datum;
 use crate::compiler::source::Source;
 use crate::compiler::source_location::SourceLocation;
+use crate::vm::scheme::value::list;
 use crate::vm::scheme::value::Value;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -18,7 +19,7 @@ pub enum LiteralExpression {
 }
 
 impl Expression {
-    pub fn parse<T: Source>(source: &mut T) -> Result<Option<Self>> {
+    pub fn parse_one<T: Source>(source: &mut T) -> Result<Option<Self>> {
         let datum_ast = Datum::parse(source)?;
 
         match datum_ast {
@@ -36,22 +37,34 @@ impl Expression {
     }
 
     fn parse_expression(datum: Datum) -> Result<Expression> {
-        match datum.value {
-            val @ Value::Bool(_) => Ok(Self::constant(val, datum.source_location.clone())),
-            Value::ProperList(elts) if elts.len() == 2 => {
-                let mut iter = elts.iter();
-                let head = iter.next().unwrap();
-                let value = iter.next().unwrap();
-
-                match &**head {
-                    Value::Symbol(sym) if sym == "quote" => Ok(Self::quoted_value(
-                        *value.clone(),
-                        datum.source_location.clone(),
-                    )),
+        match &datum.value {
+            val @ Value::Bool(_) => Ok(Self::constant(val.clone(), datum.source_location.clone())),
+            Value::ProperList(ls) => match &ls.head() {
+                Some(Value::Symbol(sym)) => match sym.as_str() {
+                    "quote" => Self::parse_quoted_datum(&ls, &datum),
                     _ => todo!(),
-                }
-            }
+                },
+                None => Error::parse_error(
+                    "Unexpected empty list literal. Did you intend to quote it?",
+                    datum.source_location.clone(),
+                ),
+                _ => todo!(),
+            },
+
             _ => todo!(),
+        }
+    }
+
+    fn parse_quoted_datum(ls: &list::List, datum: &Datum) -> Result<Expression> {
+        match (ls.len(), ls.second()) {
+            (2, Some(value)) => Ok(Self::quoted_value(
+                value.clone(),
+                datum.source_location.clone(),
+            )),
+            _ => Error::parse_error(
+                "Too many arguments. Expected (quote <datum>).",
+                datum.source_location.clone(),
+            ),
         }
     }
 }
@@ -67,12 +80,35 @@ mod tests {
         let source_type = source.source_type();
 
         assert_eq!(
-            Expression::parse(&mut source).unwrap(),
+            Expression::parse_one(&mut source).unwrap(),
             Some(Expression::constant(
                 Value::Bool(true),
                 SourceLocation::new(source_type, 1, 1)
             ))
         )
+    }
+
+    #[test]
+    fn test_parse_quoted_value() {
+        let mut source = src("'#t");
+        let source_type = source.source_type();
+
+        assert_eq!(
+            Expression::parse_one(&mut source).unwrap(),
+            Some(Expression::constant(
+                Value::Bool(true),
+                SourceLocation::new(source_type, 1, 1)
+            ))
+        );
+
+        source = src("(quote #t)");
+        assert_eq!(
+            Expression::parse_one(&mut source).unwrap(),
+            Some(Expression::constant(
+                Value::Bool(true),
+                SourceLocation::new(source_type, 1, 1)
+            ))
+        );
     }
 
     fn src(inp: &str) -> impl Source {

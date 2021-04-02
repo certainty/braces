@@ -9,34 +9,15 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct Parser;
 
 impl Parser {
-    pub fn parse<T: Source>(source: &mut T) -> Result<Option<expression::Expression>> {
-        expression::Expression::parse(source)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::expression::Expression;
-    use super::*;
-    use crate::compiler::source::{Source, StringSource};
-    use crate::compiler::source_location::SourceLocation;
-    use crate::vm::scheme::value::Value;
-
-    #[test]
-    fn test_parse_literal() {
-        let mut source = src("#true");
-        let source_type = source.source_type();
-
-        assert_eq!(
-            Parser::parse(&mut source).unwrap(),
-            Some(Expression::constant(
-                Value::Bool(true),
-                SourceLocation::new(source_type, 1, 1)
-            ))
-        )
+    pub fn parse_datum<T: Source>(source: &mut T) -> Result<Option<datum::Datum>> {
+        datum::Datum::parse(source)
     }
 
-    fn src(inp: &str) -> impl Source {
-        StringSource::new(inp, "expression-parser-test")
+    pub fn parse_program<T: Source>(_source: &mut T) -> Result<Vec<expression::Expression>> {
+        todo!()
+    }
+
+    pub fn parse_expression<T: Source>(source: &mut T) -> Result<Option<expression::Expression>> {
+        expression::Expression::parse_one(source)
     }
 }
