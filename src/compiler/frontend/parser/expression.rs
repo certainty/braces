@@ -55,6 +55,7 @@ impl Expression {
         }
     }
 
+    #[inline]
     fn parse_quoted_datum(ls: &list::List, datum: &Datum) -> Result<Expression> {
         match (ls.len(), ls.second()) {
             (2, Some(value)) => Ok(Self::quoted_value(

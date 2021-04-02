@@ -46,6 +46,7 @@ impl<'a> Instance<'a> {
         }
     }
 
+    #[inline]
     fn next_instruction(&mut self) -> &Instruction {
         let instruction = self.current_chunk.read_instruction(self.ip);
         self.ip = self.ip + 1;
