@@ -8,6 +8,7 @@ impl Writer {
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
             Value::Symbol(sym) => self.write_symbol(&sym.as_str()),
+            Value::Char(c) => todo!(),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
