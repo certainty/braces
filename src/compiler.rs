@@ -1,27 +1,42 @@
 pub mod backend;
 pub mod frontend;
 pub mod source;
-
-use super::vm::byte_code::chunk;
-use frontend::parser;
+pub mod source_location;
+use crate::vm::byte_code::chunk;
+use backend::code_generator;
+use backend::code_generator::CodeGenerator;
+use frontend::parser::Parser;
+use source::Source;
 use thiserror::Error;
 
+type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Error, Debug)]
-pub enum CompileError {
+pub enum Error {
     #[error(transparent)]
-    ParseError(#[from] parser::ParseError),
+    ParseError(#[from] frontend::parser::error::Error),
+
     #[error(transparent)]
-    CodegenerationError(#[from] backend::byte_code::GenerationError),
+    GenerationError(#[from] code_generator::Error),
 }
 
-type Result<T> = std::result::Result<T, CompileError>;
+pub struct Compiler {}
 
-pub fn jit_compile<T: source::Source>(source: &mut T) -> Result<Option<chunk::Chunk>> {
-    if let Some(ast) = parser::parse(source)? {
-        let mut chunk = backend::byte_code::generate(&ast)?;
-        backend::byte_code::finalise(&mut chunk);
-        Ok(Some(chunk))
-    } else {
-        Ok(None)
+impl Compiler {
+    pub fn new() -> Self {
+        Compiler {}
+    }
+
+    pub fn compile_expression<T: Source>(
+        &mut self,
+        source: &mut T,
+    ) -> Result<Option<chunk::Chunk>> {
+        if let Some(ast) = Parser::parse_expression(source)? {
+            let mut code_gen = CodeGenerator::new();
+            let chunk = code_gen.generate(&ast)?;
+            Ok(Some(chunk.clone()))
+        } else {
+            Ok(None)
+        }
     }
 }

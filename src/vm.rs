@@ -1,28 +1,54 @@
 pub mod byte_code;
 pub mod disassembler;
-pub mod environment;
-pub mod error;
-pub mod hash_map;
-pub mod printer;
-pub mod runtime;
-pub mod stack_vm;
-pub mod value;
+pub mod instance;
+pub mod scheme;
 
-use stack_vm::VM;
+use crate::compiler;
+use crate::compiler::source::*;
+use crate::compiler::Compiler;
+use byte_code::chunk::Chunk;
+use instance::Instance;
+use scheme::value::Value;
+use scheme::writer::Writer;
+use thiserror::Error;
 
-pub type VMResult = std::result::Result<Option<value::Value>, error::VmError>;
-
-pub trait BracesVM {
-    fn run_string(&mut self, source: &String) -> VMResult;
-    fn print(&mut self, value: value::Value) -> String;
-
-    // fn set(name, value)
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    CompilerError(#[from] compiler::Error),
 }
 
-pub fn default() -> impl BracesVM {
-    VM::default()
+type Result<T> = std::result::Result<T, Error>;
+
+pub struct VM {
+    stack_size: usize,
+    writer: Writer,
 }
 
-pub fn interactive() -> impl BracesVM {
-    VM::interactive()
+impl VM {
+    pub fn new() -> VM {
+        VM {
+            stack_size: 256,
+            writer: Writer {},
+        }
+    }
+
+    pub fn write(&self, value: &Value) -> String {
+        self.writer.external_representation(value).to_string()
+    }
+
+    pub fn run_string(&mut self, inp: &str) -> Result<Value> {
+        let mut source = StringSource::new(inp, "run_string");
+        let mut compiler = Compiler::new();
+
+        if let Some(chunk) = compiler.compile_expression(&mut source)? {
+            self.interprete(&chunk)
+        } else {
+            Ok(Value::Unspecified)
+        }
+    }
+
+    fn interprete(&mut self, chunk: &Chunk) -> Result<Value> {
+        Instance::interprete(chunk, self.stack_size)
+    }
 }

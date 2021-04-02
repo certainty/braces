@@ -1,55 +1,50 @@
-use super::*;
-use crate::vm::value::symbol;
-use crate::vm::value::Value;
+use crate::vm::byte_code::Instruction;
+use crate::vm::scheme::value::Value;
 use std::cmp::Ordering;
 
-pub(crate) type LineNumber = usize;
-pub(crate) type AddressType = usize;
-// start address, end address, line number
-pub(crate) type LineInfo = (AddressType, AddressType, LineNumber);
+pub type ConstAddressType = u16;
+pub type LineNumber = usize;
+pub type AddressType = usize;
+pub type LineInfo = (AddressType, AddressType, LineNumber);
 
 #[derive(Clone, Debug)]
 pub struct Chunk {
     pub(crate) lines: Vec<LineInfo>,
     pub(crate) constants: Vec<Value>,
-    pub(crate) symbols: symbol::SymbolTable,
-    pub(crate) code: Vec<OpCode>,
+    pub(crate) code: Vec<Instruction>,
 }
 
 impl Chunk {
-    pub fn new() -> Chunk {
-        Chunk {
-            code: vec![],
-            constants: vec![],
-            symbols: symbol::SymbolTable::new(),
+    pub fn new() -> Self {
+        Self {
             lines: vec![],
+            constants: vec![],
+            code: vec![],
         }
     }
 
-    // make this work when called multiple time with the same addresses
+    //TODO: make this work when called multiple time with the same addresses
+    //in that case it shouldn't just push but expand the interval it matches
+
     pub fn write_line(&mut self, from: AddressType, to: AddressType, line: LineNumber) {
         self.lines.push((from, to, line));
     }
 
-    pub fn add_constant(&mut self, value: Value) -> ConstAddressType {
+    pub fn add_constant(&mut self, value: &Value) -> ConstAddressType {
         self.constants.push(value.clone());
         (self.constants.len() - 1) as ConstAddressType
-    }
-
-    pub fn add_symbol(&mut self, value: String) -> symbol::InternedSymbol {
-        self.symbols.interned(value)
     }
 
     pub fn read_constant(&self, addr: ConstAddressType) -> &Value {
         &self.constants[addr as usize]
     }
 
-    pub fn write_opcode(&mut self, op_code: OpCode) -> AddressType {
-        self.code.push(op_code);
+    pub fn write_instruction(&mut self, instr: Instruction) -> AddressType {
+        self.code.push(instr);
         self.code.len() - 1
     }
 
-    pub fn read_opcode(&self, addr: AddressType) -> &OpCode {
+    pub fn read_instruction(&self, addr: AddressType) -> &Instruction {
         &self.code[addr]
     }
 

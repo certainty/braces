@@ -1,5 +1,4 @@
-use braces::vm;
-use braces::vm::BracesVM;
+use braces::vm::VM;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -14,7 +13,7 @@ fn repl() {
         println!("No previous history.");
     }
 
-    let mut vm = vm::interactive();
+    let mut vm = VM::new();
 
     loop {
         let readline = rl.readline(">> ");
@@ -22,8 +21,7 @@ fn repl() {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 match vm.run_string(&line) {
-                    Ok(Some(v)) => println!("{}", vm.print(v)),
-                    Ok(_) => (),
+                    Ok(v) => println!("{}", vm.write(&v)),
                     Err(e) => eprintln!("Error: {}", e),
                 };
             }

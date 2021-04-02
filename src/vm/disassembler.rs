@@ -1,80 +1,71 @@
-use super::byte_code::chunk::{AddressType, Chunk};
-use super::byte_code::OpCode;
-use super::printer;
-use super::{byte_code, value::symbol::InternedSymbol};
+use super::byte_code::chunk::{AddressType, Chunk, ConstAddressType};
+use super::byte_code::Instruction;
 use std::io::Write;
 
-pub fn disassemble<W: Write>(out: &mut W, chunk: &Chunk, context: &str) {
-    let mut address: usize = 0;
-
-    out.write_fmt(format_args!("== {} ==\n", context)).unwrap();
-
-    while address < chunk.code.len() {
-        address = disassemble_instruction(out, chunk, address);
-    }
-    out.write("\n".as_bytes()).unwrap();
+pub struct Disassembler<T: Write> {
+    writer: T,
 }
 
-pub fn disassemble_instruction<W: Write>(out: &mut W, chunk: &Chunk, address: usize) -> usize {
-    if let Some((begin, _, _)) = chunk.find_line(address) {
-        if address > 0 && begin <= address - 1 {
-            out.write_all("   | ".as_bytes()).unwrap();
+impl<T: Write> Disassembler<T> {
+    pub fn new(writer: T) -> Disassembler<T> {
+        Disassembler { writer }
+    }
+
+    pub fn disassemble(&mut self, chunk: &Chunk, context: &str) {
+        let mut address: usize = 0;
+
+        self.writer
+            .write_fmt(format_args!("== {} ==\n", context))
+            .unwrap();
+
+        while address < chunk.code.len() {
+            address = self.disassemble_instruction(chunk, address);
+        }
+        self.writer.write("\n".as_bytes()).unwrap();
+    }
+
+    pub fn disassemble_instruction(&mut self, chunk: &Chunk, address: usize) -> usize {
+        if let Some((begin, _, _)) = chunk.find_line(address) {
+            if address > 0 && begin <= address - 1 {
+                self.writer.write_all("   | ".as_bytes()).unwrap();
+            } else {
+                self.writer
+                    .write_fmt(format_args!("{:04} ", address))
+                    .unwrap();
+            }
         } else {
-            out.write_fmt(format_args!("{:04} ", address)).unwrap();
+            self.writer
+                .write_fmt(format_args!("{:04} ", address))
+                .unwrap();
         }
-    } else {
-        out.write_fmt(format_args!("{:04} ", address)).unwrap();
+
+        match &chunk.code[address] {
+            &Instruction::Halt => self.disassemble_simple("OP_HALT", address),
+            &Instruction::Const(const_address) => {
+                self.disassemble_constant(chunk, "OP_CONST", address, const_address)
+            }
+        }
     }
 
-    match &chunk.code[address] {
-        &OpCode::Halt => disassemble_simple(out, "OP_HALT", address),
-        &OpCode::Const(const_address) => {
-            disassemble_constant(out, chunk, "OP_CONST", address, const_address)
-        }
-        &OpCode::Get => disassemble_simple(out, "OP_GET", address),
-        &OpCode::Sym(interned) => disassemble_symbol(out, chunk, "OP_SYM", address, interned),
-        &OpCode::Nop => disassemble_simple(out, "OP_NOP", address),
-        &OpCode::Apply => disassemble_simple(out, "OP_APPLY", address),
+    fn disassemble_simple(&mut self, name: &str, address: usize) -> usize {
+        self.writer.write_fmt(format_args!("{}\n", name)).unwrap();
+        address + 1
     }
-}
 
-fn disassemble_simple<W: Write>(out: &mut W, name: &str, address: usize) -> usize {
-    out.write_fmt(format_args!("{}\n", name)).unwrap();
-    address + 1
-}
+    fn disassemble_constant(
+        &mut self,
+        chunk: &Chunk,
+        name: &str,
+        address: AddressType,
+        constant_address: ConstAddressType,
+    ) -> usize {
+        self.writer
+            .write_fmt(format_args!(
+                "{:<16} {:04}        '{:?}'\n",
+                name, constant_address, &chunk.constants[constant_address as usize]
+            ))
+            .unwrap();
 
-fn disassemble_symbol<W: Write>(
-    out: &mut W,
-    chunk: &Chunk,
-    name: &str,
-    address: AddressType,
-    interned: InternedSymbol,
-) -> usize {
-    out.write_fmt(format_args!(
-        "{:<16} {:04}  '{}'\n",
-        name,
-        interned.0,
-        printer::print(&interned, &chunk.symbols)
-    ))
-    .unwrap();
-
-    address + 1
-}
-
-fn disassemble_constant<W: Write>(
-    out: &mut W,
-    chunk: &Chunk,
-    name: &str,
-    address: AddressType,
-    constant_address: byte_code::ConstAddressType,
-) -> usize {
-    out.write_fmt(format_args!(
-        "{:<16} {:04}        '{}'\n",
-        name,
-        constant_address,
-        printer::print(&chunk.constants[constant_address as usize], &chunk.symbols)
-    ))
-    .unwrap();
-
-    address + 1
+        address + 1
+    }
 }

@@ -1,14 +1,9 @@
 pub mod chunk;
-use super::value::symbol::InternedSymbol;
-pub type ConstAddressType = u16;
+use chunk::ConstAddressType;
 
 #[repr(u8)]
 #[derive(Debug, Clone)]
-pub enum OpCode {
-    Halt,
-    Nop,
-    Apply,
-    Get,
-    Sym(InternedSymbol),
+pub enum Instruction {
     Const(ConstAddressType),
+    Halt,
 }
