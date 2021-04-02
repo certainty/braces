@@ -74,8 +74,12 @@ mod tests {
     use super::*;
     use crate::compiler::source::{Source, StringSource};
 
+    // Literals
+    // See: r7rs page 12 for all examples of literals we need to support
+    // TODO: add support for the other literals once we support them
+
     #[test]
-    fn test_parse_literal_boolean() {
+    fn test_parse_literal_constant() {
         let mut source = src("#t");
         let source_type = source.source_type();
 
@@ -89,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_quoted_value() {
+    fn test_parse_literal_quoted_datum() {
         let mut source = src("'#t");
         let source_type = source.source_type();
 
