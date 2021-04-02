@@ -7,7 +7,7 @@ impl Writer {
         match v {
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
-            Value::Symbol(sym) => format!("'{}", sym),
+            Value::Symbol(sym) => self.write_symbol(&sym.as_str()),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -17,6 +17,29 @@ impl Writer {
                 format!("'({})", body.join(" "))
             }
             Value::Unspecified => "#<unspecified>".to_string(),
+        }
+    }
+
+    fn write_symbol(&self, sym: &str) -> String {
+        let mut requires_delimiter = false;
+        let mut external = String::new();
+
+        for c in sym.chars() {
+            if !char::is_ascii(&c) {
+                requires_delimiter = true;
+                external.push_str(&format!("\\x{:x};", c as u32));
+            } else if char::is_whitespace(c) {
+                requires_delimiter = true;
+                external.push(c);
+            } else {
+                external.push(c);
+            }
+        }
+
+        if requires_delimiter {
+            format!("'|{}|", external)
+        } else {
+            format!("'{}", external)
         }
     }
 }
@@ -40,6 +63,16 @@ mod tests {
             writer.external_representation(&Value::Symbol("...".to_string())),
             "'..."
         );
+
+        assert_eq!(
+            writer.external_representation(&Value::symbol(&"foo bar".to_string())),
+            "'|foo bar|"
+        );
+
+        assert_eq!(
+            writer.external_representation(&Value::symbol(&"foo 💣 bar".to_string())),
+            "'|foo \\x1f4a3; bar|"
+        )
     }
 
     #[test]
