@@ -109,6 +109,12 @@ mod tests {
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
+
+        source = src("'");
+        assert!(
+            Expression::parse_one(&mut source).is_err(),
+            "expected error on single quote"
+        );
     }
 
     fn src(inp: &str) -> impl Source {
