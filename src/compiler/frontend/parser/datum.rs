@@ -128,19 +128,10 @@ impl Datum {
         loc: SourceLocation,
         _source_type: &SourceType,
     ) -> Result<Datum> {
-        match u32::from_str_radix(str.trim_start_matches("#\\x"), 16) {
-            Ok(val) => {
-                if let Some(c) = std::char::from_u32(val) {
-                    Ok(Datum::new(Value::character(c), loc))
-                } else {
-                    Error::domain_error(
-                        &format!("Could not create character from value {}", val),
-                        loc,
-                    )
-                }
-            }
-
-            Err(_e) => Error::parse_error("Couldn't parse hex character literal", loc),
+        if let Some(c) = Self::hex_to_char(str.trim_start_matches("#\\x")) {
+            Ok(Datum::new(Value::character(c), loc))
+        } else {
+            Error::parse_error("Couldn't parse hex character literal", loc)
         }
     }
 
@@ -164,6 +155,27 @@ impl Datum {
                     Some('r') => result.push('\r'),
                     Some('b') => result.push('\u{0007}'),
                     Some('t') => result.push('\t'),
+                    Some('x') => {
+                        let mut hex_value = String::new();
+                        loop {
+                            match iter.next() {
+                                Some(';') => break,
+                                Some(digit) => hex_value.push(digit),
+                                None => return Error::parse_error("Unexpected end of string", loc),
+                            }
+                        }
+                        if let Some(c) = Self::hex_to_char(&hex_value) {
+                            result.push(c);
+                        } else {
+                            return Error::parse_error("Invalid hex escape", loc);
+                        }
+                    }
+                    Some('"') => result.push('"'),
+                    Some('\\') => result.push('\\'),
+                    Some(' ') => continue, // handle intraline ws
+                    Some('\t') => continue,
+                    Some('\n') => continue,
+                    Some('\r') => continue,
                     _ => return Error::parse_error("Invalid escape character", loc),
                 },
                 Some(c) => result.push(c),
@@ -172,6 +184,15 @@ impl Datum {
         }
 
         Ok(Datum::new(Value::string(&result), loc))
+    }
+
+    #[inline]
+    fn hex_to_char(s: &str) -> Option<char> {
+        if let Ok(v) = u32::from_str_radix(s, 16).map(std::char::from_u32) {
+            v
+        } else {
+            None
+        }
     }
 
     fn create_location(pair: &Pair<Rule>, source_type: &SourceType) -> SourceLocation {
@@ -389,6 +410,24 @@ mod tests {
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
                 Value::string("string with \n and \t "),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("\"string with \\xa; and \\t \"");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::string("string with \n and \t "),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("\"string with \\\n and the\\\n next line\"");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::string("string with  and the next line"),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );

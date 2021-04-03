@@ -65,7 +65,7 @@ impl Writer {
 
     fn write_string(&self, s: &String) -> String {
         //TODO: escape
-        s.clone()
+        format!("\"{}\"", s)
     }
 }
 

@@ -40,6 +40,9 @@ impl Expression {
         match &datum.value {
             val @ Value::Bool(_) => Ok(Self::constant(val.clone(), datum.source_location.clone())),
             val @ Value::Char(_) => Ok(Self::constant(val.clone(), datum.source_location.clone())),
+            val @ Value::String(_) => {
+                Ok(Self::constant(val.clone(), datum.source_location.clone()))
+            }
             Value::ProperList(ls) => match &ls.head() {
                 Some(Value::Symbol(sym)) => match sym.as_str() {
                     "quote" => Self::parse_quoted_datum(&ls, &datum),
@@ -89,9 +92,18 @@ mod tests {
             Expression::parse_one(&mut source).unwrap(),
             Some(Expression::constant(
                 Value::Bool(true),
-                SourceLocation::new(source_type, 1, 1)
+                SourceLocation::new(source_type.clone(), 1, 1)
             ))
-        )
+        );
+
+        source = src("\"foo\"");
+        assert_eq!(
+            Expression::parse_one(&mut source).unwrap(),
+            Some(Expression::constant(
+                Value::string("foo"),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
     }
 
     #[test]
