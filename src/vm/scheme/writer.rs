@@ -64,8 +64,18 @@ impl Writer {
     }
 
     fn write_string(&self, s: &String) -> String {
-        //TODO: escape
-        format!("\"{}\"", s)
+        let mut external = String::from("\"");
+
+        for c in s.chars() {
+            match c {
+                '\n' => external.push_str("\\n"),
+                '\r' => external.push_str("\\r"),
+                '\t' => external.push_str("\\t"),
+                _ => external.push(c),
+            }
+        }
+        external.push('"');
+        external
     }
 }
 
