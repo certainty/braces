@@ -5,6 +5,7 @@ pub enum Value {
     Bool(bool),
     Symbol(String),
     Char(char),
+    String(std::string::String),
     ProperList(list::List),
     Unspecified,
 }
@@ -20,6 +21,10 @@ impl Value {
 
     pub fn symbol(name: &str) -> Value {
         Self::Symbol(name.to_string())
+    }
+
+    pub fn string(s: &str) -> Value {
+        Self::String(s.to_string())
     }
 
     pub fn character(c: char) -> Value {

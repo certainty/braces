@@ -51,6 +51,7 @@ impl Datum {
                 Ok(Datum::new(Value::Symbol(pair.as_str().to_string()), loc))
             }
             Rule::DELIMITED_IDENTIFIER => Self::parse_delimited_identifier(pair.as_str(), loc),
+            Rule::STRING => Self::parse_string(pair.as_str(), loc, &source_type),
             Rule::NAMED_CHAR_LITERAL => {
                 Self::parse_named_character(pair.as_str(), loc, source_type)
             }
@@ -147,6 +148,14 @@ impl Datum {
     fn parse_character(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
         Ok(Datum::new(
             Value::character(str.chars().last().unwrap()),
+            loc,
+        ))
+    }
+
+    #[inline]
+    fn parse_string(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
+        Ok(Datum::new(
+            Value::string(str.trim_matches(|c| c == '"')),
             loc,
         ))
     }
@@ -333,6 +342,21 @@ mod tests {
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
                 Value::character('☆'),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_read_string() {
+        let mut source = src("");
+        let source_type = source.source_type();
+
+        source = src("\"this is my string\"");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::string("this is my string"),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );

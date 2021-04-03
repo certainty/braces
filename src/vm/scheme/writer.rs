@@ -9,6 +9,7 @@ impl Writer {
             Value::Bool(false) => "#f".to_string(),
             Value::Symbol(sym) => self.write_symbol(&sym.as_str()),
             Value::Char(c) => self.write_char(*c),
+            Value::String(s) => self.write_string(&s),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -60,6 +61,11 @@ impl Writer {
         };
 
         format!("#\\{}", external)
+    }
+
+    fn write_string(&self, s: &String) -> String {
+        //TODO: escape
+        s.clone()
     }
 }
 
