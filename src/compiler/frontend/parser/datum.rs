@@ -154,10 +154,24 @@ impl Datum {
 
     #[inline]
     fn parse_string(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
-        Ok(Datum::new(
-            Value::string(str.trim_matches(|c| c == '"')),
-            loc,
-        ))
+        let mut result = String::new();
+        let mut iter = str.trim_matches(|c| c == '"').chars();
+
+        loop {
+            match iter.next() {
+                Some('\\') => match iter.next() {
+                    Some('n') => result.push('\n'),
+                    Some('r') => result.push('\r'),
+                    Some('b') => result.push('\u{0007}'),
+                    Some('t') => result.push('\t'),
+                    _ => return Error::parse_error("Invalid escape character", loc),
+                },
+                Some(c) => result.push(c),
+                None => break,
+            }
+        }
+
+        Ok(Datum::new(Value::string(&result), loc))
     }
 
     fn create_location(pair: &Pair<Rule>, source_type: &SourceType) -> SourceLocation {
@@ -357,6 +371,24 @@ mod tests {
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
                 Value::string("this is my string"),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("\"this is my ☆ string ☆\"");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::string("this is my ☆ string ☆"),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("\"string with \\n and \\t \"");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::string("string with \n and \t "),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
