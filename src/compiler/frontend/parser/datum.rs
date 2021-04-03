@@ -51,10 +51,11 @@ impl Datum {
                 Ok(Datum::new(Value::Symbol(pair.as_str().to_string()), loc))
             }
             Rule::DELIMITED_IDENTIFIER => Self::parse_delimited_identifier(pair.as_str(), loc),
-            Rule::abbreviation => Self::parse_abbreviation(pair, loc, &source_type),
             Rule::NAMED_CHAR_LITERAL => {
                 Self::parse_named_character(pair.as_str(), loc, source_type)
             }
+            Rule::HEX_CHAR_LITERAL => Self::parse_hex_character(pair.as_str(), loc, source_type),
+            Rule::abbreviation => Self::parse_abbreviation(pair, loc, &source_type),
             _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
         }
     }
@@ -117,6 +118,28 @@ impl Datum {
         };
 
         Ok(Datum::new(Value::character(character?), loc))
+    }
+
+    #[inline]
+    fn parse_hex_character(
+        str: &str,
+        loc: SourceLocation,
+        _source_type: &SourceType,
+    ) -> Result<Datum> {
+        match u32::from_str_radix(str.trim_start_matches("#\\x"), 16) {
+            Ok(val) => {
+                if let Some(c) = std::char::from_u32(val) {
+                    Ok(Datum::new(Value::character(c), loc))
+                } else {
+                    Error::domain_error(
+                        &format!("Could not create character from value {}", val),
+                        loc,
+                    )
+                }
+            }
+
+            Err(_e) => Error::parse_error("Couldn't parse hex character literal", loc),
+        }
     }
 
     fn create_location(pair: &Pair<Rule>, source_type: &SourceType) -> SourceLocation {
@@ -252,6 +275,21 @@ mod tests {
         let source_type = source.source_type();
 
         source = src("#\\alarm");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::character('\u{0007}'),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_read_character_hex() {
+        let mut source = src("");
+        let source_type = source.source_type();
+
+        source = src("#\\x7");
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(

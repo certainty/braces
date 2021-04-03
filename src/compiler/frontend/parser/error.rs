@@ -10,6 +10,8 @@ pub enum Error {
     SyntaxError(String, SourceType),
     #[error("ParseError")]
     ParseError(String, SourceLocation),
+    #[error("DomainError")]
+    DomainError(String, SourceLocation),
 }
 
 impl Error {
@@ -19,5 +21,9 @@ impl Error {
 
     pub fn parse_error<T>(message: &str, source: SourceLocation) -> Result<T, Error> {
         Err(Error::ParseError(message.to_string(), source))
+    }
+
+    pub fn domain_error<T>(message: &str, source: SourceLocation) -> Result<T, Error> {
+        Err(Error::DomainError(message.to_string(), source))
     }
 }

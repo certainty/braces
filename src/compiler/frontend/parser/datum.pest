@@ -8,7 +8,7 @@ simple_datum   = _{  bool | symbol | character }
 
 bool      = _{ BOOL_TRUE | BOOL_FALSE }
 symbol    = _{ IDENTIFIER | DELIMITED_IDENTIFIER | PECULIAR_IDENTIFIER }
-character = _{ NAMED_CHAR_LITERAL | HEX_CHAR_LITERAL | UNICODE_CHAR_LITERAL | CHAR_LITERAL }
+character = _{ NAMED_CHAR_LITERAL | HEX_CHAR_LITERAL | CHAR_LITERAL }
 
 
 compound_datum          = _{ proper_list | abbreviation }
@@ -57,7 +57,6 @@ NAMED_CHAR_LITERAL   = @{ "#\\" ~ CHARACTER_NAME }
 CHARACTER_NAME       = _{ "alarm" | "backspace" | "delete" |  "escape" | "newline" | "null" | "return" | "space" | "tab" }
 
 HEX_CHAR_LITERAL     = @{ "#\\x" ~ HEX_SCALAR_VALUE }
-UNICODE_CHAR_LITERAL = @{ "#\\u" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT? ~ ASCII_HEX_DIGIT? ~ ASCII_HEX_DIGIT? }
 CHAR_LITERAL         = @{ "#\\" ~ ANY }
 
 
