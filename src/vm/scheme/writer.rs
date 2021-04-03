@@ -8,7 +8,7 @@ impl Writer {
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
             Value::Symbol(sym) => self.write_symbol(&sym.as_str()),
-            Value::Char(c) => todo!(),
+            Value::Char(c) => self.write_char(*c),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -43,6 +43,24 @@ impl Writer {
             format!("'{}", external)
         }
     }
+
+    fn write_char(&self, c: char) -> String {
+        let mut b = [0; 2];
+        let external = match c as u32 {
+            0x0 => "null",
+            0x7 => "alarm",
+            0x8 => "backspace",
+            0x18 => "delete",
+            0x1b => "escape",
+            0x20 => "space",
+            0xa => "newline",
+            0xb => "tab",
+            0xd => "return",
+            _ => c.encode_utf8(&mut b),
+        };
+
+        format!("#\\{}", external)
+    }
 }
 
 #[cfg(test)]
@@ -55,6 +73,16 @@ mod tests {
 
         assert_eq!(writer.external_representation(&Value::Bool(true)), "#t");
         assert_eq!(writer.external_representation(&Value::Bool(false)), "#f");
+    }
+
+    #[test]
+    fn test_write_char() {
+        let writer = Writer;
+
+        assert_eq!(
+            writer.external_representation(&Value::Char('\u{0018}')),
+            "#\\delete"
+        );
     }
 
     #[test]
