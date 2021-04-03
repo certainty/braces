@@ -27,7 +27,7 @@ impl Datum {
         let mut buffer = String::new();
         source.read_to_string(&mut buffer)?;
 
-        match DataParser::parse(Rule::datum, &buffer) {
+        match DataParser::parse(Rule::datum_single, &buffer) {
             Ok(pair) => {
                 let mut ast = Self::to_ast_seq(pair, &source_type)?;
                 Ok(ast.pop())
@@ -55,6 +55,7 @@ impl Datum {
                 Self::parse_named_character(pair.as_str(), loc, source_type)
             }
             Rule::HEX_CHAR_LITERAL => Self::parse_hex_character(pair.as_str(), loc, source_type),
+            Rule::CHAR_LITERAL => Self::parse_character(pair.as_str(), loc, source_type),
             Rule::abbreviation => Self::parse_abbreviation(pair, loc, &source_type),
             _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
         }
@@ -140,6 +141,14 @@ impl Datum {
 
             Err(_e) => Error::parse_error("Couldn't parse hex character literal", loc),
         }
+    }
+
+    #[inline]
+    fn parse_character(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
+        Ok(Datum::new(
+            Value::character(str.chars().last().unwrap()),
+            loc,
+        ))
     }
 
     fn create_location(pair: &Pair<Rule>, source_type: &SourceType) -> SourceLocation {
@@ -294,6 +303,36 @@ mod tests {
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
                 Value::character('\u{0007}'),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("#\\xtrash");
+        assert!(
+            Datum::parse(&mut source).is_err(),
+            "expected not to parse trash hex literals"
+        );
+    }
+
+    #[test]
+    fn test_read_character() {
+        let mut source = src("");
+        let source_type = source.source_type();
+
+        source = src("#\\c");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::character('c'),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("#\\☆");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::character('☆'),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
