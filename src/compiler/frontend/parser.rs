@@ -9,15 +9,18 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct Parser;
 
 impl Parser {
-    pub fn parse_datum<T: Source>(source: &mut T) -> Result<Option<datum::Datum>> {
+    pub fn parse_datum<T: Source>(&self, source: &mut T) -> Result<Option<datum::Datum>> {
         datum::Datum::parse(source)
     }
 
-    pub fn parse_program<T: Source>(_source: &mut T) -> Result<Vec<expression::Expression>> {
+    pub fn parse_program<T: Source>(&self, _source: &mut T) -> Result<Vec<expression::Expression>> {
         todo!()
     }
 
-    pub fn parse_expression<T: Source>(source: &mut T) -> Result<Option<expression::Expression>> {
+    pub fn parse_expression<T: Source>(
+        &self,
+        source: &mut T,
+    ) -> Result<Option<expression::Expression>> {
         expression::Expression::parse_one(source)
     }
 }

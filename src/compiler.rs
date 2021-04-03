@@ -20,18 +20,20 @@ pub enum Error {
     GenerationError(#[from] code_generator::Error),
 }
 
-pub struct Compiler {}
+pub struct Compiler {
+    parser: Parser,
+}
 
 impl Compiler {
     pub fn new() -> Self {
-        Compiler {}
+        Compiler { parser: Parser }
     }
 
     pub fn compile_expression<T: Source>(
         &mut self,
         source: &mut T,
     ) -> Result<Option<chunk::Chunk>> {
-        if let Some(ast) = Parser::parse_expression(source)? {
+        if let Some(ast) = self.parser.parse_expression(source)? {
             let mut code_gen = CodeGenerator::new();
             let chunk = code_gen.generate(&ast)?;
             Ok(Some(chunk.clone()))
