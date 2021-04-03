@@ -27,7 +27,7 @@ impl Datum {
         let mut buffer = String::new();
         source.read_to_string(&mut buffer)?;
 
-        match DataParser::parse(Rule::datum, &buffer) {
+        match DataParser::parse(Rule::datum_single, &buffer) {
             Ok(pair) => {
                 let mut ast = Self::to_ast_seq(pair, &source_type)?;
                 Ok(ast.pop())
@@ -50,36 +50,105 @@ impl Datum {
             Rule::PECULIAR_IDENTIFIER => {
                 Ok(Datum::new(Value::Symbol(pair.as_str().to_string()), loc))
             }
-            Rule::DELIMITED_IDENTIFIER => {
-                let s = pair.as_str();
-                Ok(Datum::new(
-                    Value::Symbol(s[1..s.len() - 1].to_string()),
-                    loc,
-                ))
+            Rule::DELIMITED_IDENTIFIER => Self::parse_delimited_identifier(pair.as_str(), loc),
+            Rule::NAMED_CHAR_LITERAL => {
+                Self::parse_named_character(pair.as_str(), loc, source_type)
             }
-            Rule::abbreviation => {
-                let parts: Vec<Pair<Rule>> = pair.into_inner().collect();
-                match &parts[..] {
-                    [prefix, datum] => {
-                        let other_datum = Datum::to_ast(datum.clone(), source_type)?;
-                        match prefix.as_rule() {
-                            Rule::abbrev_quote => Ok(Datum::new(
-                                Value::proper_list(vec![
-                                    Value::symbol("quote"),
-                                    other_datum.value.clone(),
-                                ]),
-                                loc,
-                            )),
-                            _ => todo!(),
-                        }
-                    }
-                    _ => {
-                        Error::syntax_error("Expected (abbrev-prefix <datum>)", source_type.clone())
-                    }
-                }
-            }
+            Rule::HEX_CHAR_LITERAL => Self::parse_hex_character(pair.as_str(), loc, source_type),
+            Rule::CHAR_LITERAL => Self::parse_character(pair.as_str(), loc, source_type),
+            Rule::abbreviation => Self::parse_abbreviation(pair, loc, &source_type),
             _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
         }
+    }
+
+    #[inline]
+    fn parse_delimited_identifier(s: &str, loc: SourceLocation) -> Result<Datum> {
+        Ok(Datum::new(
+            Value::Symbol(s[1..s.len() - 1].to_string()),
+            loc,
+        ))
+    }
+
+    #[inline]
+    fn parse_abbreviation(
+        pair: Pair<Rule>,
+        loc: SourceLocation,
+        source_type: &SourceType,
+    ) -> Result<Datum> {
+        let parts: Vec<Pair<Rule>> = pair.into_inner().collect();
+
+        match &parts[..] {
+            [prefix, datum] => {
+                let other_datum = Datum::to_ast(datum.clone(), source_type)?;
+                match prefix.as_rule() {
+                    Rule::abbrev_quote => Ok(Datum::new(
+                        Value::proper_list(vec![Value::symbol("quote"), other_datum.value.clone()]),
+                        loc,
+                    )),
+                    _ => todo!(),
+                }
+            }
+            _ => Error::syntax_error("Expected (abbrev-prefix <datum>)", source_type.clone()),
+        }
+    }
+
+    #[inline]
+    fn parse_named_character(
+        str: &str,
+        loc: SourceLocation,
+        source_type: &SourceType,
+    ) -> Result<Datum> {
+        let character = match str.get(2..) {
+            Some("space") => Ok(' '),
+            Some("newline") => Ok('\n'),
+            Some("return") => Ok('\n'),
+            Some("tab") => Ok('\t'),
+            Some("alarm") => Ok('\u{0007}'),
+            Some("null") => Ok('\u{0000}'),
+            Some("backspace") => Ok('\u{0008}'),
+            Some("delete") => Ok('\u{0018}'),
+            Some("escape") => Ok('\u{001b}'),
+            Some(unknown) => Error::syntax_error(
+                &format!("Unknown character literal `{}`", unknown),
+                source_type.clone(),
+            ),
+            None => Error::syntax_error(
+                "Missing character name. Expected named character literal",
+                source_type.clone(),
+            ),
+        };
+
+        Ok(Datum::new(Value::character(character?), loc))
+    }
+
+    #[inline]
+    fn parse_hex_character(
+        str: &str,
+        loc: SourceLocation,
+        _source_type: &SourceType,
+    ) -> Result<Datum> {
+        match u32::from_str_radix(str.trim_start_matches("#\\x"), 16) {
+            Ok(val) => {
+                if let Some(c) = std::char::from_u32(val) {
+                    Ok(Datum::new(Value::character(c), loc))
+                } else {
+                    Error::domain_error(
+                        &format!("Could not create character from value {}", val),
+                        loc,
+                    )
+                }
+            }
+
+            Err(_e) => Error::parse_error("Couldn't parse hex character literal", loc),
+        }
+    }
+
+    #[inline]
+    fn parse_character(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
+        Ok(Datum::new(
+            Value::character(str.chars().last().unwrap()),
+            loc,
+        ))
     }
 
     fn create_location(pair: &Pair<Rule>, source_type: &SourceType) -> SourceLocation {
@@ -204,6 +273,66 @@ mod tests {
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
                 Value::symbol("two\x20;words"),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_read_character_named() {
+        let mut source = src("");
+        let source_type = source.source_type();
+
+        source = src("#\\alarm");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::character('\u{0007}'),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+    }
+
+    #[test]
+    fn test_read_character_hex() {
+        let mut source = src("");
+        let source_type = source.source_type();
+
+        source = src("#\\x7");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::character('\u{0007}'),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("#\\xtrash");
+        assert!(
+            Datum::parse(&mut source).is_err(),
+            "expected not to parse trash hex literals"
+        );
+    }
+
+    #[test]
+    fn test_read_character() {
+        let mut source = src("");
+        let source_type = source.source_type();
+
+        source = src("#\\c");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::character('c'),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("#\\☆");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::character('☆'),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
