@@ -176,7 +176,13 @@ impl Datum {
                     Some('\t') => continue,
                     Some('\n') => continue,
                     Some('\r') => continue,
-                    _ => return Error::parse_error("Invalid escape character", loc),
+                    Some(esc) => {
+                        return Error::parse_error(
+                            &format!("Invalid escape character {}", esc),
+                            loc,
+                        )
+                    }
+                    None => break,
                 },
                 Some(c) => result.push(c),
                 None => break,

@@ -1,3 +1,5 @@
+#[cfg(test)]
+pub mod arbitrary;
 pub mod list;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
