@@ -12,7 +12,7 @@
 - [ ] literals
   - [x] bool
   - [x] symbol
-  - [ ] char
+  - [x] char
   - [ ] number
   - [ ] vector
   - [ ] byte-vector
