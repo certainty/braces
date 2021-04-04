@@ -3,11 +3,19 @@ use im::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
 
+lazy_static! {
+    pub static ref NIL: List = List(Vector::new());
+}
+
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct List(Vector<Value>);
 
 impl List {
+    pub fn nil() -> &'static List {
+        &NIL
+    }
+
     pub fn new() -> Self {
         List(Vector::new())
     }

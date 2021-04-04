@@ -1,5 +1,4 @@
 use super::value::Value;
-use crate::compiler::frontend::parser;
 
 /// The scheme writer is responsible to create external representations
 /// of any printable scheme value.
