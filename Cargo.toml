@@ -46,6 +46,7 @@ rustyline = "8.0.0"
 hashbrown = "0.11"
 fasthash = "0.4.0"
 rustc-hash = "1.1.0"
+lazy_static = "1.4"
 
 [dev-dependencies]
 matches = "0.1"

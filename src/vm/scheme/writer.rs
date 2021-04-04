@@ -1,4 +1,12 @@
 use super::value::Value;
+use crate::compiler::frontend::parser;
+
+/// The scheme writer is responsible to create external representations
+/// of any printable scheme value.
+///
+/// The current implementation is built for correctness and needs to be
+/// tweaked a bit for better performance.
+///
 
 pub struct Writer;
 
@@ -32,11 +40,16 @@ impl Writer {
         let mut external = String::new();
 
         for c in sym.chars() {
-            if !char::is_ascii(&c) || char::is_whitespace(c) || c == ')' || c == '(' {
+            if !char::is_ascii(&c) || char::is_whitespace(c) {
                 requires_delimiter = true;
             }
-
             self.escaped_symbol_char(&c, &mut external);
+        }
+
+        let first_char = &external.chars().next().unwrap();
+
+        if char::is_ascii_digit(first_char) {
+            requires_delimiter = true;
         }
 
         if requires_delimiter {
@@ -46,9 +59,12 @@ impl Writer {
         }
     }
 
+    // create external representation of a single char, taking care of proper escaping rules
     fn write_char(&self, c: char) -> String {
         let mut b = [0; 4];
-        let external = match c as u32 {
+        let mut external = String::from("#\\");
+        external.push_str(match c as u32 {
+            // handle mnemonics
             0x0 => "null",
             0x7 => "alarm",
             0x8 => "backspace",
@@ -58,10 +74,10 @@ impl Writer {
             0x20 => "space",
             0xa => "newline",
             0xd => "return",
+            // the rest is simply converted to a character
             _ => c.encode_utf8(&mut b),
-        };
-
-        format!("#\\{}", external)
+        });
+        external
     }
 
     fn write_string(&self, s: &String) -> String {
@@ -157,6 +173,9 @@ mod tests {
             writer.write(&Value::symbol(&"test2 \\ foo".to_string())),
             "'|test2 \\x5c; foo|"
         );
+
+        // special initial or number as the first char
+        assert_eq!(writer.write(&Value::symbol(&"2foo".to_string())), "'|2foo|");
     }
 
     #[test]
@@ -171,7 +190,7 @@ mod tests {
     #[test]
     fn test_read_is_writer_inverse_bugs() {
         let input = Value::Char('\r');
-        assert_eq!(read_my_write(&input).unwrap(), Some(input))
+        assert_eq!(read_my_write(&input).unwrap(), Some(input));
     }
 
     #[quickcheck]
@@ -185,8 +204,6 @@ mod tests {
         let external = writer.write(&val);
         let mut source = StringSource::new(&external, "");
 
-        println!("Int: {:?}", val);
-        println!("Ext: {} ", external);
         reader.read(&mut source)
     }
 }
