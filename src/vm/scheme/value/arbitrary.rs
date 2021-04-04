@@ -18,7 +18,13 @@ impl Arbitrary for Value {
 
 impl Arbitrary for SymbolString {
     fn arbitrary(gen: &mut quickcheck::Gen) -> Self {
-        let problems = ["", "one two", "\t", "test with \\| escaped vertical lines"];
+        let problems = [
+            "",
+            "one two",
+            "\t",
+            "test with \\| escaped vertical lines",
+            "foo \x20; bar",
+        ];
 
         match gen.choose(&problems) {
             Some(v) => SymbolString(v.to_owned().to_string()),
