@@ -46,7 +46,7 @@ impl Datum {
         match pair.as_rule() {
             Rule::BOOL_TRUE => Ok(Datum::new(Value::Bool(true), loc)),
             Rule::BOOL_FALSE => Ok(Datum::new(Value::Bool(false), loc)),
-            Rule::IDENTIFIER => Ok(Datum::new(Value::Symbol(pair.as_str().to_string()), loc)),
+            Rule::IDENTIFIER => Self::parse_symbol(pair.as_str(), loc),
             Rule::PECULIAR_IDENTIFIER => {
                 Ok(Datum::new(Value::Symbol(pair.as_str().to_string()), loc))
             }
@@ -144,6 +144,26 @@ impl Datum {
     }
 
     #[inline]
+    fn parse_symbol(str: &str, loc: SourceLocation) -> Result<Datum> {
+        let mut result = String::new();
+        let mut iter = str.chars();
+
+        loop {
+            match iter.next() {
+                Some('\\') => match iter.next() {
+                    Some('|') => result.push('|'),
+                    Some(esc) => Self::parse_escape(&esc, &mut iter, &mut result, &loc)?,
+                    None => break,
+                },
+                Some(c) => result.push(c),
+                None => break,
+            }
+        }
+
+        Ok(Datum::new(Value::symbol(&result), loc))
+    }
+
+    #[inline]
     fn parse_string(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
         let mut result = String::new();
         let mut iter = str[1..str.len() - 1].chars();
@@ -151,32 +171,12 @@ impl Datum {
         loop {
             match iter.next() {
                 Some('\\') => match iter.next() {
-                    Some('n') => result.push('\n'),
-                    Some('r') => result.push('\r'),
-                    Some('b') => result.push('\u{0007}'),
-                    Some('t') => result.push('\t'),
-                    Some('x') => {
-                        let mut hex_value = String::new();
-                        loop {
-                            match iter.next() {
-                                Some(';') => break,
-                                Some(digit) => hex_value.push(digit),
-                                None => return Error::parse_error("Unexpected end of string", loc),
-                            }
-                        }
-                        if let Some(c) = Self::hex_to_char(&hex_value) {
-                            result.push(c);
-                        } else {
-                            return Error::parse_error("Invalid hex escape", loc);
-                        }
-                    }
-                    Some('"') => result.push('"'),
-                    Some('\\') => result.push('\\'),
-                    Some(' ') => continue, // handle intraline ws
+                    // handle intraline ws
+                    Some(' ') => continue,
                     Some('\t') => continue,
                     Some('\n') => continue,
                     Some('\r') => continue,
-                    Some(esc) => result.push(esc),
+                    Some(esc) => Self::parse_escape(&esc, &mut iter, &mut result, &loc)?,
                     None => break,
                 },
                 Some(c) => result.push(c),
@@ -185,6 +185,41 @@ impl Datum {
         }
 
         Ok(Datum::new(Value::string(&result), loc))
+    }
+
+    #[inline]
+    fn parse_escape(
+        c: &char,
+        iter: &mut std::str::Chars,
+        result: &mut String,
+        loc: &SourceLocation,
+    ) -> Result<()> {
+        match c {
+            'n' => result.push('\n'),
+            'r' => result.push('\r'),
+            'b' => result.push('\u{0007}'),
+            't' => result.push('\t'),
+            'x' => {
+                let mut hex_value = String::new();
+                loop {
+                    match iter.next() {
+                        Some(';') => break,
+                        Some(digit) => hex_value.push(digit),
+                        None => return Error::parse_error("Unexpected end of string", loc.clone()),
+                    }
+                }
+                if let Some(c) = Self::hex_to_char(&hex_value) {
+                    result.push(c);
+                } else {
+                    return Error::parse_error("Invalid hex escape", loc.clone());
+                }
+            }
+            '"' => result.push('"'),
+            '\\' => result.push('\\'),
+            esc => result.push(*esc),
+        }
+
+        Ok(())
     }
 
     #[inline]
@@ -313,16 +348,16 @@ mod tests {
             ))
         );
 
-        source = src("|two\x20;words|");
+        source = src(r#"|two\x20;words|"#);
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
-                Value::symbol("two\x20;words"),
+                Value::symbol("two words"),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
 
-        source = src("|two\\|words|");
+        source = src(r#"|two\|words|"#);
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
@@ -331,7 +366,7 @@ mod tests {
             ))
         );
 
-        source = src("|test with \\| escaped vertical lines|");
+        source = src(r#"|test with \| escaped vertical lines|"#);
         assert_eq!(
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
@@ -345,6 +380,15 @@ mod tests {
             Datum::parse(&mut source).unwrap(),
             Some(Datum::new(
                 Value::symbol(""),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src(r#"|:(\x80;\xfff6;]&\x5c;"|"#);
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::symbol(":(\u{0080}\u{fff6}]&\\\\\""),
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );

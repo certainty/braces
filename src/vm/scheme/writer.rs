@@ -32,15 +32,11 @@ impl Writer {
         let mut external = String::new();
 
         for c in sym.chars() {
-            if !char::is_ascii(&c) {
+            if !char::is_ascii(&c) || char::is_whitespace(c) || c == ')' || c == '(' {
                 requires_delimiter = true;
-                external.push_str(&format!("\\x{:x};", c as u32));
-            } else if char::is_whitespace(c) {
-                requires_delimiter = true;
-                self.escaped_char(&c, &mut external);
-            } else {
-                external.push(c);
             }
+
+            self.escaped_symbol_char(&c, &mut external);
         }
 
         if requires_delimiter {
@@ -72,7 +68,7 @@ impl Writer {
         let mut external = String::from("\"");
 
         for c in s.chars() {
-            self.escaped_char(&c, &mut external);
+            self.escaped_string_char(&c, &mut external);
         }
 
         external.push('"');
@@ -80,13 +76,26 @@ impl Writer {
     }
 
     #[inline]
-    fn escaped_char(&self, c: &char, buf: &mut String) {
+    fn escaped_string_char(&self, c: &char, buf: &mut String) {
         match c {
             '\n' => buf.push_str("\\n"),
             '\r' => buf.push_str("\\r"),
             '\t' => buf.push_str("\\t"),
             '"' => buf.push_str("\\\""),
             '\\' => buf.push_str("\\\\"),
+            _ => buf.push(*c),
+        }
+    }
+
+    #[inline]
+    fn escaped_symbol_char(&self, c: &char, buf: &mut String) {
+        match c {
+            '\n' => buf.push_str("\\n"),
+            '\r' => buf.push_str("\\r"),
+            '\t' => buf.push_str("\\t"),
+            '|' => buf.push_str("\\|"),
+            '\\' => buf.push_str("\\x5c;"),
+            c if !char::is_ascii(&c) => buf.push_str(&format!("\\x{:x};", *c as u32)),
             _ => buf.push(*c),
         }
     }
@@ -136,7 +145,17 @@ mod tests {
         assert_eq!(writer.write(&Value::symbol(&"\t".to_string())), "'|\\t|");
         assert_eq!(
             writer.write(&Value::symbol(&"test \\| foo".to_string())),
-            "'|test \\| foo|"
+            "'|test \\x5c;\\| foo|"
+        );
+
+        assert_eq!(
+            writer.write(&Value::symbol(&"test2 | foo".to_string())),
+            "'|test2 \\| foo|"
+        );
+
+        assert_eq!(
+            writer.write(&Value::symbol(&"test2 \\ foo".to_string())),
+            "'|test2 \\x5c; foo|"
         );
     }
 
@@ -166,6 +185,8 @@ mod tests {
         let external = writer.write(&val);
         let mut source = StringSource::new(&external, "");
 
+        println!("Int: {:?}", val);
+        println!("Ext: {} ", external);
         reader.read(&mut source)
     }
 }

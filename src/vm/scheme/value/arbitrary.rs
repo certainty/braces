@@ -26,9 +26,13 @@ impl Arbitrary for SymbolString {
             "foo \x20; bar",
         ];
 
-        match gen.choose(&problems) {
-            Some(v) => SymbolString(v.to_owned().to_string()),
-            None => SymbolString("foo".to_owned()),
+        if let Some(true) = gen.choose(&[true, false]) {
+            match gen.choose(&problems) {
+                Some(v) => SymbolString(v.to_owned().to_string()),
+                None => SymbolString(String::arbitrary(gen)),
+            }
+        } else {
+            SymbolString(String::arbitrary(gen))
         }
     }
 }
