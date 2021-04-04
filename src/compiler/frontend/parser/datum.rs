@@ -102,7 +102,7 @@ impl Datum {
         let character = match str.get(2..) {
             Some("space") => Ok(' '),
             Some("newline") => Ok('\n'),
-            Some("return") => Ok('\n'),
+            Some("return") => Ok('\r'),
             Some("tab") => Ok('\t'),
             Some("alarm") => Ok('\u{0007}'),
             Some("null") => Ok('\u{0000}'),
@@ -146,7 +146,7 @@ impl Datum {
     #[inline]
     fn parse_string(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
         let mut result = String::new();
-        let mut iter = str.trim_matches(|c| c == '"').chars();
+        let mut iter = str[1..str.len() - 1].chars();
 
         loop {
             match iter.next() {
@@ -176,12 +176,7 @@ impl Datum {
                     Some('\t') => continue,
                     Some('\n') => continue,
                     Some('\r') => continue,
-                    Some(esc) => {
-                        return Error::parse_error(
-                            &format!("Invalid escape character {}", esc),
-                            loc,
-                        )
-                    }
+                    Some(esc) => result.push(esc),
                     None => break,
                 },
                 Some(c) => result.push(c),
@@ -326,6 +321,33 @@ mod tests {
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
+
+        source = src("|two\\|words|");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::symbol("two\\|words"),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("|test with \\| escaped vertical lines|");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::symbol("test with \\| escaped vertical lines"),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
+
+        source = src("||");
+        assert_eq!(
+            Datum::parse(&mut source).unwrap(),
+            Some(Datum::new(
+                Value::symbol(""),
+                SourceLocation::new(source_type.clone(), 1, 1)
+            ))
+        );
     }
 
     #[test]
@@ -437,6 +459,22 @@ mod tests {
                 SourceLocation::new(source_type.clone(), 1, 1)
             ))
         );
+    }
+
+    #[test]
+    fn test_read_string_bugs() {
+        let mut source = src("\"\"");
+
+        assert!(
+            Datum::parse(&mut source).unwrap().is_some(),
+            "Expected to be able to parse"
+        );
+
+        source = src("\"–)ꍽ[\u{83}\u{2}\u{94}\u{10}\u{1e}(\u{9f}\u{94}\t^+\u{fff5}\u{2003}JX}]\u{9f}VL%®\u{81}{e@8\u{2}\u{9c}{\u{83}\u{1b}\\7/O^7x\u{19}v¤ᣋ\u{9a}^~§\u{83}02x!)\u{3b19f}f}\u{8d}>5\u{8c}{}\u{52bf9}\u{1f}徒1\u{c73ef}骍<\u{1a}v^t\u{95}\u{92}6l쏊b\u{10fffe}\\015\u{0}¯8\u{8}\"");
+        assert!(
+            Datum::parse(&mut source).unwrap().is_some(),
+            "Expected to be able to parse"
+        )
     }
 
     fn src(inp: &str) -> impl Source {

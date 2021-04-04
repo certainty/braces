@@ -9,7 +9,7 @@ pub enum ReadError {
     ReadError(#[from] error::Error),
 }
 
-type Result<T> = std::result::Result<T, ReadError>;
+pub type Result<T> = std::result::Result<T, ReadError>;
 
 pub struct Reader {
     parser: Parser,

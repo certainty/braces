@@ -49,7 +49,7 @@ EXPLICIT_SIGN        = _{ "+" | "-" }
 
 DELIMITED_IDENTIFIER = @{ VERTICAL_LINE ~ SYMBOL_ELEMENT* ~ VERTICAL_LINE }
 VERTICAL_LINE        = _{ "|" }
-SYMBOL_ELEMENT       = _{ INLINE_HEX_ESCAPE | MNEMONIC_ESCAPE | !(VERTICAL_LINE | "\\") ~ ANY }
+SYMBOL_ELEMENT       = _{ INLINE_HEX_ESCAPE | MNEMONIC_ESCAPE | "\\|" | !(VERTICAL_LINE | "\\") ~ ANY }
 INLINE_HEX_ESCAPE    = @{ "\\x" ~ HEX_SCALAR_VALUE ~ ";" }
 MNEMONIC_ESCAPE      = @{ "\\" ~ ("a" | "b" | "t" | "n" | "r") }
 
