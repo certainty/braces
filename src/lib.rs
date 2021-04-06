@@ -7,6 +7,11 @@ extern crate pest_derive;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate nom;
+
+#[macro_use]
+extern crate nom_locate;
+
 pub mod compiler;
 pub mod vm;
 

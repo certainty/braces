@@ -1,6 +1,7 @@
 pub mod datum;
 pub mod error;
 pub mod expression;
+pub mod sexp;
 use crate::compiler::source::Source;
 use error::Error;
 
