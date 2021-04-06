@@ -309,7 +309,7 @@ mod tests {
             assert_eq!(
                 Datum::parse(&mut source).unwrap(),
                 Some(Datum::new(
-                    Value::symbol(sym),
+                    Value::symbol(*sym),
                     SourceLocation::new(source_type.clone(), 1, 1)
                 ))
             );
@@ -328,7 +328,7 @@ mod tests {
             assert_eq!(
                 Datum::parse(&mut source).unwrap(),
                 Some(Datum::new(
-                    Value::symbol(sym),
+                    Value::symbol(*sym),
                     SourceLocation::new(source_type.clone(), 1, 1)
                 ))
             );
