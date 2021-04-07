@@ -49,7 +49,7 @@ pub enum Error {
     Incomplete,
 }
 
-// impl<I> ContextError<I> for Error {}
+impl<I> ContextError<I> for Error {}
 
 impl<I> ParseError<I> for Error {
     fn from_error_kind(_: I, kind: ErrorKind) -> Self {
@@ -66,12 +66,6 @@ impl<I> FromExternalError<I, std::num::ParseIntError> for Error {
         todo!()
     }
 }
-
-// impl<I> FromExternalError<I, std::io::Error> for Error {
-//     fn from_external_error(_: I, _: nom::error::ErrorKind, e: std::io::Error) -> Self {
-//         Error::IoError(e)
-//     }
-// }
 
 pub fn parse<'a, T: Source>(source: &'a mut T) -> std::result::Result<Datum, Error> {
     let source_type = source.source_type();
@@ -90,8 +84,8 @@ fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 }
 
 fn parse_character<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
-    let variant_parser = alt((parse_hex_char_literal, parse_named_char_literal));
-    let (s, c) = preceded(tag("#\\"), variant_parser)(input)?;
+    let variant_parser = alt((parse_hex_char_literal, parse_named_char_literal, anychar));
+    let (s, c) = context("character", preceded(tag("#\\"), variant_parser))(input)?;
 
     let datum = Datum::from_input(Value::character(c), &s);
     Ok((s, datum))
@@ -146,6 +140,15 @@ mod tests {
     fn test_read_char_named_literal() {
         let datum = test_parse("#\\alarm").unwrap();
         assert_eq!(datum.value, Value::character('\u{7}'));
+    }
+
+    #[test]
+    fn test_read_char_literal() {
+        let mut datum = test_parse("#\\a").unwrap();
+        assert_eq!(datum.value, Value::character('a'));
+
+        datum = test_parse("#\\☆").unwrap();
+        assert_eq!(datum.value, Value::character('☆'));
     }
 
     fn test_parse(inp: &str) -> std::result::Result<Datum, Error> {
