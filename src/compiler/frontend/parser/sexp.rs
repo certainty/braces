@@ -3,15 +3,16 @@ use crate::compiler::source_location::SourceLocation;
 use crate::vm::scheme::value::Value;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_while_m_n};
-use nom::character::complete::{anychar, char, multispace1};
+use nom::character::complete::{anychar, char, multispace1, none_of};
 use nom::combinator::{map, map_opt, map_res, value, verify};
-use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError};
-use nom::multi::fold_many0;
-use nom::sequence::{delimited, preceded};
+use nom::error::{
+    context, ContextError, ErrorKind, FromExternalError, ParseError, VerboseError, VerboseErrorKind,
+};
+use nom::multi::{fold_many0, many0};
+use nom::sequence::{delimited, preceded, terminated};
 use nom::Err;
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
-use std::convert::From;
 use thiserror::Error;
 
 #[derive(Debug, PartialEq)]
@@ -37,21 +38,23 @@ impl Datum {
 /// Parser definition
 
 type Input<'a> = LocatedSpan<&'a str, SourceType>;
-type ParseResult<'a, T> = IResult<Input<'a>, T, Error>;
+type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
 
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum Error<'a> {
     #[error("IoError")]
     IoError(#[from] std::io::Error),
     #[error("ParseError")]
+    ParseError(VerboseError<Input<'a>>),
+    #[error("Nom Error")]
     Nom(ErrorKind),
     #[error("Input was incomplete")]
     Incomplete,
 }
 
-impl<I> ContextError<I> for Error {}
+impl<'a, I> ContextError<I> for Error<'a> {}
 
-impl<I> ParseError<I> for Error {
+impl<'a, I> ParseError<I> for Error<'a> {
     fn from_error_kind(_: I, kind: ErrorKind) -> Self {
         Error::Nom(kind)
     }
@@ -61,7 +64,7 @@ impl<I> ParseError<I> for Error {
     }
 }
 
-impl<I> FromExternalError<I, std::num::ParseIntError> for Error {
+impl<'a, I> FromExternalError<I, std::num::ParseIntError> for Error<'a> {
     fn from_external_error(_: I, _: nom::error::ErrorKind, _: std::num::ParseIntError) -> Self {
         todo!()
     }
@@ -73,8 +76,14 @@ pub fn parse<'a, T: Source>(source: &'a mut T) -> std::result::Result<Datum, Err
     let input = Input::new_extra(source_str, source_type);
     match parse_datum(input) {
         Ok(result) => Ok(result.1),
-        Err(nom::Err::Error(e)) => Err(e),
-        Err(nom::Err::Failure(e)) => Err(e),
+        Err(nom::Err::Error(e)) => {
+            println!("{:#?}", e);
+            Err(Error::ParseError(e))
+        }
+        Err(nom::Err::Failure(e)) => {
+            println!("{:#?}", e);
+            Err(Error::ParseError(e))
+        }
         Err(nom::Err::Incomplete(_)) => Err(Error::Incomplete),
     }
 }
@@ -85,6 +94,7 @@ fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
         alt((
             context("boolean", parse_boolean),
             context("character", parse_character),
+            context("string", parse_string),
         )),
     )(input)
 }
@@ -128,8 +138,7 @@ fn parse_named_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 
 #[inline]
 fn parse_hex_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
-    let (s, _) = char('x')(input)?;
-    parse_hex_literal(s)
+    preceded(char('x'), parse_hex_char_literal)(input)
 }
 
 // parse a sequence of 3 bytes hex encoded
@@ -143,50 +152,184 @@ fn parse_hex_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
     map_opt(parse_u32, |value| std::char::from_u32(value))(input)
 }
 
+//////////////////////////////
+// String parser
+//////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StringElement<'a> {
+    Literal(&'a str),
+    EscapedChar(char),
+    Continuation,
+}
+
+fn parse_string<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let build_string = fold_many0(
+        parse_string_element,
+        String::new(),
+        |mut string, element| {
+            match element {
+                StringElement::Literal(s) => string.push_str(s),
+                StringElement::EscapedChar(c) => string.push(c),
+                StringElement::Continuation => string.push(' '),
+            }
+            string
+        },
+    );
+
+    let (s, string) = delimited(char('"'), build_string, char('"'))(input)?;
+    let datum = Datum::from_input(Value::string(string), &s);
+
+    Ok((s, datum))
+}
+
+fn parse_string_element<'a>(input: Input<'a>) -> ParseResult<'a, StringElement<'a>> {
+    alt((
+        map(parse_mnemonic_escape, StringElement::EscapedChar),
+        map(parse_string_escape, StringElement::EscapedChar),
+        value(StringElement::Continuation, parse_string_continuation),
+        map(parse_inline_hex_escape, StringElement::EscapedChar),
+        map(parse_string_literal, StringElement::Literal),
+    ))(input)
+}
+
+fn parse_string_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    context(
+        "escaped character",
+        preceded(
+            char('\\'),
+            alt((value('"', char('"')), value('\\', char('\\')))),
+        ),
+    )(input)
+}
+
+fn parse_mnemonic_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    context(
+        "mnemonic escape",
+        preceded(
+            char('\\'),
+            alt((
+                value('\n', char('n')),
+                value('\r', char('r')),
+                value('\u{7}', char('b')),
+                value('\t', char('t')),
+            )),
+        ),
+    )(input)
+}
+
+#[inline]
+fn parse_inline_hex_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    context(
+        "inline hex escape",
+        delimited(tag("\\x"), parse_hex_literal, char(';')),
+    )(input)
+}
+
+#[inline]
+fn parse_string_continuation<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    let line_continuation = terminated(
+        terminated(many0(parse_intra_line_ws), consume_line_ending),
+        parse_intra_line_ws,
+    );
+
+    let (s, _) = preceded(char('\\'), line_continuation)(input)?;
+    Ok((s, ()))
+}
+
+#[inline]
+fn parse_string_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
+    let (s, v) = is_not("\\\"")(input)?;
+
+    if v.fragment().is_empty() {
+        Err(nom::Err::Error(VerboseError::from_error_kind(
+            s,
+            ErrorKind::Verify,
+        )))
+    } else {
+        Ok((s, v.fragment()))
+    }
+}
+
+fn consume_line_ending<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    value((), alt((tag("\r\n"), tag("\n"), tag("\r"))))(input)
+}
+
+fn parse_intra_line_ws<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    value((), alt((char(' '), char(' '))))(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::source::{Source, StringSource};
+    use crate::compiler::source::StringSource;
 
     #[test]
     fn test_read_boolean_literal() {
-        let mut datum = test_parse("#t").unwrap();
-        assert_eq!(datum.value, Value::boolean(true));
+        assert_parse_as("#t", Value::boolean(true));
+        assert_parse_as("#true", Value::boolean(true));
 
-        datum = test_parse("#true").unwrap();
-        assert_eq!(datum.value, Value::boolean(true));
-
-        datum = test_parse("#f").unwrap();
-        assert_eq!(datum.value, Value::boolean(false));
-
-        datum = test_parse("#false").unwrap();
-        assert_eq!(datum.value, Value::boolean(false));
+        assert_parse_as("#f", Value::boolean(false));
+        assert_parse_as("#false", Value::boolean(false));
     }
 
     #[test]
     fn test_read_char_hex_literal() {
-        let datum = test_parse("#\\x43").unwrap();
-        assert_eq!(datum.value, Value::character('C'));
-
-        assert!(test_parse("\\xtrash").is_err(), "expected parse error");
+        assert_parse_as("#\\x43", Value::character('C'));
     }
 
     #[test]
     fn test_read_char_named_literal() {
-        let datum = test_parse("#\\alarm").unwrap();
-        assert_eq!(datum.value, Value::character('\u{7}'));
+        assert_parse_as("#\\alarm", Value::character('\u{7}'));
     }
 
     #[test]
     fn test_read_char_literal() {
-        let mut datum = test_parse("#\\a").unwrap();
-        assert_eq!(datum.value, Value::character('a'));
+        assert_parse_as("#\\a", Value::character('a'));
 
-        datum = test_parse("#\\☆").unwrap();
-        assert_eq!(datum.value, Value::character('☆'));
+        assert_parse_as("#\\☆", Value::character('☆'));
     }
 
-    fn test_parse(inp: &str) -> std::result::Result<Datum, Error> {
-        parse(&mut StringSource::new(inp, "datum-parser-test"))
+    #[test]
+    fn test_read_string() {
+        assert_parse_as("\"this is my string\"", Value::string("this is my string"));
+
+        assert_parse_as(
+            "\"this is my ☆ string ☆\"",
+            Value::string("this is my ☆ string ☆"),
+        );
+
+        assert_parse_as(
+            "\"string with \\n and \\t \"",
+            Value::string("string with \n and \t "),
+        );
+
+        assert_parse_as(
+            "\"string with \\xa; and \\t \"",
+            Value::string("string with \n and \t "),
+        );
+
+        assert_parse_as(
+            "\"string with \\\n and the\\\n next line\"",
+            Value::string("string with  and the next line"),
+        );
+    }
+
+    #[test]
+    fn test_read_string_bugs() {
+        assert_parse_as("\"\"", Value::string(""));
+        assert_parse_ok("\"–)ꍽ[\u{83}\u{2}\u{94}\u{10}\u{1e}(\u{9f}\u{94}\t^+\u{fff5}\u{2003}JX}]\u{9f}VL%®\u{81}{e@8\u{2}\u{9c}{\u{83}\u{1b}\\7/O^7x\u{19}v¤ᣋ\u{9a}^~§\u{83}02x!)\u{3b19f}f}\u{8d}>5\u{8c}{}\u{52bf9}\u{1f}徒1\u{c73ef}骍<\u{1a}v^t\u{95}\u{92}6l쏊b\u{10fffe}\\015\u{0}¯8\u{8}\"");
+    }
+
+    fn assert_parse_as(inp: &str, expected: Value) {
+        let datum = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
+
+        assert_eq!(datum.value, expected)
+    }
+
+    fn assert_parse_ok(inp: &str) {
+        let parsed = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
+
+        assert!(false, "expected to parse successfully")
     }
 }
