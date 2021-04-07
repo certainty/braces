@@ -90,11 +90,16 @@ fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 }
 
 fn parse_character<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
-    let variant_parser = parse_hex_literal;
+    let variant_parser = parse_hex_char_literal;
     let (s, c) = preceded(tag("#\\"), variant_parser)(input)?;
-    let datum = Datum::from_input(Value::character(c), &s);
 
+    let datum = Datum::from_input(Value::character(c), &s);
     Ok((s, datum))
+}
+
+fn parse_hex_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    let (s, _) = char('x')(input)?;
+    parse_hex_literal(s)
 }
 
 // parse a sequence of 3 bytes hex encoded
@@ -105,9 +110,7 @@ fn parse_hex_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
         u32::from_str_radix(hex.fragment(), 16)
     });
 
-    map_opt(preceded(char('x'), parse_u32), |value| {
-        std::char::from_u32(value)
-    })(input)
+    map_opt(parse_u32, |value| std::char::from_u32(value))(input)
 }
 
 #[cfg(test)]
@@ -117,13 +120,13 @@ mod tests {
 
     #[test]
     fn test_read_char_hex_literal() {
-        let mut source = src("#\\x43");
-        let datum = parse(&mut source).unwrap();
-
+        let datum = test_parse("#\\x43").unwrap();
         assert_eq!(datum.value, Value::character('C'));
+
+        assert!(test_parse("\\xtrash").is_err(), "expected parse error");
     }
 
-    fn src(inp: &str) -> impl Source {
-        StringSource::new(inp, "datum-parser-test")
+    fn test_parse(inp: &str) -> std::result::Result<Datum, Error> {
+        parse(&mut StringSource::new(inp, "datum-parser-test"))
     }
 }
