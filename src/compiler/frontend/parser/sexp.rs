@@ -90,13 +90,29 @@ fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 }
 
 fn parse_character<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
-    let variant_parser = parse_hex_char_literal;
+    let variant_parser = alt((parse_hex_char_literal, parse_named_char_literal));
     let (s, c) = preceded(tag("#\\"), variant_parser)(input)?;
 
     let datum = Datum::from_input(Value::character(c), &s);
     Ok((s, datum))
 }
 
+#[inline]
+fn parse_named_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    alt((
+        value(' ', tag("space")),
+        value('\n', tag("newline")),
+        value('\r', tag("return")),
+        value('\t', tag("tab")),
+        value('\u{7}', tag("alarm")),
+        value('\u{0}', tag("null")),
+        value('\u{8}', tag("backspace")),
+        value('\u{18}', tag("delete")),
+        value('\u{1b}', tag("escape")),
+    ))(input)
+}
+
+#[inline]
 fn parse_hex_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
     let (s, _) = char('x')(input)?;
     parse_hex_literal(s)
@@ -124,6 +140,12 @@ mod tests {
         assert_eq!(datum.value, Value::character('C'));
 
         assert!(test_parse("\\xtrash").is_err(), "expected parse error");
+    }
+
+    #[test]
+    fn test_read_char_named_literal() {
+        let datum = test_parse("#\\alarm").unwrap();
+        assert_eq!(datum.value, Value::character('\u{7}'));
     }
 
     fn test_parse(inp: &str) -> std::result::Result<Datum, Error> {
