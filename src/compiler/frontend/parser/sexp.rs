@@ -80,12 +80,32 @@ pub fn parse<'a, T: Source>(source: &'a mut T) -> std::result::Result<Datum, Err
 }
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
-    parse_character(input)
+    context(
+        "datum",
+        alt((
+            context("boolean", parse_boolean),
+            context("character", parse_character),
+        )),
+    )(input)
 }
 
+// Boolean parser
+fn parse_boolean<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let (s, v) = alt((
+        value(true, tag("#t")),
+        value(true, tag("#true")),
+        value(false, tag("#f")),
+        value(false, tag("#false")),
+    ))(input)?;
+
+    let datum = Datum::from_input(Value::boolean(v), &s);
+    Ok((s, datum))
+}
+
+// Character parser
 fn parse_character<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let variant_parser = alt((parse_hex_char_literal, parse_named_char_literal, anychar));
-    let (s, c) = context("character", preceded(tag("#\\"), variant_parser))(input)?;
+    let (s, c) = preceded(tag("#\\"), variant_parser)(input)?;
 
     let datum = Datum::from_input(Value::character(c), &s);
     Ok((s, datum))
@@ -127,6 +147,21 @@ fn parse_hex_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 mod tests {
     use super::*;
     use crate::compiler::source::{Source, StringSource};
+
+    #[test]
+    fn test_read_boolean_literal() {
+        let mut datum = test_parse("#t").unwrap();
+        assert_eq!(datum.value, Value::boolean(true));
+
+        datum = test_parse("#true").unwrap();
+        assert_eq!(datum.value, Value::boolean(true));
+
+        datum = test_parse("#f").unwrap();
+        assert_eq!(datum.value, Value::boolean(false));
+
+        datum = test_parse("#false").unwrap();
+        assert_eq!(datum.value, Value::boolean(false));
+    }
 
     #[test]
     fn test_read_char_hex_literal() {
