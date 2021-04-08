@@ -9,6 +9,7 @@ use super::value::Value;
 
 pub struct Writer;
 
+// TODO: clean up the mess :D
 impl Writer {
     pub fn new() -> Self {
         Writer

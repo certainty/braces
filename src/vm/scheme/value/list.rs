@@ -20,10 +20,16 @@ impl List {
         List(Vector::new())
     }
 
+    pub fn is_null(&self) -> bool {
+        &self == &Self::nil()
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[inline]
     pub fn head(&self) -> Option<&Value> {
         self.0.head()
     }
@@ -33,6 +39,7 @@ impl List {
         self.head()
     }
 
+    #[inline]
     pub fn second(&self) -> Option<&Value> {
         self.0.get(1)
     }
