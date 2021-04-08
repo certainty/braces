@@ -15,14 +15,18 @@ impl Writer {
     }
 
     pub fn write(&self, v: &Value) -> String {
+        self.write_impl(v, true)
+    }
+
+    fn write_impl(&self, v: &Value, quote: bool) -> String {
         match v {
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
-            Value::Symbol(sym) => self.write_symbol(&sym.as_str()),
+            Value::Symbol(sym) => self.write_symbol(&sym.as_str(), quote),
             Value::Char(c) => self.write_char(*c),
             Value::String(s) => self.write_string(&s),
             Value::ProperList(elts) => {
-                let body: Vec<String> = elts.iter().map(|e| self.write(&e)).collect();
+                let body: Vec<String> = elts.iter().map(|e| self.write_impl(&e, false)).collect();
 
                 format!("'({})", body.join(" "))
             }
@@ -30,9 +34,9 @@ impl Writer {
         }
     }
 
-    fn write_symbol(&self, sym: &str) -> String {
+    fn write_symbol(&self, sym: &str, quote: bool) -> String {
         if sym.len() == 0 {
-            return String::from("'||");
+            return self.add_quote(String::from("||"), quote);
         }
 
         let mut requires_delimiter = false;
@@ -52,9 +56,9 @@ impl Writer {
         }
 
         if requires_delimiter {
-            format!("'|{}|", external)
+            self.add_quote(format!("|{}|", external), quote)
         } else {
-            format!("'{}", external)
+            self.add_quote(external, quote)
         }
     }
 
@@ -88,6 +92,15 @@ impl Writer {
 
         external.push('"');
         external
+    }
+
+    #[inline]
+    fn add_quote(&self, s: String, quote: bool) -> String {
+        if quote {
+            format!("'{}", s)
+        } else {
+            s
+        }
     }
 
     #[inline]
