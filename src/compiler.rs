@@ -33,12 +33,9 @@ impl Compiler {
         &mut self,
         source: &mut T,
     ) -> Result<Option<chunk::Chunk>> {
-        if let Some(ast) = self.parser.parse_expression(source)? {
-            let mut code_gen = CodeGenerator::new();
-            let chunk = code_gen.generate(&ast)?;
-            Ok(Some(chunk.clone()))
-        } else {
-            Ok(None)
-        }
+        let ast = self.parser.parse_expression(source)?;
+        let mut code_gen = CodeGenerator::new();
+        let chunk = code_gen.generate(&ast)?;
+        Ok(Some(chunk.clone()))
     }
 }

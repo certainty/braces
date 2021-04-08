@@ -20,7 +20,7 @@ impl Reader {
         Reader { parser: Parser }
     }
 
-    pub fn read<T: Source>(&self, source: &mut T) -> Result<Option<Value>> {
-        Ok(self.parser.parse_datum(source)?.map(|d| d.value))
+    pub fn read<T: Source>(&self, source: &mut T) -> Result<Value> {
+        Ok(self.parser.parse_datum(source)?.value)
     }
 }

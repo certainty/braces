@@ -1,297 +1,493 @@
-use super::error::Error;
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
 use crate::vm::scheme::value::Value;
-use pest::iterators::{Pair, Pairs};
-use pest::Parser;
+use nom::branch::alt;
+use nom::bytes::complete::{is_not, tag, take_while_m_n};
+use nom::character::complete::{alpha1, anychar, char, line_ending, multispace1, none_of, one_of};
+use nom::combinator::{map, map_opt, map_res, value, verify};
+use nom::error::{
+    context, ContextError, ErrorKind, FromExternalError, ParseError, VerboseError, VerboseErrorKind,
+};
+use nom::multi::{fold_many0, many0};
+use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::Err;
+use nom::IResult;
+use nom_locate::{position, LocatedSpan};
+use thiserror::Error;
 
-type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct Datum {
+    pub location: SourceLocation,
     pub value: Value,
-    pub source_location: SourceLocation,
 }
 
 impl Datum {
-    pub fn new(value: Value, source_location: SourceLocation) -> Self {
-        Self {
+    fn from_input<'a>(value: Value, input: &Input<'a>) -> Self {
+        let loc = SourceLocation::new(
+            input.extra.clone(),
+            input.location_line() as usize,
+            input.get_column(),
+        );
+        Datum {
+            location: loc,
             value,
-            source_location,
         }
-    }
-
-    // parses the next available Datum from Source
-    pub fn parse(source: &mut impl Source) -> Result<Option<Datum>> {
-        let source_type = source.source_type();
-        let mut buffer = String::new();
-        source.read_to_string(&mut buffer)?;
-
-        match DataParser::parse(Rule::datum_single, &buffer) {
-            Ok(pair) => {
-                let mut ast = Self::to_ast_seq(pair, &source_type)?;
-                Ok(ast.pop())
-            }
-            Err(e) => Error::syntax_error(&format!("{}", e), source_type.clone()),
-        }
-    }
-
-    fn to_ast_seq(pairs: Pairs<Rule>, source_type: &SourceType) -> Result<Vec<Datum>> {
-        pairs.map(|p| Self::to_ast(p, source_type)).collect()
-    }
-
-    fn to_ast(pair: Pair<Rule>, source_type: &SourceType) -> Result<Datum> {
-        let loc = Self::create_location(&pair, source_type);
-
-        match pair.as_rule() {
-            Rule::BOOL_TRUE => Ok(Datum::new(Value::Bool(true), loc)),
-            Rule::BOOL_FALSE => Ok(Datum::new(Value::Bool(false), loc)),
-            Rule::IDENTIFIER => Self::parse_symbol(pair.as_str(), loc),
-            Rule::PECULIAR_IDENTIFIER => Self::parse_symbol(pair.as_str(), loc),
-            Rule::DELIMITED_IDENTIFIER => Self::parse_delimited_identifier(pair.as_str(), loc),
-            Rule::STRING => Self::parse_string(pair.as_str(), loc, &source_type),
-            Rule::NAMED_CHAR_LITERAL => {
-                Self::parse_character_named(pair.as_str(), loc, source_type)
-            }
-            Rule::HEX_CHAR_LITERAL => {
-                Self::parse_character_hex_literal(pair.as_str(), loc, source_type)
-            }
-            Rule::CHAR_LITERAL => Self::parse_character(pair.as_str(), loc, source_type),
-            Rule::abbreviation => Self::parse_abbreviation(pair, loc, &source_type),
-            _ => Error::syntax_error("Unsupported external representation", source_type.clone()),
-        }
-    }
-
-    #[inline]
-    fn parse_delimited_identifier(s: &str, loc: SourceLocation) -> Result<Datum> {
-        Self::parse_symbol(&s[1..s.len() - 1], loc)
-    }
-
-    #[inline]
-    fn parse_symbol(str: &str, loc: SourceLocation) -> Result<Datum> {
-        let mut result = String::new();
-        let mut iter = str.chars();
-
-        loop {
-            match iter.next() {
-                Some('\\') => match iter.next() {
-                    Some('|') => result.push('|'),
-                    Some(esc) => Self::parse_escape(&esc, &mut iter, &mut result, &loc)?,
-                    None => break,
-                },
-                Some(c) => result.push(c),
-                None => break,
-            }
-        }
-
-        Ok(Datum::new(Value::symbol(&result), loc))
-    }
-
-    #[inline]
-    fn parse_string(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
-        let mut result = String::new();
-        let mut iter = str[1..str.len() - 1].chars();
-
-        loop {
-            match iter.next() {
-                Some('\\') => match iter.next() {
-                    // handle intraline ws
-                    Some(' ') => continue,
-                    Some('\t') => continue,
-                    Some('\n') => continue,
-                    Some('\r') => continue,
-                    Some(esc) => Self::parse_escape(&esc, &mut iter, &mut result, &loc)?,
-                    None => break,
-                },
-                Some(c) => result.push(c),
-                None => break,
-            }
-        }
-
-        Ok(Datum::new(Value::string(&result), loc))
-    }
-
-    #[inline]
-    fn parse_abbreviation(
-        pair: Pair<Rule>,
-        loc: SourceLocation,
-        source_type: &SourceType,
-    ) -> Result<Datum> {
-        let parts: Vec<Pair<Rule>> = pair.into_inner().collect();
-
-        match &parts[..] {
-            [prefix, datum] => {
-                let other_datum = Datum::to_ast(datum.clone(), source_type)?;
-                match prefix.as_rule() {
-                    Rule::abbrev_quote => Ok(Datum::new(
-                        Value::proper_list(vec![Value::symbol("quote"), other_datum.value.clone()]),
-                        loc,
-                    )),
-                    _ => todo!(),
-                }
-            }
-            _ => Error::syntax_error("Expected (abbrev-prefix <datum>)", source_type.clone()),
-        }
-    }
-
-    #[inline]
-    fn parse_character_named(
-        str: &str,
-        loc: SourceLocation,
-        source_type: &SourceType,
-    ) -> Result<Datum> {
-        let character = match str.get(2..) {
-            Some("space") => Ok(' '),
-            Some("newline") => Ok('\n'),
-            Some("return") => Ok('\r'),
-            Some("tab") => Ok('\t'),
-            Some("alarm") => Ok('\u{0007}'),
-            Some("null") => Ok('\u{0000}'),
-            Some("backspace") => Ok('\u{0008}'),
-            Some("delete") => Ok('\u{0018}'),
-            Some("escape") => Ok('\u{001b}'),
-            Some(unknown) => Error::syntax_error(
-                &format!("Unknown character literal `{}`", unknown),
-                source_type.clone(),
-            ),
-            None => Error::syntax_error(
-                "Missing character name. Expected named character literal",
-                source_type.clone(),
-            ),
-        };
-
-        Ok(Datum::new(Value::character(character?), loc))
-    }
-
-    #[inline]
-    fn parse_character_hex_literal(
-        str: &str,
-        loc: SourceLocation,
-        _source_type: &SourceType,
-    ) -> Result<Datum> {
-        if let Some(c) = Self::hex_to_char(str.trim_start_matches("#\\x")) {
-            Ok(Datum::new(Value::character(c), loc))
-        } else {
-            Error::parse_error("Couldn't parse hex character literal", loc)
-        }
-    }
-
-    #[inline]
-    fn parse_character(str: &str, loc: SourceLocation, _source_type: &SourceType) -> Result<Datum> {
-        Ok(Datum::new(
-            Value::character(str.chars().last().unwrap()),
-            loc,
-        ))
-    }
-
-    #[inline]
-    fn parse_escape(
-        c: &char,
-        iter: &mut std::str::Chars,
-        result: &mut String,
-        loc: &SourceLocation,
-    ) -> Result<()> {
-        match c {
-            // mnemonic escape
-            'n' => result.push('\n'),
-            'r' => result.push('\r'),
-            'b' => result.push('\u{0007}'),
-            't' => result.push('\t'),
-
-            // inline hex-escape
-            'x' => {
-                let mut hex_value = String::new();
-                loop {
-                    match iter.next() {
-                        Some(';') => break,
-                        Some(digit) => hex_value.push(digit),
-                        None => return Error::parse_error("Unexpected end of string", loc.clone()),
-                    }
-                }
-                if let Some(c) = Self::hex_to_char(&hex_value) {
-                    result.push(c);
-                } else {
-                    return Error::parse_error("Invalid hex escape", loc.clone());
-                }
-            }
-            // escaped quotes and backslash
-            '"' => result.push('"'),
-            '\\' => result.push('\\'),
-            esc => result.push(*esc),
-        }
-
-        Ok(())
-    }
-
-    #[inline]
-    fn hex_to_char(s: &str) -> Option<char> {
-        if let Ok(v) = u32::from_str_radix(s, 16).map(std::char::from_u32) {
-            v
-        } else {
-            None
-        }
-    }
-
-    fn create_location(pair: &Pair<Rule>, source_type: &SourceType) -> SourceLocation {
-        let span = pair.as_span();
-        let start = span.start_pos();
-        let (line, col) = start.line_col();
-
-        SourceLocation::new(source_type.clone(), line, col)
     }
 }
 
-#[derive(Parser)]
-#[grammar = "compiler/frontend/parser/datum.pest"]
-struct DataParser;
+/// Parser definition
+
+type Input<'a> = LocatedSpan<&'a str, SourceType>;
+type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
+
+#[derive(Debug, Error)]
+pub enum Error<'a> {
+    #[error("IoError")]
+    IoError(#[from] std::io::Error),
+    #[error("ParseError")]
+    ParseError(VerboseError<Input<'a>>),
+    #[error("Nom Error")]
+    Nom(ErrorKind),
+    #[error("Input was incomplete")]
+    Incomplete,
+}
+
+impl<'a, I> ContextError<I> for Error<'a> {}
+
+impl<'a, I> ParseError<I> for Error<'a> {
+    fn from_error_kind(_: I, kind: ErrorKind) -> Self {
+        Error::Nom(kind)
+    }
+
+    fn append(_: I, _: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a, I> FromExternalError<I, std::num::ParseIntError> for Error<'a> {
+    fn from_external_error(_: I, k: nom::error::ErrorKind, _: std::num::ParseIntError) -> Self {
+        Error::Nom(k)
+    }
+}
+
+pub fn parse<'a, T: Source>(source: &'a mut T) -> std::result::Result<Datum, Error> {
+    let source_type = source.source_type();
+    let source_str = source.as_str()?;
+    let input = Input::new_extra(source_str, source_type);
+    match parse_datum(input) {
+        Ok(result) => Ok(result.1),
+        Err(nom::Err::Error(e)) => Err(Error::ParseError(e)),
+        Err(nom::Err::Failure(e)) => Err(Error::ParseError(e)),
+        Err(nom::Err::Incomplete(_)) => Err(Error::Incomplete),
+    }
+}
+
+fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    context(
+        "datum",
+        alt((
+            context("character", parse_character),
+            context("boolean", parse_boolean),
+            context("symbol", parse_symbol),
+            context("string", parse_string),
+        )),
+    )(input)
+}
+
+// Helper to create datum from a parser
+pub fn map_datum<'a, O1, F, G>(
+    mut first: F,
+    mut second: G,
+) -> impl FnMut(Input<'a>) -> ParseResult<'a, Datum>
+where
+    F: FnMut(Input<'a>) -> ParseResult<'a, O1>,
+    G: FnMut(O1) -> Value,
+{
+    move |input: Input<'a>| {
+        let (s, v) = first(input)?;
+        let value = second(v);
+        let datum = Datum::from_input(value, &s);
+        Ok((s, datum))
+    }
+}
+
+////////////////////////
+// Boolean parser
+////////////////////////
+
+fn parse_boolean<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let bool_literal = alt((
+        value(true, tag("#t")),
+        value(true, tag("#true")),
+        value(false, tag("#f")),
+        value(false, tag("#false")),
+    ));
+
+    map_datum(bool_literal, Value::boolean)(input)
+}
+
+////////////////////////
+// Character parser
+////////////////////////
+
+fn parse_character<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let char_literal = preceded(
+        tag("#\\"),
+        alt((parse_hex_char_literal, parse_named_char_literal, anychar)),
+    );
+
+    map_datum(char_literal, Value::character)(input)
+}
+
+#[inline]
+fn parse_named_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    alt((
+        value(' ', tag("space")),
+        value('\n', tag("newline")),
+        value('\r', tag("return")),
+        value('\t', tag("tab")),
+        value('\u{7}', tag("alarm")),
+        value('\u{0}', tag("null")),
+        value('\u{8}', tag("backspace")),
+        value('\u{18}', tag("delete")),
+        value('\u{1b}', tag("escape")),
+    ))(input)
+}
+
+#[inline]
+fn parse_hex_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    preceded(char('x'), parse_hex_literal)(input)
+}
+
+// parse a sequence of 3 bytes hex encoded
+#[inline]
+fn parse_hex_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    let parse_hex = take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit());
+    let parse_u32 = map_res(parse_hex, move |hex: Input<'a>| {
+        u32::from_str_radix(hex.fragment(), 16)
+    });
+
+    map_opt(parse_u32, |value| std::char::from_u32(value))(input)
+}
+
+//////////////////////////////
+// String parser
+//////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StringElement<'a> {
+    Literal(&'a str),
+    EscapedChar(char),
+    Continuation,
+}
+
+fn parse_string<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let string_elements = fold_many0(
+        parse_string_element,
+        String::new(),
+        |mut string, element| {
+            match element {
+                StringElement::Literal(s) => string.push_str(s),
+                StringElement::EscapedChar(c) => string.push(c),
+                StringElement::Continuation => string.push(' '),
+            }
+            string
+        },
+    );
+
+    let string_literal = delimited(char('"'), string_elements, char('"'));
+
+    map_datum(string_literal, Value::String)(input)
+}
+
+fn parse_string_element<'a>(input: Input<'a>) -> ParseResult<'a, StringElement<'a>> {
+    alt((
+        map(parse_mnemonic_escape, StringElement::EscapedChar),
+        map(parse_string_escape, StringElement::EscapedChar),
+        value(StringElement::Continuation, parse_string_continuation),
+        map(parse_inline_hex_escape, StringElement::EscapedChar),
+        map(parse_string_literal, StringElement::Literal),
+    ))(input)
+}
+
+fn parse_string_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    context(
+        "escaped character",
+        preceded(
+            char('\\'),
+            alt((value('"', char('"')), value('\\', char('\\')))),
+        ),
+    )(input)
+}
+
+fn parse_mnemonic_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    context(
+        "mnemonic escape",
+        preceded(
+            char('\\'),
+            alt((
+                value('\n', char('n')),
+                value('\r', char('r')),
+                value('\u{7}', char('b')),
+                value('\t', char('t')),
+            )),
+        ),
+    )(input)
+}
+
+#[inline]
+fn parse_inline_hex_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    context(
+        "inline hex escape",
+        delimited(tag("\\x"), parse_hex_literal, char(';')),
+    )(input)
+}
+
+#[inline]
+fn parse_string_continuation<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    let line_continuation = terminated(
+        terminated(many0(parse_intra_line_ws), consume_line_ending),
+        parse_intra_line_ws,
+    );
+
+    let (s, _) = preceded(char('\\'), line_continuation)(input)?;
+    Ok((s, ()))
+}
+
+#[inline]
+fn parse_string_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
+    let (s, v) = is_not("\\\"")(input)?;
+
+    if v.fragment().is_empty() {
+        Err(nom::Err::Error(VerboseError::from_error_kind(
+            s,
+            ErrorKind::Verify,
+        )))
+    } else {
+        Ok((s, v.fragment()))
+    }
+}
+
+//////////////////////////////////////////
+// Identifier / Symbol
+/////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SymbolElement<'a> {
+    Literal(&'a str),
+    EscapedChar(char),
+}
+
+fn parse_symbol<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let symbol_literal = alt((
+        parse_identifier,
+        parse_delimited_identifier,
+        parse_peculiar_identifier,
+    ));
+
+    map_datum(symbol_literal, Value::symbol)(input)
+}
+
+#[inline]
+fn parse_peculiar_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+    let explicit_sign_str = map(parse_explicit_sign, String::from);
+
+    alt((
+        parse_peculiar_with_sign,
+        parse_peculiar_with_sign_dot,
+        parse_peculiar_with_dot,
+        explicit_sign_str,
+    ))(input)
+}
+
+#[inline]
+fn parse_peculiar_with_sign<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+    let (s, (sign, sign_sub, subseq)) = tuple((
+        parse_explicit_sign,
+        parse_sign_subsequent,
+        many0(parse_sign_subsequent),
+    ))(input)?;
+
+    let mut symbol = String::from(sign);
+    symbol.push(sign_sub);
+    symbol.extend(subseq.iter());
+
+    Ok((s, symbol))
+}
+
+#[inline]
+fn parse_peculiar_with_dot<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+    let (s, (dot, dot_subseq, subseq)) =
+        tuple((char('.'), parse_dot_subsequent, many0(parse_subsequent)))(input)?;
+
+    let mut symbol = String::from(dot);
+    symbol.push(dot_subseq);
+    symbol.extend(subseq.iter());
+
+    Ok((s, symbol))
+}
+
+#[inline]
+fn parse_peculiar_with_sign_dot<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+    let (s, (sign, sign_sub, dot_subseq)) =
+        tuple((parse_explicit_sign, char('.'), parse_dot_subsequent))(input)?;
+
+    let mut symbol = String::from(sign);
+    symbol.push(sign_sub);
+    symbol.push(dot_subseq);
+
+    Ok((s, symbol))
+}
+
+#[inline]
+fn parse_dot_subsequent<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    alt((parse_sign_subsequent, char('.')))(input)
+}
+
+#[inline]
+fn parse_sign_subsequent<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    alt((parse_initial, parse_explicit_sign, char('@')))(input)
+}
+
+#[inline]
+fn parse_delimited_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+    let symbol_elements = fold_many0(
+        parse_symbol_element,
+        String::new(),
+        |mut string, element| {
+            match element {
+                SymbolElement::Literal(s) => string.push_str(s),
+                SymbolElement::EscapedChar(c) => string.push(c),
+            }
+            string
+        },
+    );
+
+    delimited(char('|'), symbol_elements, char('|'))(input)
+}
+
+#[inline]
+fn parse_symbol_element<'a>(input: Input<'a>) -> ParseResult<'a, SymbolElement<'a>> {
+    let parse_symbol_escape = value('|', tag("\\|"));
+
+    alt((
+        map(parse_mnemonic_escape, SymbolElement::EscapedChar),
+        map(parse_inline_hex_escape, SymbolElement::EscapedChar),
+        map(parse_symbol_escape, SymbolElement::EscapedChar),
+        map(parse_symbol_literal, SymbolElement::Literal),
+    ))(input)
+}
+
+#[inline]
+fn parse_symbol_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
+    let (s, v) = is_not("|\\")(input)?;
+
+    Ok((s, v.fragment()))
+}
+
+fn parse_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+    let mut identifier = String::new();
+    let (s, (init, subseq)) = pair(parse_initial, many0(parse_subsequent))(input)?;
+
+    identifier.push(init);
+    identifier.extend(subseq.iter());
+
+    Ok((s, identifier))
+}
+
+#[inline]
+fn parse_initial<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    let letter = verify(anychar, |c| c.is_alphabetic());
+    let special_initial = one_of("!$%&*/:<=>?^_~");
+
+    alt((letter, special_initial))(input)
+}
+
+#[inline]
+fn parse_subsequent<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    let digit = verify(anychar, |c| c.is_digit(10));
+    let special_subsequent = alt((parse_explicit_sign, char('.'), char('@')));
+
+    alt((parse_initial, digit, special_subsequent))(input)
+}
+
+#[inline]
+fn parse_explicit_sign<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+    alt((char('+'), char('-')))(input)
+}
+
+fn consume_line_ending<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    value((), line_ending)(input)
+}
+
+fn parse_intra_line_ws<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    value((), alt((char(' '), char(' '))))(input)
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::source::{Source, StringSource};
+    use crate::compiler::source::StringSource;
 
     #[test]
-    fn test_read_bool_true() {
-        let mut source = src("#t");
-        let source_type = source.source_type();
+    fn test_read_boolean_literal() {
+        assert_parse_as("#t", Value::boolean(true));
+        assert_parse_as("#true", Value::boolean(true));
 
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::boolean(true),
-                SourceLocation::new(source_type, 1, 1)
-            ))
+        assert_parse_as("#f", Value::boolean(false));
+        assert_parse_as("#false", Value::boolean(false));
+    }
+
+    #[test]
+    fn test_read_char_hex_literal() {
+        assert_parse_as("#\\x43", Value::character('C'));
+    }
+
+    #[test]
+    fn test_read_char_named_literal() {
+        assert_parse_as("#\\alarm", Value::character('\u{7}'));
+    }
+
+    #[test]
+    fn test_read_char_literal() {
+        assert_parse_as("#\\a", Value::character('a'));
+
+        assert_parse_as("#\\☆", Value::character('☆'));
+    }
+
+    #[test]
+    fn test_read_string() {
+        assert_parse_as("\"this is my string\"", Value::string("this is my string"));
+
+        assert_parse_as(
+            "\"this is my ☆ string ☆\"",
+            Value::string("this is my ☆ string ☆"),
         );
 
-        source = src("#true");
-        let source_type = source.source_type();
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::boolean(true),
-                SourceLocation::new(source_type, 1, 1)
-            ))
+        assert_parse_as(
+            "\"string with \\n and \\t \"",
+            Value::string("string with \n and \t "),
+        );
+
+        assert_parse_as(
+            "\"string with \\xa; and \\t \"",
+            Value::string("string with \n and \t "),
+        );
+
+        assert_parse_as(
+            "\"string with \\\n and the\\\n next line\"",
+            Value::string("string with  and the next line"),
         );
     }
 
     #[test]
-    fn test_read_quotation() {
-        let mut source = src("'#f");
-        let source_type = source.source_type();
-
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::proper_list(vec![Value::symbol("quote"), Value::boolean(false)]),
-                SourceLocation::new(source_type, 1, 1)
-            ))
-        );
+    fn test_read_string_bugs() {
+        assert_parse_as("\"\"", Value::string(""));
+        assert_parse_as(r#""\\7""#, Value::string("\\7"));
     }
 
     #[test]
     fn test_read_symbol() {
-        let mut source = src("<=?");
-        let source_type = source.source_type();
         let symbols = vec![
             "<=?",
             "->string",
@@ -304,225 +500,37 @@ mod tests {
         ];
 
         for sym in symbols.iter() {
-            source = src(sym);
-
-            assert_eq!(
-                Datum::parse(&mut source).unwrap(),
-                Some(Datum::new(
-                    Value::symbol(*sym),
-                    SourceLocation::new(source_type.clone(), 1, 1)
-                ))
-            );
-        }
-    }
-
-    #[test]
-    fn test_read_symbol_peculiar() {
-        let mut source = src("");
-        let source_type = source.source_type();
-        let symbols = vec!["...", "+soup+", "+"];
-
-        for sym in symbols.iter() {
-            source = src(sym);
-
-            assert_eq!(
-                Datum::parse(&mut source).unwrap(),
-                Some(Datum::new(
-                    Value::symbol(*sym),
-                    SourceLocation::new(source_type.clone(), 1, 1)
-                ))
-            );
+            assert_parse_as(sym, Value::symbol(*sym))
         }
     }
 
     #[test]
     fn test_read_symbol_delimited() {
-        let mut source = src("");
-        let source_type = source.source_type();
+        assert_parse_as("||", Value::symbol(""));
 
-        source = src("|two words|");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::symbol("two words"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
+        assert_parse_as("|two words|", Value::symbol("two words"));
+        assert_parse_as(r#"|two\x20;words|"#, Value::symbol("two words"));
+        assert_parse_as(r#"|two\|words|"#, Value::symbol("two|words"));
+
+        assert_parse_as(
+            r#"|test with \| escaped vertical lines|"#,
+            Value::symbol("test with | escaped vertical lines"),
         );
-
-        source = src(r#"|two\x20;words|"#);
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::symbol("two words"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src(r#"|two\|words|"#);
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::symbol("two|words"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src(r#"|test with \| escaped vertical lines|"#);
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::symbol("test with | escaped vertical lines"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src("||");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::symbol(""),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src(r#"|:(\x80;\xfff6;]&\x5c;"|"#);
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::symbol(":(\u{0080}\u{fff6}]&\\\""),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
+        assert_parse_as(
+            r#"|:(\x80;\xfff6;]&\x5c;"|"#,
+            Value::symbol(":(\u{0080}\u{fff6}]&\\\""),
         );
     }
 
-    #[test]
-    fn test_read_character_named() {
-        let mut source = src("");
-        let source_type = source.source_type();
+    fn assert_parse_as(inp: &str, expected: Value) {
+        let datum = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
 
-        source = src("#\\alarm");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::character('\u{0007}'),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
+        assert_eq!(datum.value, expected)
     }
 
-    #[test]
-    fn test_read_character_hex() {
-        let mut source = src("");
-        let source_type = source.source_type();
+    fn assert_parse_ok(inp: &str) {
+        let parsed = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
 
-        source = src("#\\x7");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::character('\u{0007}'),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src("#\\xtrash");
-        assert!(
-            Datum::parse(&mut source).is_err(),
-            "expected not to parse trash hex literals"
-        );
-    }
-
-    #[test]
-    fn test_read_character() {
-        let mut source = src("");
-        let source_type = source.source_type();
-
-        source = src("#\\c");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::character('c'),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src("#\\☆");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::character('☆'),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-    }
-
-    #[test]
-    fn test_read_string() {
-        let mut source = src("");
-        let source_type = source.source_type();
-
-        source = src("\"this is my string\"");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::string("this is my string"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src("\"this is my ☆ string ☆\"");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::string("this is my ☆ string ☆"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src("\"string with \\n and \\t \"");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::string("string with \n and \t "),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src("\"string with \\xa; and \\t \"");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::string("string with \n and \t "),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-
-        source = src("\"string with \\\n and the\\\n next line\"");
-        assert_eq!(
-            Datum::parse(&mut source).unwrap(),
-            Some(Datum::new(
-                Value::string("string with  and the next line"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
-        );
-    }
-
-    #[test]
-    fn test_read_string_bugs() {
-        let mut source = src("\"\"");
-
-        assert!(
-            Datum::parse(&mut source).unwrap().is_some(),
-            "Expected to be able to parse"
-        );
-
-        source = src("\"–)ꍽ[\u{83}\u{2}\u{94}\u{10}\u{1e}(\u{9f}\u{94}\t^+\u{fff5}\u{2003}JX}]\u{9f}VL%®\u{81}{e@8\u{2}\u{9c}{\u{83}\u{1b}\\7/O^7x\u{19}v¤ᣋ\u{9a}^~§\u{83}02x!)\u{3b19f}f}\u{8d}>5\u{8c}{}\u{52bf9}\u{1f}徒1\u{c73ef}骍<\u{1a}v^t\u{95}\u{92}6l쏊b\u{10fffe}\\015\u{0}¯8\u{8}\"");
-        assert!(
-            Datum::parse(&mut source).unwrap().is_some(),
-            "Expected to be able to parse"
-        )
-    }
-
-    fn src(inp: &str) -> impl Source {
-        StringSource::new(inp, "datum-parser-test")
+        assert!(false, "expected to parse successfully")
     }
 }

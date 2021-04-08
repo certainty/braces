@@ -1,6 +1,8 @@
 use super::error::Error;
+use crate::compiler::frontend::parser::datum;
 use crate::compiler::frontend::parser::datum::Datum;
-use crate::compiler::source::Source;
+use crate::compiler::frontend::parser::Parser;
+use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
 use crate::vm::scheme::value::list;
 use crate::vm::scheme::value::Value;
@@ -19,13 +21,10 @@ pub enum LiteralExpression {
 }
 
 impl Expression {
-    pub fn parse_one<T: Source>(source: &mut T) -> Result<Option<Self>> {
-        let datum_ast = Datum::parse(source)?;
-
-        match datum_ast {
-            Some(ast) => Ok(Some(Self::parse_expression(ast)?)),
-            None => Ok(None),
-        }
+    pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
+        let parser = Parser;
+        let ast = parser.parse_datum(source)?;
+        Self::parse_expression(ast)
     }
 
     pub fn constant(value: Value, location: SourceLocation) -> Expression {
@@ -38,11 +37,9 @@ impl Expression {
 
     fn parse_expression(datum: Datum) -> Result<Expression> {
         match &datum.value {
-            val @ Value::Bool(_) => Ok(Self::constant(val.clone(), datum.source_location.clone())),
-            val @ Value::Char(_) => Ok(Self::constant(val.clone(), datum.source_location.clone())),
-            val @ Value::String(_) => {
-                Ok(Self::constant(val.clone(), datum.source_location.clone()))
-            }
+            val @ Value::Bool(_) => Ok(Self::constant(val.clone(), datum.location.clone())),
+            val @ Value::Char(_) => Ok(Self::constant(val.clone(), datum.location.clone())),
+            val @ Value::String(_) => Ok(Self::constant(val.clone(), datum.location.clone())),
             Value::ProperList(ls) => match &ls.head() {
                 Some(Value::Symbol(sym)) => match sym.as_str() {
                     "quote" => Self::parse_quoted_datum(&ls, &datum),
@@ -50,7 +47,7 @@ impl Expression {
                 },
                 None => Error::parse_error(
                     "Unexpected empty list literal. Did you intend to quote it?",
-                    datum.source_location.clone(),
+                    datum.location.clone(),
                 ),
                 _ => todo!(),
             },
@@ -62,13 +59,10 @@ impl Expression {
     #[inline]
     fn parse_quoted_datum(ls: &list::List, datum: &Datum) -> Result<Expression> {
         match (ls.len(), ls.second()) {
-            (2, Some(value)) => Ok(Self::quoted_value(
-                value.clone(),
-                datum.source_location.clone(),
-            )),
+            (2, Some(value)) => Ok(Self::quoted_value(value.clone(), datum.location.clone())),
             _ => Error::parse_error(
                 "Too many arguments. Expected (quote <datum>).",
-                datum.source_location.clone(),
+                datum.location.clone(),
             ),
         }
     }
@@ -85,66 +79,58 @@ mod tests {
 
     #[test]
     fn test_parse_literal_constant() {
-        let mut source = src("#t");
-        let source_type = source.source_type();
-
-        assert_eq!(
-            Expression::parse_one(&mut source).unwrap(),
-            Some(Expression::constant(
-                Value::Bool(true),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
+        assert_parse_as(
+            "#t",
+            Expression::constant(Value::Bool(true), location(1, 1)),
         );
 
-        source = src("\"foo\"");
-        assert_eq!(
-            Expression::parse_one(&mut source).unwrap(),
-            Some(Expression::constant(
-                Value::string("foo"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
+        assert_parse_as(
+            "\"foo\"",
+            Expression::constant(Value::string("foo"), location(1, 1)),
         );
     }
 
     #[test]
     fn test_parse_literal_quoted_datum() {
-        let mut source = src("'#t");
-        let source_type = source.source_type();
-
-        assert_eq!(
-            Expression::parse_one(&mut source).unwrap(),
-            Some(Expression::quoted_value(
-                Value::Bool(true),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
+        assert_parse_as(
+            "'#t",
+            Expression::quoted_value(Value::Bool(true), location(1, 1)),
         );
 
-        source = src("'#\\a");
-        assert_eq!(
-            Expression::parse_one(&mut source).unwrap(),
-            Some(Expression::quoted_value(
-                Value::character('a'),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
+        assert_parse_as(
+            "'#\\a",
+            Expression::quoted_value(Value::character('a'), location(1, 1)),
         );
 
-        source = src("'foo");
-        assert_eq!(
-            Expression::parse_one(&mut source).unwrap(),
-            Some(Expression::quoted_value(
-                Value::symbol("foo"),
-                SourceLocation::new(source_type.clone(), 1, 1)
-            ))
+        assert_parse_as(
+            "'foo",
+            Expression::quoted_value(Value::symbol("foo"), location(1, 1)),
         );
 
-        source = src("'");
-        assert!(
-            Expression::parse_one(&mut source).is_err(),
-            "expected error on single quote"
-        );
+        assert_parse_error("'");
     }
 
-    fn src(inp: &str) -> impl Source {
-        StringSource::new(inp, "datum-parser-test")
+    fn assert_parse_as(inp: &str, exp: Expression) {
+        let mut source = StringSource::new(inp, "datum-parser-test");
+        let parsed_exp = Expression::parse_one(&mut source).unwrap();
+
+        assert_eq!(exp, parsed_exp)
+    }
+
+    fn assert_parse_error(inp: &str) {
+        let mut source = StringSource::new(inp, "datum-parser-test");
+
+        assert!(
+            Expression::parse_one(&mut source).is_err(),
+            "expected parse error"
+        )
+    }
+
+    fn location(line: usize, col: usize) -> SourceLocation {
+        SourceLocation::new(
+            SourceType::Buffer("datum-parser-test".to_string()),
+            line,
+            col,
+        )
     }
 }

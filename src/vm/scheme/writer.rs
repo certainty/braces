@@ -189,15 +189,15 @@ mod tests {
     #[test]
     fn test_read_is_writer_inverse_bugs() {
         let input = Value::Char('\r');
-        assert_eq!(read_my_write(&input).unwrap(), Some(input));
+        assert_eq!(read_my_write(&input).unwrap(), input);
     }
 
     #[quickcheck]
     fn test_read_is_write_inverse(val: Value) -> bool {
-        read_my_write(&val).unwrap().is_some()
+        read_my_write(&val).is_ok()
     }
 
-    fn read_my_write(val: &Value) -> reader::Result<Option<Value>> {
+    fn read_my_write(val: &Value) -> reader::Result<Value> {
         let reader = reader::Reader::new();
         let writer = writer::Writer::new();
         let external = writer.write(&val);
