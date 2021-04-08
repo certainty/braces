@@ -34,7 +34,7 @@ impl VM {
     }
 
     pub fn write(&self, value: &Value) -> String {
-        self.writer.external_representation(value).to_string()
+        self.writer.write(value).to_string()
     }
 
     pub fn run_string(&mut self, inp: &str) -> Result<Value> {

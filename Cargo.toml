@@ -36,17 +36,20 @@ anyhow = "1.0"
 # values
 im = "15.0"
 
-# parser
-pest = "2.1"
-pest_derive = "2.1"
-
 # compiler / interpreter
 clap-v3 = "3.0.0-beta.1"
 rustyline = "8.0.0"
 hashbrown = "0.11"
 fasthash = "0.4.0"
 rustc-hash = "1.1.0"
+lazy_static = "1.4"
+
+#parser
+nom_locate = "3.0"
+nom = "6.1"
 
 [dev-dependencies]
 matches = "0.1"
 criterion = "0.3.4"
+quickcheck = "1"
+quickcheck_macros = "1.0"

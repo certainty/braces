@@ -1,10 +1,14 @@
+#[cfg(test)]
+pub mod arbitrary;
 pub mod list;
+use std::convert::Into;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     Bool(bool),
     Symbol(String),
     Char(char),
+    String(String),
     ProperList(list::List),
     Unspecified,
 }
@@ -18,8 +22,12 @@ impl Value {
         Self::Bool(val)
     }
 
-    pub fn symbol(name: &str) -> Value {
-        Self::Symbol(name.to_string())
+    pub fn symbol(name: impl Into<String>) -> Value {
+        Self::Symbol(name.into())
+    }
+
+    pub fn string(s: impl Into<String>) -> Value {
+        Self::String(s.into())
     }
 
     pub fn character(c: char) -> Value {

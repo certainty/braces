@@ -8,6 +8,7 @@ pub enum SourceType {
 
 pub trait Source {
     fn source_type(&self) -> SourceType;
+    fn as_str(&self) -> std::io::Result<&str>;
     fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<()>;
 }
 
@@ -30,6 +31,10 @@ impl Source for StringSource {
     fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<()> {
         *buf = self.internal.clone();
         Ok(())
+    }
+
+    fn as_str(&self) -> std::io::Result<&str> {
+        Ok(&self.internal)
     }
 
     fn source_type(&self) -> SourceType {

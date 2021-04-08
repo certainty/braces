@@ -15,3 +15,4 @@ Cargo.lock
 /target
 history.txt
 r7rs.pdf
+.DS_*

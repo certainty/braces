@@ -3,19 +3,33 @@ use im::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
 
+lazy_static! {
+    pub static ref NIL: List = List(Vector::new());
+}
+
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct List(Vector<Value>);
 
 impl List {
+    pub fn nil() -> &'static List {
+        &NIL
+    }
+
     pub fn new() -> Self {
         List(Vector::new())
     }
 
+    pub fn is_null(&self) -> bool {
+        &self == &Self::nil()
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[inline]
     pub fn head(&self) -> Option<&Value> {
         self.0.head()
     }
@@ -25,6 +39,7 @@ impl List {
         self.head()
     }
 
+    #[inline]
     pub fn second(&self) -> Option<&Value> {
         self.0.get(1)
     }
