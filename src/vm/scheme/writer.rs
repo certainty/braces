@@ -121,7 +121,6 @@ mod tests {
     use super::*;
     use crate::compiler::source::StringSource;
     use crate::vm::scheme::reader;
-    use crate::vm::scheme::value::arbitrary;
     use crate::vm::scheme::value::Value;
     use crate::vm::scheme::writer;
     use quickcheck;

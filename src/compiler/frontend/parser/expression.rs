@@ -1,8 +1,7 @@
 use super::error::Error;
-use crate::compiler::frontend::parser::datum;
 use crate::compiler::frontend::parser::datum::Datum;
 use crate::compiler::frontend::parser::Parser;
-use crate::compiler::source::{Source, SourceType};
+use crate::compiler::source::Source;
 use crate::compiler::source_location::SourceLocation;
 use crate::vm::scheme::value::list;
 use crate::vm::scheme::value::Value;
@@ -71,7 +70,7 @@ impl Expression {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::source::{Source, StringSource};
+    use crate::compiler::source::{SourceType, StringSource};
 
     // Literals
     // See: r7rs page 12 for all examples of literals we need to support

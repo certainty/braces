@@ -1,5 +1,3 @@
-use crate::compiler::frontend::parser::datum;
-use crate::compiler::source::SourceType;
 use crate::compiler::source_location::SourceLocation;
 use thiserror::Error;
 

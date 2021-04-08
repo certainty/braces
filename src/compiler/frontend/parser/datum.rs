@@ -3,14 +3,12 @@ use crate::compiler::source_location::SourceLocation;
 use crate::vm::scheme::value::Value;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_while_m_n};
-use nom::character::complete::{alpha1, anychar, char, line_ending, multispace1, none_of, one_of};
+use nom::character::complete::{anychar, char, line_ending, one_of};
 use nom::combinator::{map, map_opt, map_res, value, verify};
-use nom::error::{
-    context, ContextError, ErrorKind, FromExternalError, ParseError, VerboseError, VerboseErrorKind,
-};
+use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError, VerboseError};
+use nom::multi::many_till;
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
-use nom::Err;
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
 use thiserror::Error;
@@ -22,16 +20,8 @@ pub struct Datum {
 }
 
 impl Datum {
-    fn from_input<'a>(value: Value, input: &Input<'a>) -> Self {
-        let loc = SourceLocation::new(
-            input.extra.clone(),
-            input.location_line() as usize,
-            input.get_column(),
-        );
-        Datum {
-            location: loc,
-            value,
-        }
+    fn new(value: Value, location: SourceLocation) -> Self {
+        Self { value, location }
     }
 }
 
@@ -83,13 +73,31 @@ pub fn parse<'a, T: Source>(source: &'a mut T) -> std::result::Result<Datum, Err
 }
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let datum = context("datum", alt((parse_simple_datum, parse_compound_datum)));
+
+    preceded(parse_inter_token_space, datum)(input)
+}
+
+#[inline]
+fn parse_simple_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     context(
-        "datum",
+        "simple datum",
         alt((
             context("character", parse_character),
             context("boolean", parse_boolean),
             context("symbol", parse_symbol),
             context("string", parse_string),
+        )),
+    )(input)
+}
+
+#[inline]
+fn parse_compound_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    context(
+        "compund datum",
+        alt((
+            context("list", parse_proper_list),
+            context("abbreviation", parse_abbreviation),
         )),
     )(input)
 }
@@ -104,11 +112,28 @@ where
     G: FnMut(O1) -> Value,
 {
     move |input: Input<'a>| {
-        let (s, v) = first(input)?;
+        let (s, p) = position(input)?;
+        let (s, v) = first(s)?;
         let value = second(v);
-        let datum = Datum::from_input(value, &s);
+        let datum = Datum::new(value, location(p));
         Ok((s, datum))
     }
+}
+
+fn location<'a>(input: Input<'a>) -> SourceLocation {
+    SourceLocation::new(
+        input.extra.clone(),
+        input.location_line() as usize,
+        input.get_column(),
+    )
+}
+
+#[inline]
+pub fn unit<'a, O, F>(parser: F) -> impl FnMut(Input<'a>) -> ParseResult<'a, ()>
+where
+    F: FnMut(Input<'a>) -> ParseResult<'a, O>,
+{
+    value((), parser)
 }
 
 ////////////////////////
@@ -416,12 +441,105 @@ fn parse_explicit_sign<'a>(input: Input<'a>) -> ParseResult<'a, char> {
     alt((char('+'), char('-')))(input)
 }
 
-fn consume_line_ending<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
-    value((), line_ending)(input)
+/////////////////////////////
+// proper list
+/////////////////////////////
+
+#[inline]
+fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let list_elements = delimited(
+        parse_inter_token_space,
+        parse_datum,
+        parse_inter_token_space,
+    );
+    let list = delimited(char('('), many0(list_elements), char(')'));
+
+    map_datum(list, |elts| {
+        Value::proper_list(elts.iter().map(|e| e.value.clone()).collect())
+    })(input)
 }
 
+////////////////////////////
+// abbreviation
+////////////////////////////
+
+#[inline]
+fn parse_abbreviation<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let abbrev = pair(parse_abbrev_prefix, parse_datum);
+
+    map_datum(abbrev, |(abbr, datum)| {
+        Value::proper_list(vec![abbr.value, datum.value])
+    })(input)
+}
+
+#[inline]
+fn parse_abbrev_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let abbrev = alt((
+        value(Value::symbol("quote"), char('\'')),
+        value(Value::symbol("quasi-quote"), char('`')),
+        value(Value::symbol("unquote-splicing"), tag(",@")),
+        value(Value::symbol("unquote"), char(',')),
+    ));
+
+    map_datum(abbrev, |v| v)(input)
+}
+
+#[inline]
+fn consume_line_ending<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    unit(line_ending)(input)
+}
+
+#[inline]
 fn parse_intra_line_ws<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
-    value((), alt((char(' '), char(' '))))(input)
+    unit(alt((char(' '), char(' '))))(input)
+}
+
+#[inline]
+fn parse_inter_token_space<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    let atmosphere = alt((parse_white_space, parse_comment, parse_directive));
+    unit(many0(atmosphere))(input)
+}
+
+#[inline]
+fn parse_white_space<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    alt((parse_intra_line_ws, consume_line_ending))(input)
+}
+
+#[inline]
+fn parse_comment<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    context(
+        "comment",
+        unit(alt((
+            parse_line_comment,
+            parse_nested_comment,
+            parse_inline_comment,
+        ))),
+    )(input)
+}
+
+#[inline]
+fn parse_nested_comment<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    let comment_text = many0(anychar);
+    let nested_comment = delimited(tag("#|"), comment_text, tag("|#"));
+    context("nested comment", unit(nested_comment))(input)
+}
+
+#[inline]
+fn parse_line_comment<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    unit(preceded(char(';'), many_till(anychar, line_ending)))(input)
+}
+
+#[inline]
+fn parse_inline_comment<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    unit(preceded(
+        tag("#;"),
+        preceded(parse_inter_token_space, parse_datum),
+    ))(input)
+}
+
+#[inline]
+fn parse_directive<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+    unit(alt((tag("#!fold-case"), tag("#!no-fold-case"))))(input)
 }
 
 #[cfg(test)]
@@ -522,6 +640,64 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_read_abbrev() {
+        assert_parse_as(
+            "'foo",
+            Value::proper_list(vec![Value::symbol("quote"), Value::symbol("foo")]),
+        );
+        assert_parse_as(
+            ",foo",
+            Value::proper_list(vec![Value::symbol("unquote"), Value::symbol("foo")]),
+        );
+
+        assert_parse_as(
+            "`foo",
+            Value::proper_list(vec![Value::symbol("quasi-quote"), Value::symbol("foo")]),
+        );
+
+        assert_parse_as(
+            ",@foo",
+            Value::proper_list(vec![
+                Value::symbol("unquote-splicing"),
+                Value::symbol("foo"),
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_read_proper_list() {
+        assert_parse_as(
+            "(#t    #f)",
+            Value::proper_list(vec![Value::boolean(true), Value::boolean(false)]),
+        );
+
+        assert_parse_as("()", Value::proper_list(vec![]));
+
+        assert_parse_as(
+            "((foo #t))",
+            Value::proper_list(vec![Value::proper_list(vec![
+                Value::symbol("foo"),
+                Value::boolean(true),
+            ])]),
+        );
+    }
+
+    #[test]
+    fn test_read_comments() {
+        assert_parse_as(";foo bar\n #t", Value::boolean(true));
+        assert_parse_as(
+            "(#t \n #; foo\n #f)",
+            Value::proper_list(vec![Value::boolean(true), Value::boolean(false)]),
+        );
+
+        //TODO: fix me
+        // assert_parse_as(
+        //     "#| this is a nested comment\n\n\n followed by more comments\n|# #t",
+        //     Value::boolean(true),
+        // );
+    }
+
     fn assert_parse_as(inp: &str, expected: Value) {
         let datum = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
 
@@ -529,8 +705,9 @@ mod tests {
     }
 
     fn assert_parse_ok(inp: &str) {
-        let parsed = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
+        let mut source = StringSource::new(inp, "datum-parser-test");
+        let parsed = parse(&mut source);
 
-        assert!(false, "expected to parse successfully")
+        assert!(parsed.is_ok(), "expected to parse successfully")
     }
 }
