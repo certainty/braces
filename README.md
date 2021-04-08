@@ -16,8 +16,10 @@
   - [ ] number
   - [ ] vector
   - [ ] byte-vector
-  - [ ] string
-  - [ ] quoted constants
+  - [x] proper list 
+  - [ ] improper list 
+  - [x] string
+  - [x] quoted constants
   
 - [ ] variables
 - [ ] conditionals
