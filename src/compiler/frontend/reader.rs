@@ -1,75 +1,36 @@
+pub mod datum;
+pub mod error;
+
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
 use crate::vm::scheme::value::Value;
+use datum::Datum;
+use error::ReadError;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_while_m_n};
 use nom::character::complete::{anychar, char, line_ending, one_of};
 use nom::combinator::{map, map_opt, map_res, value, verify};
-use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError, VerboseError};
+use nom::error::{context, ErrorKind, ParseError, VerboseError};
 use nom::multi::many_till;
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
-use thiserror::Error;
-
-#[derive(Debug, PartialEq)]
-pub struct Datum {
-    pub location: SourceLocation,
-    pub value: Value,
-}
-
-impl Datum {
-    fn new(value: Value, location: SourceLocation) -> Self {
-        Self { value, location }
-    }
-}
 
 /// Parser definition
-
-type Input<'a> = LocatedSpan<&'a str, SourceType>;
+pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
 type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
 
-#[derive(Debug, Error)]
-pub enum Error<'a> {
-    #[error("IoError")]
-    IoError(#[from] std::io::Error),
-    #[error("ParseError")]
-    ParseError(VerboseError<Input<'a>>),
-    #[error("Nom Error")]
-    Nom(ErrorKind),
-    #[error("Input was incomplete")]
-    Incomplete,
-}
+pub type Result<T> = std::result::Result<T, ReadError>;
 
-impl<'a, I> ContextError<I> for Error<'a> {}
-
-impl<'a, I> ParseError<I> for Error<'a> {
-    fn from_error_kind(_: I, kind: ErrorKind) -> Self {
-        Error::Nom(kind)
-    }
-
-    fn append(_: I, _: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a, I> FromExternalError<I, std::num::ParseIntError> for Error<'a> {
-    fn from_external_error(_: I, k: nom::error::ErrorKind, _: std::num::ParseIntError) -> Self {
-        Error::Nom(k)
-    }
-}
-
-pub fn parse<'a, T: Source>(source: &'a mut T) -> std::result::Result<Datum, Error> {
+pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Datum> {
     let source_type = source.source_type();
     let source_str = source.as_str()?;
     let input = Input::new_extra(source_str, source_type);
-    match parse_datum(input) {
-        Ok(result) => Ok(result.1),
-        Err(nom::Err::Error(e)) => Err(Error::ParseError(e)),
-        Err(nom::Err::Failure(e)) => Err(Error::ParseError(e)),
-        Err(nom::Err::Incomplete(_)) => Err(Error::Incomplete),
-    }
+    // TODO: handle errors and keep parsing
+    let (_remaining, datum) = parse_datum(input)?;
+
+    Ok(datum)
 }
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
