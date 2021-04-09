@@ -36,16 +36,12 @@ impl CodeGenerator {
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
         match ast {
-            Expression::Literal(LiteralExpression::SelfEvaluating(constant), loc) => match constant
-            {
-                Value::Bool(true) => self.emit_instruction(Instruction::True, loc)?,
-                Value::Bool(false) => self.emit_instruction(Instruction::False, loc)?,
-                _ => self.emit_constant(constant, loc)?,
-            },
-            Expression::Literal(LiteralExpression::Quotation(datum), loc) => match datum {
-                Value::ProperList(List::Nil) => self.emit_instruction(Instruction::Nil, loc)?,
-                _ => self.emit_constant(datum, loc)?,
-            },
+            Expression::Literal(LiteralExpression::SelfEvaluating(constant), loc) => {
+                self.emit_lit(constant, loc)?
+            }
+            Expression::Literal(LiteralExpression::Quotation(datum), loc) => {
+                self.emit_lit(datum, loc)?
+            }
         }
         Ok(())
     }
@@ -58,6 +54,17 @@ impl CodeGenerator {
 
         self.current_chunk()
             .write_line(inst_addr, inst_addr, source_location.line);
+        Ok(())
+    }
+
+    fn emit_lit(&mut self, value: &Value, loc: &SourceLocation) -> Result<()> {
+        match value {
+            Value::Bool(true) => self.emit_instruction(Instruction::True, loc)?,
+            Value::Bool(false) => self.emit_instruction(Instruction::False, loc)?,
+            Value::ProperList(List::Nil) => self.emit_instruction(Instruction::Nil, loc)?,
+            _ => self.emit_constant(value, loc)?,
+        }
+
         Ok(())
     }
 

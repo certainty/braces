@@ -62,10 +62,11 @@ impl<T: Write> Disassembler<T> {
         address: AddressType,
         constant_address: ConstAddressType,
     ) -> usize {
+        let constant = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}        '{:?}'\n",
-                name, constant_address, &chunk.constants[constant_address as usize]
+                "{:<16} {:04}        '{:?}' mem[{:p}]\n",
+                name, constant_address, constant, &constant
             ))
             .unwrap();
 

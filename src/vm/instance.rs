@@ -4,12 +4,33 @@ use super::byte_code::Instruction;
 use super::disassembler::Disassembler;
 use super::scheme::value::Value;
 use super::Error;
+use rustc_hash::FxHashMap;
 
 type Result<T> = std::result::Result<T, Error>;
+
+struct StringTable {
+    strings: FxHashMap<String, Value>,
+}
+
+impl StringTable {
+    pub fn new() -> Self {
+        Self {
+            strings: FxHashMap::default(),
+        }
+    }
+
+    pub fn intern(&mut self, s: impl Into<String>) -> &Value {
+        let k = s.into();
+        let v = k.clone();
+
+        self.strings.entry(k).or_insert(Value::string(v))
+    }
+}
 
 pub struct Instance<'a> {
     ip: AddressType,
     current_chunk: &'a Chunk,
+    strings: StringTable,
     stack: Vec<Value>,
     #[cfg(feature = "debug_vm")]
     disassembler: Disassembler<std::io::Stdout>,
@@ -19,6 +40,7 @@ impl<'a> Instance<'a> {
     pub fn interprete(chunk: &Chunk, stack_size: usize) -> Result<Value> {
         Instance {
             stack: Vec::with_capacity(stack_size),
+            strings: StringTable::new(),
             current_chunk: &chunk,
             ip: 0,
             #[cfg(feature = "debug_vm")]
@@ -43,7 +65,10 @@ impl<'a> Instance<'a> {
                 &Instruction::Nil => self.stack.push(Value::nil()),
                 &Instruction::Const(addr) => {
                     let value = self.current_chunk.read_constant(addr);
-                    self.stack.push(value.clone());
+                    match value {
+                        Value::String(s) => self.stack.push(self.strings.intern(s).clone()),
+                        _ => self.stack.push(value.clone()),
+                    }
                 }
             }
         }
