@@ -183,7 +183,7 @@ mod tests {
     fn make_datum(sexp: Sexp) -> Datum {
         Datum::new(
             sexp,
-            SourceLocation::new(SourceType::Buffer("test".to_string()), 1, 1),
+            SourceLocation::new(SourceType::Buffer("datum-parser-test".to_string()), 1, 1),
         )
     }
 }
