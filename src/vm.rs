@@ -16,6 +16,8 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
+    #[error("RuntimeError: {} at line {}", 0, 1)]
+    RuntimeError(String, usize),
 }
 
 type Result<T> = std::result::Result<T, Error>;

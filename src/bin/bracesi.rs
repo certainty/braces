@@ -25,6 +25,7 @@ fn repl() {
                 match vm.run_string(&line, "repl") {
                     Ok(v) => println!("{}", vm.write(&v)),
                     Err(vm::Error::CompilerError(e)) => e.print_user_friendly_message(),
+                    Err(e @ vm::Error::RuntimeError(_, _)) => eprintln!("{}", e),
                 };
             }
             Err(ReadlineError::Interrupted) => {

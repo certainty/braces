@@ -38,4 +38,8 @@ impl Value {
         let ls: list::List = vals.into();
         Value::ProperList(ls)
     }
+
+    pub fn nil() -> Value {
+        Value::ProperList(list::List::Nil)
+    }
 }

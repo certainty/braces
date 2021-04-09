@@ -24,6 +24,7 @@ harness=false
 
 [features]
 debug_vm = []
+debug_code = []
 
 [dependencies]
 # utils

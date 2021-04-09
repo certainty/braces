@@ -41,6 +41,9 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Halt => self.disassemble_simple("OP_HALT", address),
+            &Instruction::True => self.disassemble_simple("OP_TRUE", address),
+            &Instruction::False => self.disassemble_simple("OP_FALSE", address),
+            &Instruction::Nil => self.disassemble_simple("OP_NIL", address),
             &Instruction::Const(const_address) => {
                 self.disassemble_constant(chunk, "OP_CONST", address, const_address)
             }

@@ -6,4 +6,7 @@ use chunk::ConstAddressType;
 pub enum Instruction {
     Const(ConstAddressType),
     Halt,
+    Nil,
+    True,
+    False,
 }

@@ -38,12 +38,20 @@ impl<'a> Instance<'a> {
 
             match self.next_instruction() {
                 &Instruction::Halt => return Ok(self.stack.pop().unwrap_or(Value::Unspecified)),
+                &Instruction::True => self.stack.push(Value::boolean(true)),
+                &Instruction::False => self.stack.push(Value::boolean(false)),
+                &Instruction::Nil => self.stack.push(Value::nil()),
                 &Instruction::Const(addr) => {
                     let value = self.current_chunk.read_constant(addr);
                     self.stack.push(value.clone());
                 }
             }
         }
+    }
+
+    fn peek(&'a self, distance: usize) -> &'a [Value] {
+        let from = self.stack.len() - distance;
+        &self.stack[from..]
     }
 
     #[inline]
