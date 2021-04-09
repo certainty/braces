@@ -128,11 +128,14 @@ mod tests {
 
     #[test]
     fn test_parse_literal_constant() {
-        assert_parse_as("#t", Expression::constant(&make_datum(Sexp::Bool(true))));
+        assert_parse_as(
+            "#t",
+            Expression::constant(&make_datum(Sexp::Bool(true), 1, 1)),
+        );
 
         assert_parse_as(
             "\"foo\"",
-            Expression::constant(&make_datum(Sexp::string("foo"))),
+            Expression::constant(&make_datum(Sexp::string("foo"), 1, 1)),
         );
     }
 
@@ -140,17 +143,17 @@ mod tests {
     fn test_parse_literal_quoted_datum() {
         assert_parse_as(
             "'#t",
-            Expression::quoted_value(&make_datum(Sexp::Bool(true))),
+            Expression::quoted_value(&make_datum(Sexp::Bool(true), 1, 2)),
         );
 
         assert_parse_as(
             "'#\\a",
-            Expression::quoted_value(&make_datum(Sexp::character('a'))),
+            Expression::quoted_value(&make_datum(Sexp::character('a'), 1, 2)),
         );
 
         assert_parse_as(
             "'foo",
-            Expression::quoted_value(&make_datum(Sexp::symbol("foo"))),
+            Expression::quoted_value(&make_datum(Sexp::symbol("foo"), 1, 2)),
         );
 
         assert_parse_error("'");
@@ -180,10 +183,7 @@ mod tests {
         )
     }
 
-    fn make_datum(sexp: Sexp) -> Datum {
-        Datum::new(
-            sexp,
-            SourceLocation::new(SourceType::Buffer("datum-parser-test".to_string()), 1, 1),
-        )
+    fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
+        Datum::new(sexp, location(line, col))
     }
 }

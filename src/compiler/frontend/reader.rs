@@ -601,31 +601,31 @@ mod tests {
         assert_parse_as(
             "'foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("quote")),
-                make_datum(Sexp::symbol("foo")),
+                make_datum(Sexp::symbol("quote"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 2),
             ]),
         );
         assert_parse_as(
             ",foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("unquote")),
-                make_datum(Sexp::symbol("foo")),
+                make_datum(Sexp::symbol("unquote"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 2),
             ]),
         );
 
         assert_parse_as(
             "`foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("quasi-quote")),
-                make_datum(Sexp::symbol("foo")),
+                make_datum(Sexp::symbol("quasi-quote"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 2),
             ]),
         );
 
         assert_parse_as(
             ",@foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("unquote-splicing")),
-                make_datum(Sexp::symbol("foo")),
+                make_datum(Sexp::symbol("unquote-splicing"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 3),
             ]),
         );
     }
@@ -635,8 +635,8 @@ mod tests {
         assert_parse_as(
             "(#t    #f)",
             Sexp::list(vec![
-                make_datum(Sexp::boolean(true)),
-                make_datum(Sexp::boolean(false)),
+                make_datum(Sexp::boolean(true), 1, 2),
+                make_datum(Sexp::boolean(false), 1, 8),
             ]),
         );
 
@@ -644,10 +644,14 @@ mod tests {
 
         assert_parse_as(
             "((foo #t))",
-            Sexp::list(vec![make_datum(Sexp::list(vec![
-                make_datum(Sexp::symbol("foo")),
-                make_datum(Sexp::boolean(true)),
-            ]))]),
+            Sexp::list(vec![make_datum(
+                Sexp::list(vec![
+                    make_datum(Sexp::symbol("foo"), 1, 3),
+                    make_datum(Sexp::boolean(true), 1, 7),
+                ]),
+                1,
+                2,
+            )]),
         );
     }
 
@@ -657,8 +661,8 @@ mod tests {
         assert_parse_as(
             "(#t \n #; foo\n #f)",
             Sexp::list(vec![
-                make_datum(Sexp::boolean(true)),
-                make_datum(Sexp::boolean(false)),
+                make_datum(Sexp::boolean(true), 1, 2),
+                make_datum(Sexp::boolean(false), 3, 2),
             ]),
         );
 
@@ -682,10 +686,15 @@ mod tests {
         assert!(parsed.is_ok(), "expected to parse successfully")
     }
 
-    fn make_datum(sexp: Sexp) -> Datum {
-        Datum::new(
-            sexp,
-            SourceLocation::new(SourceType::Buffer("test".to_string()), 1, 1),
+    fn location(line: usize, col: usize) -> SourceLocation {
+        SourceLocation::new(
+            SourceType::Buffer("datum-parser-test".to_string()),
+            line,
+            col,
         )
+    }
+
+    fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
+        Datum::new(sexp, location(line, col))
     }
 }
