@@ -215,6 +215,6 @@ mod tests {
         let external = writer.write(&val);
         let mut source = StringSource::new(&external, "");
 
-        reader::parse(&mut source).map(|e| e.value)
+        reader::parse(&mut source).map(|e| Value::from(e))
     }
 }

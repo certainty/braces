@@ -8,7 +8,7 @@ lazy_static! {
     pub static ref EMPTY: im::vector::Vector<Value> = Vector::new();
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum List {
     Nil,
     Cons(Vector<Value>),
@@ -53,6 +53,22 @@ impl List {
         match self {
             List::Nil => None,
             List::Cons(e) => e.get(1),
+        }
+    }
+
+    #[inline]
+    pub fn third(&self) -> Option<&Value> {
+        match self {
+            List::Nil => None,
+            List::Cons(e) => e.get(2),
+        }
+    }
+
+    #[inline]
+    pub fn fourth(&self) -> Option<&Value> {
+        match self {
+            List::Nil => None,
+            List::Cons(e) => e.get(3),
         }
     }
 

@@ -1,10 +1,10 @@
 use crate::compiler::frontend::parser::expression::{Expression, LiteralExpression};
+use crate::compiler::frontend::reader::datum;
 use crate::compiler::source_location::SourceLocation;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
 use crate::vm::disassembler::Disassembler;
-use crate::vm::scheme::value::list::List;
 use crate::vm::scheme::value::Value;
 use thiserror::Error;
 
@@ -36,33 +36,37 @@ impl CodeGenerator {
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
         match ast {
-            Expression::Literal(LiteralExpression::SelfEvaluating(constant), loc) => {
-                self.emit_lit(constant, loc)?
+            Expression::Identifier(_, _) => todo!(),
+            Expression::Literal(LiteralExpression::SelfEvaluating(constant)) => {
+                self.emit_lit(constant)?
             }
-            Expression::Literal(LiteralExpression::Quotation(datum), loc) => {
-                self.emit_lit(datum, loc)?
-            }
+            Expression::Literal(LiteralExpression::Quotation(datum)) => self.emit_lit(datum)?,
+            Expression::Conditional(test, consequent, alternate, loc) => todo!(),
         }
         Ok(())
     }
 
-    fn emit_constant(&mut self, value: &Value, source_location: &SourceLocation) -> Result<()> {
-        let const_addr = self.current_chunk().add_constant(value);
+    fn emit_constant(&mut self, datum: &datum::Datum) -> Result<()> {
+        let const_addr = self.current_chunk().add_constant(&Value::from(datum));
         let inst_addr = self
             .current_chunk()
             .write_instruction(Instruction::Const(const_addr));
 
         self.current_chunk()
-            .write_line(inst_addr, inst_addr, source_location.line);
+            .write_line(inst_addr, inst_addr, datum.location.line);
         Ok(())
     }
 
-    fn emit_lit(&mut self, value: &Value, loc: &SourceLocation) -> Result<()> {
-        match value {
-            Value::Bool(true) => self.emit_instruction(Instruction::True, loc)?,
-            Value::Bool(false) => self.emit_instruction(Instruction::False, loc)?,
-            Value::ProperList(List::Nil) => self.emit_instruction(Instruction::Nil, loc)?,
-            _ => self.emit_constant(value, loc)?,
+    fn emit_lit(&mut self, datum: &datum::Datum) -> Result<()> {
+        match datum.sexp() {
+            datum::Sexp::Bool(true) => self.emit_instruction(Instruction::True, &datum.location)?,
+            datum::Sexp::Bool(false) => {
+                self.emit_instruction(Instruction::False, &datum.location)?
+            }
+            datum::Sexp::List(ls) if ls.is_empty() => {
+                self.emit_instruction(Instruction::Nil, &datum.location)?
+            }
+            _ => self.emit_constant(&datum)?,
         }
 
         Ok(())
