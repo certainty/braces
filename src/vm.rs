@@ -37,8 +37,8 @@ impl VM {
         self.writer.write(value).to_string()
     }
 
-    pub fn run_string(&mut self, inp: &str) -> Result<Value> {
-        let mut source = StringSource::new(inp, "run_string");
+    pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
+        let mut source = StringSource::new(inp, context);
         let mut compiler = Compiler::new();
 
         if let Some(chunk) = compiler.compile_expression(&mut source)? {

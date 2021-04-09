@@ -27,8 +27,7 @@ pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Datum> {
     let source_type = source.source_type();
     let source_str = source.as_str()?;
     let input = Input::new_extra(source_str, source_type);
-    // TODO: handle errors and keep parsing
-    let (_remaining, datum) = parse_datum(input)?;
+    let (_, datum) = parse_datum(input)?;
 
     Ok(datum)
 }

@@ -8,9 +8,9 @@ type NomError<'a> = VerboseError<Input<'a>>;
 
 #[derive(Debug, Clone)]
 pub struct ParserErrorDetail {
-    context: String,
-    span: String,
-    location: SourceLocation,
+    pub context: String,
+    pub span: String,
+    pub location: SourceLocation,
 }
 
 impl<'a> From<&(Input<'a>, VerboseErrorKind)> for ParserErrorDetail {
@@ -18,7 +18,7 @@ impl<'a> From<&(Input<'a>, VerboseErrorKind)> for ParserErrorDetail {
         let (input, kind) = e;
         let context = match kind {
             VerboseErrorKind::Context(ctx) => ctx.to_string(),
-            VerboseErrorKind::Char(c) => format!("expecting {}", c),
+            VerboseErrorKind::Char(c) => format!("expected {}", c),
             VerboseErrorKind::Nom(k) => format!("while parsing {:?}", k),
         };
         let span = input.fragment().to_string();
@@ -49,7 +49,7 @@ pub enum ReadError {
 impl<'a> From<Err<NomError<'a>>> for ReadError {
     fn from(e: Err<NomError<'a>>) -> ReadError {
         match e {
-            Err::Incomplete(_needed) => ReadError::IncompleteInput,
+            Err::Incomplete(_) => ReadError::IncompleteInput,
             Err::Failure(e) => {
                 ReadError::ReadError(e.errors.iter().map(|elt| elt.into()).collect())
             }

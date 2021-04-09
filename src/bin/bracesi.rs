@@ -1,3 +1,5 @@
+use braces::compiler::error::UserMessage;
+use braces::vm;
 use braces::vm::VM;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -20,9 +22,9 @@ fn repl() {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                match vm.run_string(&line) {
+                match vm.run_string(&line, "repl") {
                     Ok(v) => println!("{}", vm.write(&v)),
-                    Err(e) => eprintln!("Error: {}", e),
+                    Err(vm::Error::CompilerError(e)) => e.print_user_friendly_message(),
                 };
             }
             Err(ReadlineError::Interrupted) => {
