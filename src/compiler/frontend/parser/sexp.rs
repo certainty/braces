@@ -17,6 +17,12 @@ use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
 
+// TODO: Better error reporting strategy
+// Every parser that returns a datum is a good candidate to be on a boundary
+// for better errors. We should create a meaningful error if these parser fail
+// and give enough context to be useful for the user. This requires a custom error
+// type and not `VerboseError`
+
 /// Parser definition
 pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
 type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
@@ -81,11 +87,9 @@ where
 }
 
 fn location<'a>(input: Input<'a>) -> SourceLocation {
-    SourceLocation::new(
-        input.extra.clone(),
-        input.location_line() as usize,
-        input.get_column(),
-    )
+    input
+        .extra
+        .location(input.location_line() as usize, input.get_column())
 }
 
 #[inline]
@@ -640,7 +644,9 @@ mod tests {
             ]),
         );
 
-        assert_parse_as("()", Sexp::list(vec![]));
+        let v: Vec<Datum> = vec![];
+
+        assert_parse_as("()", Sexp::list(v));
 
         assert_parse_as(
             "((foo #t))",
@@ -687,11 +693,7 @@ mod tests {
     }
 
     fn location(line: usize, col: usize) -> SourceLocation {
-        SourceLocation::new(
-            SourceType::Buffer("datum-parser-test".to_string()),
-            line,
-            col,
-        )
+        SourceType::Buffer("datum-parser-test".to_string()).location(line, col)
     }
 
     fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {

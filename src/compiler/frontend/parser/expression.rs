@@ -7,10 +7,27 @@ use error::Error;
 
 type Result<T> = std::result::Result<T, Error>;
 
+#[repr(transparent)]
+#[derive(Clone, PartialEq, Debug)]
+pub struct Identifier(String);
+
+impl Identifier {
+    pub fn string(&self) -> &String {
+        &self.0
+    }
+}
+
+impl From<Identifier> for String {
+    fn from(id: Identifier) -> String {
+        id.0
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
-    Identifier(String, SourceLocation),
+    Identifier(Identifier, SourceLocation),
     Literal(LiteralExpression),
+    Assign(Identifier, Box<Expression>, SourceLocation),
     Conditional(
         Box<Expression>,
         Box<Expression>,
@@ -40,6 +57,14 @@ impl Expression {
         Expression::Literal(LiteralExpression::Quotation(datum.clone()))
     }
 
+    pub fn assign(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
+        Expression::Assign(id, Box::new(expr), loc)
+    }
+
+    pub fn identifier(str: String, loc: SourceLocation) -> Expression {
+        Expression::Identifier(Identifier(str), loc)
+    }
+
     pub fn conditional(
         test: Expression,
         conseqent: Expression,
@@ -56,13 +81,18 @@ impl Expression {
 
     fn parse_expression(datum: &Datum) -> Result<Expression> {
         match datum.sexp() {
+            Sexp::Symbol(s) => Ok(Self::identifier(s.to_string(), datum.location.clone())),
             Sexp::Bool(_) => Ok(Self::constant(datum)),
             Sexp::Char(_) => Ok(Self::constant(datum)),
             Sexp::String(_) => Ok(Self::constant(datum)),
             Sexp::List(ls) => match Self::head_symbol(&ls) {
                 Some("quote") => Self::parse_quoted_datum(&ls, &datum.location),
+                Some("set!") => Self::parse_assignment(&ls, &datum.location),
                 Some("if") => Self::parse_conditional(&ls, &datum.location),
-                _ => todo!(),
+                other => {
+                    println!("{:?}", other);
+                    todo!()
+                }
             },
 
             _ => todo!(),
@@ -98,6 +128,26 @@ impl Expression {
                 "Expected (if <test> <consequent> <alternate>?)",
                 loc.clone(),
             ),
+        }
+    }
+
+    fn parse_assignment(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
+        match &ls[..] {
+            [_, identifier, expr] => {
+                if let Expression::Identifier(id, _) = Self::parse_expression(identifier)? {
+                    Ok(Expression::assign(
+                        id,
+                        Self::parse_expression(expr)?,
+                        loc.clone(),
+                    ))
+                } else {
+                    Error::parse_error(
+                        "Can only set! variables. (set! <identifier> <expression>)",
+                        loc.clone(),
+                    )
+                }
+            }
+            _ => Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone()),
         }
     }
 

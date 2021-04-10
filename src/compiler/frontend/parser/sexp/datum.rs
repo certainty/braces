@@ -28,12 +28,20 @@ impl Sexp {
         Sexp::String(val.into())
     }
 
-    pub fn list(val: impl Into<Vec<Datum>>) -> Self {
-        Sexp::List(val.into())
+    pub fn list<I>(elements: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<Datum>,
+    {
+        Self::List(elements.into_iter().map(Into::into).collect())
     }
 
-    pub fn vector(val: impl Into<Vec<Datum>>) -> Self {
-        Sexp::Vector(val.into())
+    pub fn vector<I>(elements: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<Datum>,
+    {
+        Self::Vector(elements.into_iter().map(Into::into).collect())
     }
 
     pub fn byte_vector(val: impl Into<Vec<u8>>) -> Self {

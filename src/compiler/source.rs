@@ -1,3 +1,4 @@
+use super::source_location::SourceLocation;
 use std::path;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -6,10 +7,20 @@ pub enum SourceType {
     File(path::PathBuf),
 }
 
+impl SourceType {
+    pub fn location(&self, line: usize, col: usize) -> SourceLocation {
+        SourceLocation::new(self.clone(), line, col)
+    }
+}
+
 pub trait Source {
     fn source_type(&self) -> SourceType;
     fn as_str(&self) -> std::io::Result<&str>;
     fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<()>;
+
+    fn location(&self, line: usize, col: usize) -> SourceLocation {
+        SourceLocation::new(self.source_type(), line, col)
+    }
 }
 
 /// Implementation of source that can be constructed for strings

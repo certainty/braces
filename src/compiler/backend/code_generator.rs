@@ -1,3 +1,4 @@
+use crate::compiler::frontend::parser::expression::Identifier;
 use crate::compiler::frontend::parser::expression::{Expression, LiteralExpression};
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::SourceLocation;
@@ -36,7 +37,8 @@ impl CodeGenerator {
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
         match ast {
-            Expression::Identifier(_, _) => todo!(),
+            Expression::Identifier(id, loc) => self.emit_read_variable(id, loc)?,
+            Expression::Assign(id, expr, loc) => self.emit_assignment(id, expr, loc)?,
             Expression::Literal(LiteralExpression::SelfEvaluating(constant)) => {
                 self.emit_lit(constant)?
             }
@@ -46,14 +48,34 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_constant(&mut self, datum: &datum::Datum) -> Result<()> {
-        let const_addr = self.current_chunk().add_constant(&Value::from(datum));
+    fn emit_read_variable(&mut self, id: &Identifier, loc: &SourceLocation) -> Result<()> {
+        let const_addr = self
+            .current_chunk()
+            .add_constant(&Value::symbol(id.string()));
+        self.emit_instruction(Instruction::Get(const_addr), loc)
+    }
+
+    fn emit_assignment(
+        &mut self,
+        id: &Identifier,
+        expr: &Expression,
+        loc: &SourceLocation,
+    ) -> Result<()> {
+        self.emit_instructions(expr)?;
+        let const_addr = self
+            .current_chunk()
+            .add_constant(&Value::symbol(id.string()));
+        self.emit_instruction(Instruction::Set(const_addr), loc)
+    }
+
+    fn emit_constant(&mut self, value: &Value, loc: &SourceLocation) -> Result<()> {
+        let const_addr = self.current_chunk().add_constant(value);
         let inst_addr = self
             .current_chunk()
             .write_instruction(Instruction::Const(const_addr));
 
         self.current_chunk()
-            .write_line(inst_addr, inst_addr, datum.location.line);
+            .write_line(inst_addr, inst_addr, loc.line);
         Ok(())
     }
 
@@ -66,7 +88,7 @@ impl CodeGenerator {
             datum::Sexp::List(ls) if ls.is_empty() => {
                 self.emit_instruction(Instruction::Nil, &datum.location)?
             }
-            _ => self.emit_constant(&datum)?,
+            _ => self.emit_constant(&Value::from(datum), &datum.location)?,
         }
 
         Ok(())
