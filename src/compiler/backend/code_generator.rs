@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::expression::{Expression, LiteralExpression};
-use crate::compiler::frontend::reader::datum;
+use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::SourceLocation;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;

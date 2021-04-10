@@ -1,9 +1,9 @@
-use super::error::Error;
+pub mod error;
+use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::frontend::parser::Parser;
-use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::frontend::reader::datum::Sexp;
 use crate::compiler::source::Source;
 use crate::compiler::source_location::SourceLocation;
+use error::Error;
 
 type Result<T> = std::result::Result<T, Error>;
 

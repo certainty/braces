@@ -1,5 +1,5 @@
-use super::frontend::parser;
-use super::frontend::reader::error::ReadError;
+use super::frontend::parser::expression;
+use super::frontend::parser::sexp::error::ReadError;
 use super::source::SourceType;
 use super::source_location::SourceLocation;
 
@@ -30,15 +30,15 @@ impl UserMessage for ReadError {
     }
 }
 
-impl UserMessage for parser::error::Error {
+impl UserMessage for expression::error::Error {
     fn print_user_friendly_message(&self) {
         match self {
-            parser::error::Error::ReadError(e) => e.print_user_friendly_message(),
-            parser::error::Error::ParseError(message, location) => {
+            expression::error::Error::ReadError(e) => e.print_user_friendly_message(),
+            expression::error::Error::ParseError(message, location) => {
                 eprintln!("ParseError: {}", message);
                 eprintln!("--> {} ", source_location_string(location))
             }
-            parser::error::Error::DomainError(message, location) => {
+            expression::error::Error::DomainError(message, location) => {
                 eprintln!("DomainError: {}", message);
                 eprintln!("--> {} ", source_location_string(location))
             }

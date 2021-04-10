@@ -1,7 +1,7 @@
 #[cfg(test)]
 pub mod arbitrary;
 pub mod list;
-use crate::compiler::frontend::reader::datum::{Datum, Sexp};
+use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use std::convert::Into;
 
 /// Runtime representation of values

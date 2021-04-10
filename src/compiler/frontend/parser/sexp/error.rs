@@ -1,4 +1,4 @@
-use crate::compiler::frontend::reader::Input;
+use super::Input;
 use crate::compiler::source_location::SourceLocation;
 use nom::error::{VerboseError, VerboseErrorKind};
 use nom::Err;
