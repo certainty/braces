@@ -1,4 +1,5 @@
 pub mod backend;
+pub mod error;
 pub mod frontend;
 pub mod source;
 pub mod source_location;
@@ -14,7 +15,7 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    ParseError(#[from] frontend::parser::error::Error),
+    ParseError(#[from] frontend::parser::expression::error::Error),
 
     #[error(transparent)]
     GenerationError(#[from] code_generator::Error),

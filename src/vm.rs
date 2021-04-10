@@ -7,7 +7,7 @@ use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::Compiler;
 use byte_code::chunk::Chunk;
-use instance::Instance;
+use instance::{Instance, TopLevel};
 use scheme::value::Value;
 use scheme::writer::Writer;
 use thiserror::Error;
@@ -16,6 +16,10 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
+    #[error("RuntimeError: {0} at line {1}")]
+    RuntimeError(String, usize),
+    #[error("CompilerBug: {}", 0)]
+    CompilerBug(String),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -23,6 +27,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct VM {
     stack_size: usize,
     writer: Writer,
+    toplevel: TopLevel,
 }
 
 impl VM {
@@ -30,6 +35,7 @@ impl VM {
         VM {
             stack_size: 256,
             writer: Writer {},
+            toplevel: TopLevel::new(),
         }
     }
 
@@ -37,8 +43,8 @@ impl VM {
         self.writer.write(value).to_string()
     }
 
-    pub fn run_string(&mut self, inp: &str) -> Result<Value> {
-        let mut source = StringSource::new(inp, "run_string");
+    pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
+        let mut source = StringSource::new(inp, context);
         let mut compiler = Compiler::new();
 
         if let Some(chunk) = compiler.compile_expression(&mut source)? {
@@ -49,6 +55,6 @@ impl VM {
     }
 
     fn interprete(&mut self, chunk: &Chunk) -> Result<Value> {
-        Instance::interprete(chunk, self.stack_size)
+        Instance::interprete(chunk, self.stack_size, &mut self.toplevel)
     }
 }

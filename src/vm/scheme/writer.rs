@@ -133,8 +133,8 @@ impl Writer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::frontend::parser::sexp;
     use crate::compiler::source::StringSource;
-    use crate::vm::scheme::reader;
     use crate::vm::scheme::value::Value;
     use crate::vm::scheme::writer;
     use quickcheck;
@@ -210,12 +210,11 @@ mod tests {
         read_my_write(&val).is_ok()
     }
 
-    fn read_my_write(val: &Value) -> reader::Result<Value> {
-        let reader = reader::Reader::new();
+    fn read_my_write(val: &Value) -> sexp::Result<Value> {
         let writer = writer::Writer::new();
         let external = writer.write(&val);
         let mut source = StringSource::new(&external, "");
 
-        reader.read(&mut source)
+        sexp::parse(&mut source).map(|e| Value::from(e))
     }
 }

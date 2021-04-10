@@ -1,75 +1,41 @@
+pub mod datum;
+pub mod error;
+
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
-use crate::vm::scheme::value::Value;
+use datum::Datum;
+use datum::Sexp;
+use error::ReadError;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_while_m_n};
 use nom::character::complete::{anychar, char, line_ending, one_of};
 use nom::combinator::{map, map_opt, map_res, value, verify};
-use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError, VerboseError};
+use nom::error::{context, ErrorKind, ParseError, VerboseError};
 use nom::multi::many_till;
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
-use thiserror::Error;
 
-#[derive(Debug, PartialEq)]
-pub struct Datum {
-    pub location: SourceLocation,
-    pub value: Value,
-}
-
-impl Datum {
-    fn new(value: Value, location: SourceLocation) -> Self {
-        Self { value, location }
-    }
-}
+// TODO: Better error reporting strategy
+// Every parser that returns a datum is a good candidate to be on a boundary
+// for better errors. We should create a meaningful error if these parser fail
+// and give enough context to be useful for the user. This requires a custom error
+// type and not `VerboseError`
 
 /// Parser definition
-
-type Input<'a> = LocatedSpan<&'a str, SourceType>;
+pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
 type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
 
-#[derive(Debug, Error)]
-pub enum Error<'a> {
-    #[error("IoError")]
-    IoError(#[from] std::io::Error),
-    #[error("ParseError")]
-    ParseError(VerboseError<Input<'a>>),
-    #[error("Nom Error")]
-    Nom(ErrorKind),
-    #[error("Input was incomplete")]
-    Incomplete,
-}
+pub type Result<T> = std::result::Result<T, ReadError>;
 
-impl<'a, I> ContextError<I> for Error<'a> {}
-
-impl<'a, I> ParseError<I> for Error<'a> {
-    fn from_error_kind(_: I, kind: ErrorKind) -> Self {
-        Error::Nom(kind)
-    }
-
-    fn append(_: I, _: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a, I> FromExternalError<I, std::num::ParseIntError> for Error<'a> {
-    fn from_external_error(_: I, k: nom::error::ErrorKind, _: std::num::ParseIntError) -> Self {
-        Error::Nom(k)
-    }
-}
-
-pub fn parse<'a, T: Source>(source: &'a mut T) -> std::result::Result<Datum, Error> {
+pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Datum> {
     let source_type = source.source_type();
     let source_str = source.as_str()?;
     let input = Input::new_extra(source_str, source_type);
-    match parse_datum(input) {
-        Ok(result) => Ok(result.1),
-        Err(nom::Err::Error(e)) => Err(Error::ParseError(e)),
-        Err(nom::Err::Failure(e)) => Err(Error::ParseError(e)),
-        Err(nom::Err::Incomplete(_)) => Err(Error::Incomplete),
-    }
+    let (_, datum) = parse_datum(input)?;
+
+    Ok(datum)
 }
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
@@ -109,7 +75,7 @@ pub fn map_datum<'a, O1, F, G>(
 ) -> impl FnMut(Input<'a>) -> ParseResult<'a, Datum>
 where
     F: FnMut(Input<'a>) -> ParseResult<'a, O1>,
-    G: FnMut(O1) -> Value,
+    G: FnMut(O1) -> Sexp,
 {
     move |input: Input<'a>| {
         let (s, p) = position(input)?;
@@ -121,11 +87,9 @@ where
 }
 
 fn location<'a>(input: Input<'a>) -> SourceLocation {
-    SourceLocation::new(
-        input.extra.clone(),
-        input.location_line() as usize,
-        input.get_column(),
-    )
+    input
+        .extra
+        .location(input.location_line() as usize, input.get_column())
 }
 
 #[inline]
@@ -142,13 +106,13 @@ where
 
 fn parse_boolean<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let bool_literal = alt((
-        value(true, tag("#t")),
         value(true, tag("#true")),
-        value(false, tag("#f")),
         value(false, tag("#false")),
+        value(true, tag("#t")),
+        value(false, tag("#f")),
     ));
 
-    map_datum(bool_literal, Value::boolean)(input)
+    map_datum(bool_literal, Sexp::boolean)(input)
 }
 
 ////////////////////////
@@ -161,7 +125,7 @@ fn parse_character<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
         alt((parse_hex_char_literal, parse_named_char_literal, anychar)),
     );
 
-    map_datum(char_literal, Value::character)(input)
+    map_datum(char_literal, Sexp::character)(input)
 }
 
 #[inline]
@@ -222,7 +186,7 @@ fn parse_string<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 
     let string_literal = delimited(char('"'), string_elements, char('"'));
 
-    map_datum(string_literal, Value::String)(input)
+    map_datum(string_literal, Sexp::String)(input)
 }
 
 fn parse_string_element<'a>(input: Input<'a>) -> ParseResult<'a, StringElement<'a>> {
@@ -310,7 +274,7 @@ fn parse_symbol<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
         parse_peculiar_identifier,
     ));
 
-    map_datum(symbol_literal, Value::symbol)(input)
+    map_datum(symbol_literal, Sexp::symbol)(input)
 }
 
 #[inline]
@@ -454,9 +418,7 @@ fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     );
     let list = delimited(char('('), many0(list_elements), char(')'));
 
-    map_datum(list, |elts| {
-        Value::proper_list(elts.iter().map(|e| e.value.clone()).collect())
-    })(input)
+    map_datum(list, Sexp::list)(input)
 }
 
 ////////////////////////////
@@ -467,18 +429,16 @@ fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 fn parse_abbreviation<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let abbrev = pair(parse_abbrev_prefix, parse_datum);
 
-    map_datum(abbrev, |(abbr, datum)| {
-        Value::proper_list(vec![abbr.value, datum.value])
-    })(input)
+    map_datum(abbrev, |(abbr, datum)| Sexp::list(vec![abbr, datum]))(input)
 }
 
 #[inline]
 fn parse_abbrev_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let abbrev = alt((
-        value(Value::symbol("quote"), char('\'')),
-        value(Value::symbol("quasi-quote"), char('`')),
-        value(Value::symbol("unquote-splicing"), tag(",@")),
-        value(Value::symbol("unquote"), char(',')),
+        value(Sexp::symbol("quote"), char('\'')),
+        value(Sexp::symbol("quasi-quote"), char('`')),
+        value(Sexp::symbol("unquote-splicing"), tag(",@")),
+        value(Sexp::symbol("unquote"), char(',')),
     ));
 
     map_datum(abbrev, |v| v)(input)
@@ -549,59 +509,59 @@ mod tests {
 
     #[test]
     fn test_read_boolean_literal() {
-        assert_parse_as("#t", Value::boolean(true));
-        assert_parse_as("#true", Value::boolean(true));
+        assert_parse_as("#t", Sexp::boolean(true));
+        assert_parse_as("#true", Sexp::boolean(true));
 
-        assert_parse_as("#f", Value::boolean(false));
-        assert_parse_as("#false", Value::boolean(false));
+        assert_parse_as("#f", Sexp::boolean(false));
+        assert_parse_as("#false", Sexp::boolean(false));
     }
 
     #[test]
     fn test_read_char_hex_literal() {
-        assert_parse_as("#\\x43", Value::character('C'));
+        assert_parse_as("#\\x43", Sexp::character('C'));
     }
 
     #[test]
     fn test_read_char_named_literal() {
-        assert_parse_as("#\\alarm", Value::character('\u{7}'));
+        assert_parse_as("#\\alarm", Sexp::character('\u{7}'));
     }
 
     #[test]
     fn test_read_char_literal() {
-        assert_parse_as("#\\a", Value::character('a'));
+        assert_parse_as("#\\a", Sexp::character('a'));
 
-        assert_parse_as("#\\☆", Value::character('☆'));
+        assert_parse_as("#\\☆", Sexp::character('☆'));
     }
 
     #[test]
     fn test_read_string() {
-        assert_parse_as("\"this is my string\"", Value::string("this is my string"));
+        assert_parse_as("\"this is my string\"", Sexp::string("this is my string"));
 
         assert_parse_as(
             "\"this is my ☆ string ☆\"",
-            Value::string("this is my ☆ string ☆"),
+            Sexp::string("this is my ☆ string ☆"),
         );
 
         assert_parse_as(
             "\"string with \\n and \\t \"",
-            Value::string("string with \n and \t "),
+            Sexp::string("string with \n and \t "),
         );
 
         assert_parse_as(
             "\"string with \\xa; and \\t \"",
-            Value::string("string with \n and \t "),
+            Sexp::string("string with \n and \t "),
         );
 
         assert_parse_as(
             "\"string with \\\n and the\\\n next line\"",
-            Value::string("string with  and the next line"),
+            Sexp::string("string with  and the next line"),
         );
     }
 
     #[test]
     fn test_read_string_bugs() {
-        assert_parse_as("\"\"", Value::string(""));
-        assert_parse_as(r#""\\7""#, Value::string("\\7"));
+        assert_parse_as("\"\"", Sexp::string(""));
+        assert_parse_as(r#""\\7""#, Sexp::string("\\7"));
     }
 
     #[test]
@@ -618,25 +578,25 @@ mod tests {
         ];
 
         for sym in symbols.iter() {
-            assert_parse_as(sym, Value::symbol(*sym))
+            assert_parse_as(sym, Sexp::symbol(*sym))
         }
     }
 
     #[test]
     fn test_read_symbol_delimited() {
-        assert_parse_as("||", Value::symbol(""));
+        assert_parse_as("||", Sexp::symbol(""));
 
-        assert_parse_as("|two words|", Value::symbol("two words"));
-        assert_parse_as(r#"|two\x20;words|"#, Value::symbol("two words"));
-        assert_parse_as(r#"|two\|words|"#, Value::symbol("two|words"));
+        assert_parse_as("|two words|", Sexp::symbol("two words"));
+        assert_parse_as(r#"|two\x20;words|"#, Sexp::symbol("two words"));
+        assert_parse_as(r#"|two\|words|"#, Sexp::symbol("two|words"));
 
         assert_parse_as(
             r#"|test with \| escaped vertical lines|"#,
-            Value::symbol("test with | escaped vertical lines"),
+            Sexp::symbol("test with | escaped vertical lines"),
         );
         assert_parse_as(
             r#"|:(\x80;\xfff6;]&\x5c;"|"#,
-            Value::symbol(":(\u{0080}\u{fff6}]&\\\""),
+            Sexp::symbol(":(\u{0080}\u{fff6}]&\\\""),
         );
     }
 
@@ -644,23 +604,32 @@ mod tests {
     fn test_read_abbrev() {
         assert_parse_as(
             "'foo",
-            Value::proper_list(vec![Value::symbol("quote"), Value::symbol("foo")]),
+            Sexp::list(vec![
+                make_datum(Sexp::symbol("quote"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 2),
+            ]),
         );
         assert_parse_as(
             ",foo",
-            Value::proper_list(vec![Value::symbol("unquote"), Value::symbol("foo")]),
+            Sexp::list(vec![
+                make_datum(Sexp::symbol("unquote"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 2),
+            ]),
         );
 
         assert_parse_as(
             "`foo",
-            Value::proper_list(vec![Value::symbol("quasi-quote"), Value::symbol("foo")]),
+            Sexp::list(vec![
+                make_datum(Sexp::symbol("quasi-quote"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 2),
+            ]),
         );
 
         assert_parse_as(
             ",@foo",
-            Value::proper_list(vec![
-                Value::symbol("unquote-splicing"),
-                Value::symbol("foo"),
+            Sexp::list(vec![
+                make_datum(Sexp::symbol("unquote-splicing"), 1, 1),
+                make_datum(Sexp::symbol("foo"), 1, 3),
             ]),
         );
     }
@@ -669,26 +638,38 @@ mod tests {
     fn test_read_proper_list() {
         assert_parse_as(
             "(#t    #f)",
-            Value::proper_list(vec![Value::boolean(true), Value::boolean(false)]),
+            Sexp::list(vec![
+                make_datum(Sexp::boolean(true), 1, 2),
+                make_datum(Sexp::boolean(false), 1, 8),
+            ]),
         );
 
-        assert_parse_as("()", Value::proper_list(vec![]));
+        let v: Vec<Datum> = vec![];
+
+        assert_parse_as("()", Sexp::list(v));
 
         assert_parse_as(
             "((foo #t))",
-            Value::proper_list(vec![Value::proper_list(vec![
-                Value::symbol("foo"),
-                Value::boolean(true),
-            ])]),
+            Sexp::list(vec![make_datum(
+                Sexp::list(vec![
+                    make_datum(Sexp::symbol("foo"), 1, 3),
+                    make_datum(Sexp::boolean(true), 1, 7),
+                ]),
+                1,
+                2,
+            )]),
         );
     }
 
     #[test]
     fn test_read_comments() {
-        assert_parse_as(";foo bar\n #t", Value::boolean(true));
+        assert_parse_as(";foo bar\n #t", Sexp::boolean(true));
         assert_parse_as(
             "(#t \n #; foo\n #f)",
-            Value::proper_list(vec![Value::boolean(true), Value::boolean(false)]),
+            Sexp::list(vec![
+                make_datum(Sexp::boolean(true), 1, 2),
+                make_datum(Sexp::boolean(false), 3, 2),
+            ]),
         );
 
         //TODO: fix me
@@ -698,10 +679,10 @@ mod tests {
         // );
     }
 
-    fn assert_parse_as(inp: &str, expected: Value) {
+    fn assert_parse_as(inp: &str, expected: Sexp) {
         let datum = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
 
-        assert_eq!(datum.value, expected)
+        assert_eq!(datum.sexp, expected)
     }
 
     fn assert_parse_ok(inp: &str) {
@@ -709,5 +690,13 @@ mod tests {
         let parsed = parse(&mut source);
 
         assert!(parsed.is_ok(), "expected to parse successfully")
+    }
+
+    fn location(line: usize, col: usize) -> SourceLocation {
+        SourceType::Buffer("datum-parser-test".to_string()).location(line, col)
+    }
+
+    fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
+        Datum::new(sexp, location(line, col))
     }
 }

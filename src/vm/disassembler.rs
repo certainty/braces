@@ -41,6 +41,15 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Halt => self.disassemble_simple("OP_HALT", address),
+            &Instruction::True => self.disassemble_simple("OP_TRUE", address),
+            &Instruction::False => self.disassemble_simple("OP_FALSE", address),
+            &Instruction::Nil => self.disassemble_simple("OP_NIL", address),
+            &Instruction::Get(const_address) => {
+                self.disassemble_constant(chunk, "OP_GET", address, const_address)
+            }
+            &Instruction::Set(const_address) => {
+                self.disassemble_constant(chunk, "OP_SET", address, const_address)
+            }
             &Instruction::Const(const_address) => {
                 self.disassemble_constant(chunk, "OP_CONST", address, const_address)
             }
@@ -59,10 +68,11 @@ impl<T: Write> Disassembler<T> {
         address: AddressType,
         constant_address: ConstAddressType,
     ) -> usize {
+        let constant = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}        '{:?}'\n",
-                name, constant_address, &chunk.constants[constant_address as usize]
+                "{:<16} {:04}        '{:?}' mem[{:p}]\n",
+                name, constant_address, constant, &constant
             ))
             .unwrap();
 

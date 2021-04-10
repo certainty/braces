@@ -4,12 +4,15 @@ use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
 
 lazy_static! {
-    pub static ref NIL: List = List(Vector::new());
+    pub static ref NIL: List = List::Nil;
+    pub static ref EMPTY: im::vector::Vector<Value> = Vector::new();
 }
 
-#[repr(transparent)]
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct List(Vector<Value>);
+#[derive(Debug, PartialEq, Clone)]
+pub enum List {
+    Nil,
+    Cons(Vector<Value>),
+}
 
 impl List {
     pub fn nil() -> &'static List {
@@ -17,7 +20,7 @@ impl List {
     }
 
     pub fn new() -> Self {
-        List(Vector::new())
+        List::Cons(Vector::new())
     }
 
     pub fn is_null(&self) -> bool {
@@ -26,12 +29,18 @@ impl List {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.0.len()
+        match self {
+            List::Nil => 0,
+            List::Cons(e) => e.len(),
+        }
     }
 
     #[inline]
     pub fn head(&self) -> Option<&Value> {
-        self.0.head()
+        match self {
+            List::Nil => None,
+            List::Cons(e) => e.head(),
+        }
     }
 
     #[inline]
@@ -41,17 +50,44 @@ impl List {
 
     #[inline]
     pub fn second(&self) -> Option<&Value> {
-        self.0.get(1)
+        match self {
+            List::Nil => None,
+            List::Cons(e) => e.get(1),
+        }
+    }
+
+    #[inline]
+    pub fn third(&self) -> Option<&Value> {
+        match self {
+            List::Nil => None,
+            List::Cons(e) => e.get(2),
+        }
+    }
+
+    #[inline]
+    pub fn fourth(&self) -> Option<&Value> {
+        match self {
+            List::Nil => None,
+            List::Cons(e) => e.get(3),
+        }
     }
 
     pub fn iter(&self) -> im::vector::Iter<Value> {
-        self.0.iter()
+        match self {
+            List::Nil => EMPTY.iter(),
+            List::Cons(e) => e.iter(),
+        }
     }
 }
 
 impl FromIterator<Value> for List {
     fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
-        List(std::iter::FromIterator::from_iter(iter))
+        let ls: im::vector::Vector<Value> = std::iter::FromIterator::from_iter(iter);
+        if ls.is_empty() {
+            List::Nil
+        } else {
+            List::Cons(ls)
+        }
     }
 }
 
@@ -60,13 +96,21 @@ impl IntoIterator for List {
     type IntoIter = im::vector::ConsumingIter<Value>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        match self {
+            List::Nil => im::vector::Vector::new().into_iter(),
+            List::Cons(e) => e.into_iter(),
+        }
     }
 }
 
 impl From<Vec<Value>> for List {
     fn from(elements: Vec<Value>) -> Self {
-        let ls: List = elements.into_iter().collect();
-        ls
+        let ls: im::vector::Vector<Value> = elements.into_iter().collect();
+
+        if ls.is_empty() {
+            List::Nil
+        } else {
+            List::Cons(ls)
+        }
     }
 }
