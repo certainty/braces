@@ -97,10 +97,10 @@ impl<'a> Instance<'a> {
                 }
                 &Instruction::Set(addr) => {
                     let value = self.pop();
-                    let id = self.read_identifier(addr)?;
 
                     if let Some(v) = value {
-                        self.toplevel.set(id.to_string(), v);
+                        let id = self.read_identifier(addr)?.clone();
+                        self.toplevel.set(id, v);
                     } else {
                         return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
                     }
