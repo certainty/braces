@@ -106,10 +106,10 @@ where
 
 fn parse_boolean<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let bool_literal = alt((
-        value(true, tag("#t")),
         value(true, tag("#true")),
-        value(false, tag("#f")),
         value(false, tag("#false")),
+        value(true, tag("#t")),
+        value(false, tag("#f")),
     ));
 
     map_datum(bool_literal, Sexp::boolean)(input)

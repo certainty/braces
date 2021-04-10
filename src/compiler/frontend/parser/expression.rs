@@ -147,7 +147,10 @@ impl Expression {
                     )
                 }
             }
-            _ => Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone()),
+            other => {
+                println!("expr: {:?}", other);
+                Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone())
+            }
         }
     }
 
