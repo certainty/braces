@@ -7,7 +7,7 @@ use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::Compiler;
 use byte_code::chunk::Chunk;
-use instance::Instance;
+use instance::{Instance, TopLevel};
 use scheme::value::Value;
 use scheme::writer::Writer;
 use thiserror::Error;
@@ -27,6 +27,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct VM {
     stack_size: usize,
     writer: Writer,
+    toplevel: TopLevel,
 }
 
 impl VM {
@@ -34,6 +35,7 @@ impl VM {
         VM {
             stack_size: 256,
             writer: Writer {},
+            toplevel: TopLevel::new(),
         }
     }
 
@@ -53,6 +55,6 @@ impl VM {
     }
 
     fn interprete(&mut self, chunk: &Chunk) -> Result<Value> {
-        Instance::interprete(chunk, self.stack_size)
+        Instance::interprete(chunk, self.stack_size, &mut self.toplevel)
     }
 }

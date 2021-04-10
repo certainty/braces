@@ -29,7 +29,7 @@ impl StringTable {
     }
 }
 
-struct TopLevel {
+pub struct TopLevel {
     bindings: FxHashMap<String, Value>,
 }
 
@@ -53,17 +53,17 @@ pub struct Instance<'a> {
     ip: AddressType,
     current_chunk: &'a Chunk,
     strings: StringTable,
-    toplevel: TopLevel,
+    toplevel: &'a mut TopLevel,
     stack: Vec<Value>,
     #[cfg(feature = "debug_vm")]
     disassembler: Disassembler<std::io::Stdout>,
 }
 
 impl<'a> Instance<'a> {
-    pub fn interprete(chunk: &Chunk, stack_size: usize) -> Result<Value> {
+    pub fn interprete(chunk: &Chunk, stack_size: usize, toplevel: &mut TopLevel) -> Result<Value> {
         Instance {
             stack: Vec::with_capacity(stack_size),
-            toplevel: TopLevel::new(),
+            toplevel,
             strings: StringTable::new(),
             current_chunk: &chunk,
             ip: 0,
