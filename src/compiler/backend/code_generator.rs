@@ -2,6 +2,7 @@ use crate::compiler::frontend::parser::expression::Identifier;
 use crate::compiler::frontend::parser::expression::{Expression, LiteralExpression};
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::SourceLocation;
+use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
@@ -16,31 +17,29 @@ pub enum Error {}
 type Result<T> = std::result::Result<T, Error>;
 
 pub struct CodeGenerator {
-    values: value::Factory,
-    chunk: Chunk,
+    unit: CompilationUnit,
 }
 
 impl CodeGenerator {
     pub fn new() -> Self {
         CodeGenerator {
-            chunk: Chunk::new(),
-            values: value::Factory::default(),
+            unit: CompilationUnit::new(value::Factory::default(), Chunk::new()),
         }
     }
 
-    pub fn generate(&mut self, ast: &Expression) -> Result<&Chunk> {
+    pub fn generate(&mut self, ast: &Expression) -> Result<CompilationUnit> {
         self.emit_instructions(ast)?;
         self.current_chunk().write_instruction(Instruction::Halt);
 
         #[cfg(feature = "debug_code")]
         Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), "code");
 
-        Ok(self.current_chunk())
+        Ok(self.unit.clone())
     }
 
     #[inline]
     fn sym(&mut self, s: &str) -> Value {
-        self.values.symbol(s)
+        self.unit.values.symbol(s)
     }
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
@@ -96,11 +95,11 @@ impl CodeGenerator {
                 self.emit_instruction(Instruction::Nil, &datum.location)?
             }
             datum::Sexp::String(s) => {
-                let interned = self.values.interned_string(s);
+                let interned = self.unit.values.interned_string(s);
                 self.emit_constant(&interned, &datum.location)?;
             }
             _ => {
-                let value = self.values.from_datum(datum);
+                let value = self.unit.values.from_datum(datum);
                 self.emit_constant(&value, &datum.location)?
             }
         }
@@ -122,6 +121,6 @@ impl CodeGenerator {
 
     #[inline]
     fn current_chunk(&mut self) -> &mut Chunk {
-        &mut self.chunk
+        &mut self.unit.code
     }
 }

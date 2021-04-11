@@ -121,4 +121,13 @@ impl Factory {
             _ => todo!(),
         }
     }
+
+    pub fn absorb(&mut self, other: &Self) {
+        if self as *const _ == other as *const _ {
+            return ();
+        } else {
+            self.strings.absorb(&other.strings);
+            self.symbols.absorb(&other.symbols);
+        }
+    }
 }

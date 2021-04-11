@@ -5,6 +5,7 @@ pub mod scheme;
 
 use crate::compiler;
 use crate::compiler::source::*;
+use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use byte_code::chunk::Chunk;
 use instance::{Instance, TopLevel};
@@ -50,15 +51,18 @@ impl VM {
     pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
         let mut source = StringSource::new(inp, context);
         let mut compiler = Compiler::new();
-
-        if let Some(chunk) = compiler.compile_expression(&mut source)? {
-            self.interprete(&chunk)
-        } else {
-            Ok(Value::Unspecified)
-        }
+        let unit = compiler.compile_expression(&mut source)?;
+        self.interprete(&unit)
     }
 
-    fn interprete(&mut self, chunk: &Chunk) -> Result<Value> {
-        Instance::interprete(chunk, self.stack_size, &mut self.toplevel, &mut self.values)
+    fn interprete(&mut self, unit: &CompilationUnit) -> Result<Value> {
+        self.values.absorb(&unit.values);
+
+        Instance::interprete(
+            &unit.code,
+            self.stack_size,
+            &mut self.toplevel,
+            &mut self.values,
+        )
     }
 }
