@@ -3,6 +3,7 @@ pub mod error;
 pub mod frontend;
 pub mod source;
 pub mod source_location;
+pub mod utils;
 use crate::vm::byte_code::chunk;
 use backend::code_generator;
 use backend::code_generator::CodeGenerator;

@@ -18,12 +18,16 @@ fn repl() {
     let mut vm = VM::new();
 
     loop {
+        println!("{:#?}", vm);
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 match vm.run_string(&line, "repl") {
-                    Ok(v) => println!("{}", vm.write(&v)),
+                    Ok(v) => {
+                        println!("{:#?}", vm);
+                        println!("{}", vm.write(&v))
+                    }
                     Err(vm::Error::CompilerError(e)) => e.print_user_friendly_message(),
                     Err(e @ vm::Error::RuntimeError(_, _)) => eprintln!("{}", e),
                     Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),

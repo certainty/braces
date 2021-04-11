@@ -8,6 +8,7 @@ use crate::compiler::source::*;
 use crate::compiler::Compiler;
 use byte_code::chunk::Chunk;
 use instance::{Instance, TopLevel};
+use scheme::value;
 use scheme::value::Value;
 use scheme::writer::Writer;
 use thiserror::Error;
@@ -24,9 +25,10 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub struct VM {
     stack_size: usize,
-    writer: Writer,
+    values: value::Factory,
     toplevel: TopLevel,
 }
 
@@ -34,13 +36,15 @@ impl VM {
     pub fn new() -> VM {
         VM {
             stack_size: 256,
-            writer: Writer {},
+            values: value::Factory::default(),
             toplevel: TopLevel::new(),
         }
     }
 
     pub fn write(&self, value: &Value) -> String {
-        self.writer.write(value).to_string()
+        println!("{:?}", value);
+        let writer = Writer::new(&self.values);
+        writer.write(value).to_string()
     }
 
     pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
@@ -55,6 +59,6 @@ impl VM {
     }
 
     fn interprete(&mut self, chunk: &Chunk) -> Result<Value> {
-        Instance::interprete(chunk, self.stack_size, &mut self.toplevel)
+        Instance::interprete(chunk, self.stack_size, &mut self.toplevel, &mut self.values)
     }
 }
