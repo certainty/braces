@@ -99,7 +99,8 @@ impl CodeGenerator {
             }
             Expression::Literal(LiteralExpression::Quotation(datum)) => self.emit_lit(datum)?,
             Expression::If(_if_expr, _loc) => todo!(),
-            Expression::Let(_let_expr, loc) => todo!(),
+            Expression::Let(_let_expr, _loc) => todo!(),
+            Expression::Define(_definition, _loc) => todo!(),
         }
         Ok(())
     }

@@ -34,6 +34,7 @@ pub enum Expression {
     Identifier(Identifier, SourceLocation),
     Literal(LiteralExpression),
     Assign(Identifier, Box<Expression>, SourceLocation),
+    Define(DefinitionExpression, SourceLocation),
     Let(LetExpression, SourceLocation),
     If(IfExpression, SourceLocation),
 }
@@ -60,7 +61,7 @@ pub struct BodyExpression {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum DefinitionExpression {
-    DefineSimple(Identifier, Expression),
+    DefineSimple(Identifier, Box<Expression>),
     Begin(Vec<Box<DefinitionExpression>>),
 }
 
@@ -87,6 +88,10 @@ impl Expression {
 
     pub fn assign(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
         Expression::Assign(id, Box::new(expr), loc)
+    }
+
+    pub fn define(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
+        Expression::Define(DefinitionExpression::DefineSimple(id, Box::new(expr)), loc)
     }
 
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
@@ -135,6 +140,10 @@ impl Expression {
                 Some("set!") => Self::parse_assignment(&ls, &datum.location),
                 Some("if") => Self::parse_conditional(&ls, &datum.location),
                 Some("let") => Self::parse_let(&ls, &datum.location),
+                Some("define") => Ok(Expression::Define(
+                    Self::parse_definition(&datum)?,
+                    datum.location.clone(),
+                )),
                 other => {
                     println!("{:?}", other);
                     todo!()
@@ -281,7 +290,7 @@ impl Expression {
                 Some("define") => match &ls[..] {
                     [_, identifier, expr] => Ok(DefinitionExpression::DefineSimple(
                         Self::parse_identifier(&identifier)?,
-                        Self::parse_expression(&expr)?,
+                        Box::new(Self::parse_expression(&expr)?),
                     )),
                     _ => todo!(),
                 },
@@ -382,6 +391,18 @@ mod tests {
                     Expression::constant(&make_datum(Sexp::Bool(true), 1, 10)),
                 )],
                 Expression::constant(&make_datum(Sexp::Bool(false), 1, 15)).to_body_expression(),
+                location(1, 1),
+            ),
+        )
+    }
+
+    #[test]
+    fn test_parse_define() {
+        assert_parse_as(
+            "(define x #t)",
+            Expression::define(
+                Identifier::from("x"),
+                Expression::constant(&make_datum(Sexp::Bool(true), 1, 11)),
                 location(1, 1),
             ),
         )
