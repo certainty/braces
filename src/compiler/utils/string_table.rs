@@ -1,7 +1,5 @@
-use lasso::{Rodeo, RodeoReader, Spur};
+use lasso::{Rodeo, Spur};
 pub type Key = Spur;
-
-type StringTableView = RodeoReader<Key>;
 
 #[repr(transparent)]
 #[derive(Debug)]
@@ -18,8 +16,15 @@ impl Default for StringTable {
 }
 
 impl StringTable {
-    pub fn view(&self) -> StringTableView {
-        self.implementation.into_reader()
+    pub fn string_set(&self) -> Vec<String> {
+        self.implementation
+            .iter()
+            .map(|e| String::from(e.1))
+            .collect()
+    }
+
+    pub fn str_set<'a>(&'a self) -> Vec<&'a str> {
+        self.implementation.iter().map(|e| e.1).collect()
     }
 
     pub fn get<'a>(&'a self, key: &Key) -> &'a str {
@@ -38,5 +43,16 @@ impl StringTable {
                 self.get_or_intern(string.1);
             }
         }
+    }
+}
+
+impl From<&Vec<String>> for StringTable {
+    fn from(strings: &Vec<String>) -> StringTable {
+        let mut table = StringTable::default();
+        for s in strings {
+            table.get_or_intern(&s);
+        }
+
+        table
     }
 }

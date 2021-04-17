@@ -2,7 +2,9 @@
 pub mod arbitrary;
 pub mod list;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
-use crate::compiler::utils::string_table::{Key, StringTable};
+use crate::compiler::utils::string_table;
+use crate::compiler::utils::string_table::StringTable;
+use lasso::Key;
 use std::convert::Into;
 use thiserror::Error;
 
@@ -25,12 +27,30 @@ pub enum Value {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
-pub struct Symbol(Key);
+#[derive(Clone, PartialEq, Hash, Eq)]
+pub struct Symbol(string_table::Key);
+
+impl std::fmt::Debug for Symbol {
+    fn fmt(
+        &self,
+        formatter: &mut std::fmt::Formatter<'_>,
+    ) -> std::result::Result<(), std::fmt::Error> {
+        formatter.write_fmt(format_args!("sym#{}", self.0.into_usize()))
+    }
+}
 
 #[repr(transparent)]
-#[derive(Clone, PartialEq, Debug)]
-pub struct InternedString(Key);
+#[derive(Clone, PartialEq)]
+pub struct InternedString(string_table::Key);
+
+impl std::fmt::Debug for InternedString {
+    fn fmt(
+        &self,
+        formatter: &mut std::fmt::Formatter<'_>,
+    ) -> std::result::Result<(), std::fmt::Error> {
+        formatter.write_fmt(format_args!("str#{}", self.0.into_usize()))
+    }
+}
 
 #[derive(Debug)]
 pub struct Factory {
@@ -48,7 +68,7 @@ impl Default for Factory {
             strings: StringTable::default(),
             symbols: StringTable::default(),
             true_value: Value::Bool(true),
-            false_value: Value::Bool(true),
+            false_value: Value::Bool(false),
             nil_value: Value::ProperList(list::List::Nil),
             unspecified: Value::Unspecified,
         }
@@ -129,5 +149,13 @@ impl Factory {
             self.strings.absorb(&other.strings);
             self.symbols.absorb(&other.symbols);
         }
+    }
+
+    pub fn symbol_set(&self) -> Vec<String> {
+        self.symbols.string_set()
+    }
+
+    pub fn string_set(&self) -> Vec<String> {
+        self.strings.string_set()
     }
 }

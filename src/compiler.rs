@@ -5,7 +5,6 @@ pub mod source;
 pub mod source_location;
 pub mod utils;
 use crate::vm::byte_code::chunk;
-use crate::vm::scheme::value;
 use backend::code_generator;
 use backend::code_generator::CodeGenerator;
 use frontend::parser::Parser;
@@ -27,14 +26,20 @@ pub struct Compiler {
     parser: Parser,
 }
 
+#[derive(Clone, Debug)]
 pub struct CompilationUnit {
-    pub values: value::Factory,
+    pub symbols: Vec<String>,
+    pub strings: Vec<String>,
     pub code: chunk::Chunk,
 }
 
 impl CompilationUnit {
-    pub fn new(values: value::Factory, code: chunk::Chunk) -> Self {
-        CompilationUnit { values, code }
+    pub fn new(symbols: Vec<String>, strings: Vec<String>, code: chunk::Chunk) -> Self {
+        CompilationUnit {
+            symbols,
+            strings,
+            code,
+        }
     }
 }
 

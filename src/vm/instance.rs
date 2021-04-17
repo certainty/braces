@@ -85,7 +85,8 @@ impl<'a> Instance<'a> {
                 &Instruction::Get(addr) => {
                     let id = self.read_identifier(addr)?;
                     if let Some(value) = self.toplevel.get(&id) {
-                        self.push(value.clone());
+                        let cloned = value.clone();
+                        self.push(cloned);
                     } else {
                         return self.runtime_error(&format!(
                             "Variable {} is unbound",

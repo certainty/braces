@@ -387,7 +387,8 @@ fn parse_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
 #[inline]
 fn parse_initial<'a>(input: Input<'a>) -> ParseResult<'a, char> {
     let letter = verify(anychar, |c| c.is_alphabetic());
-    let special_initial = one_of("!$%&*/:<=>?^_~");
+    // Deviation: the spec doesn't allow @ here. But I tested racket and chicken and both accept that at the start
+    let special_initial = one_of("!$%&*/:<=>?^_~@");
 
     alt((letter, special_initial))(input)
 }
@@ -570,6 +571,7 @@ mod tests {
             "<=?",
             "->string",
             "a34kTMNs",
+            "@sI",
             "lambda",
             "list->vector",
             "q",

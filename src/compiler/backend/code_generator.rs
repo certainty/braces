@@ -17,13 +17,15 @@ pub enum Error {}
 type Result<T> = std::result::Result<T, Error>;
 
 pub struct CodeGenerator {
-    unit: CompilationUnit,
+    values: value::Factory,
+    chunk: Chunk,
 }
 
 impl CodeGenerator {
     pub fn new() -> Self {
         CodeGenerator {
-            unit: CompilationUnit::new(value::Factory::default(), Chunk::new()),
+            values: value::Factory::default(),
+            chunk: Chunk::new(),
         }
     }
 
@@ -34,12 +36,23 @@ impl CodeGenerator {
         #[cfg(feature = "debug_code")]
         Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), "code");
 
-        Ok(self.unit.clone())
+        let unit = CompilationUnit::new(
+            self.values.symbol_set(),
+            self.values.string_set(),
+            self.current_chunk().clone(),
+        );
+
+        Ok(unit)
     }
 
     #[inline]
     fn sym(&mut self, s: &str) -> Value {
-        self.unit.values.symbol(s)
+        self.values.symbol(s)
+    }
+
+    #[inline]
+    fn intern(&mut self, s: &str) -> Value {
+        self.values.interned_string(s)
     }
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
@@ -95,11 +108,11 @@ impl CodeGenerator {
                 self.emit_instruction(Instruction::Nil, &datum.location)?
             }
             datum::Sexp::String(s) => {
-                let interned = self.unit.values.interned_string(s);
+                let interned = self.intern(s);
                 self.emit_constant(&interned, &datum.location)?;
             }
             _ => {
-                let value = self.unit.values.from_datum(datum);
+                let value = self.values.from_datum(datum);
                 self.emit_constant(&value, &datum.location)?
             }
         }
@@ -121,6 +134,6 @@ impl CodeGenerator {
 
     #[inline]
     fn current_chunk(&mut self) -> &mut Chunk {
-        &mut self.unit.code
+        &mut self.chunk
     }
 }

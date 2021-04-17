@@ -1,17 +1,20 @@
 use super::Value;
+
 use quickcheck::Arbitrary;
 
 #[derive(Clone, Debug)]
-struct SymbolString(String);
+pub struct SymbolString(pub String);
 
 impl Arbitrary for Value {
     fn arbitrary(gen: &mut quickcheck::Gen) -> Self {
+        let mut factory = super::Factory::default();
+
         match gen.choose(&[1, 2, 3, 4, 5]) {
-            Some(1) => Value::boolean(bool::arbitrary(gen)),
-            Some(2) => Value::character(char::arbitrary(gen)),
-            Some(3) => Value::string(&String::arbitrary(gen)),
-            Some(4) => Value::symbol(&SymbolString::arbitrary(gen).0),
-            _ => Value::boolean(false),
+            Some(1) if bool::arbitrary(gen) => factory.bool_true().clone(),
+            Some(1) => factory.bool_false().clone(),
+            Some(2) => factory.character(char::arbitrary(gen)).clone(),
+            Some(3) => factory.string(&String::arbitrary(gen)).clone(),
+            _ => factory.bool_false().clone(),
         }
     }
 }

@@ -7,7 +7,6 @@ use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
-use byte_code::chunk::Chunk;
 use instance::{Instance, TopLevel};
 use scheme::value;
 use scheme::value::Value;
@@ -31,6 +30,7 @@ pub struct VM {
     stack_size: usize,
     values: value::Factory,
     toplevel: TopLevel,
+    writer: Writer,
 }
 
 impl VM {
@@ -39,13 +39,13 @@ impl VM {
             stack_size: 256,
             values: value::Factory::default(),
             toplevel: TopLevel::new(),
+            writer: Writer::new(),
         }
     }
 
     pub fn write(&self, value: &Value) -> String {
         println!("{:?}", value);
-        let writer = Writer::new(&self.values);
-        writer.write(value).to_string()
+        self.writer.write(value, &self.values).to_string()
     }
 
     pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
@@ -56,7 +56,13 @@ impl VM {
     }
 
     fn interprete(&mut self, unit: &CompilationUnit) -> Result<Value> {
-        self.values.absorb(&unit.values);
+        for str in &unit.strings {
+            self.values.interned_string(str);
+        }
+
+        for sym in &unit.symbols {
+            self.values.symbol(sym);
+        }
 
         Instance::interprete(
             &unit.code,
