@@ -44,6 +44,7 @@ hashbrown = "0.11"
 fasthash = "0.4.0"
 rustc-hash = "1.1.0"
 lazy_static = "1.4"
+lasso = "0.5"
 
 #parser
 nom_locate = "3.0"

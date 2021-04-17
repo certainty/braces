@@ -2,7 +2,8 @@ use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::Instruction;
 #[cfg(feature = "debug_vm")]
 use super::disassembler::Disassembler;
-use super::scheme::value::Value;
+use super::scheme::value;
+use super::scheme::value::{Symbol, Value};
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
 use crate::vm::byte_code::chunk::LineNumber;
@@ -10,27 +11,9 @@ use rustc_hash::FxHashMap;
 
 type Result<T> = std::result::Result<T, Error>;
 
-struct StringTable {
-    strings: FxHashMap<String, Value>,
-}
-
-impl StringTable {
-    pub fn new() -> Self {
-        Self {
-            strings: FxHashMap::default(),
-        }
-    }
-
-    pub fn intern(&mut self, s: impl Into<String>) -> &Value {
-        let k = s.into();
-        let v = k.clone();
-
-        self.strings.entry(k).or_insert(Value::string(v))
-    }
-}
-
+#[derive(Debug)]
 pub struct TopLevel {
-    bindings: FxHashMap<String, Value>,
+    bindings: FxHashMap<Symbol, Value>,
 }
 
 impl TopLevel {
@@ -40,11 +23,11 @@ impl TopLevel {
         }
     }
 
-    pub fn set(&mut self, k: String, v: Value) {
+    pub fn set(&mut self, k: Symbol, v: Value) {
         self.bindings.insert(k, v);
     }
 
-    pub fn get(&self, k: &String) -> Option<&Value> {
+    pub fn get(&self, k: &Symbol) -> Option<&Value> {
         self.bindings.get(k)
     }
 }
@@ -52,20 +35,26 @@ impl TopLevel {
 pub struct Instance<'a> {
     ip: AddressType,
     current_chunk: &'a Chunk,
-    strings: StringTable,
+    values: &'a mut value::Factory,
     toplevel: &'a mut TopLevel,
+    // could be tweaked to store references or owned values
     stack: Vec<Value>,
     #[cfg(feature = "debug_vm")]
     disassembler: Disassembler<std::io::Stdout>,
 }
 
 impl<'a> Instance<'a> {
-    pub fn interprete(chunk: &Chunk, stack_size: usize, toplevel: &mut TopLevel) -> Result<Value> {
+    pub fn interprete<'b>(
+        chunk: &Chunk,
+        stack_size: usize,
+        toplevel: &mut TopLevel,
+        values: &mut value::Factory,
+    ) -> Result<Value> {
         Instance {
             stack: Vec::with_capacity(stack_size),
             toplevel,
-            strings: StringTable::new(),
             current_chunk: &chunk,
+            values: values,
             ip: 0,
             #[cfg(feature = "debug_vm")]
             disassembler: Disassembler::new(std::io::stdout()),
@@ -83,42 +72,55 @@ impl<'a> Instance<'a> {
             self.debug_cycle();
 
             match self.next_instruction() {
-                &Instruction::Halt => return Ok(self.stack.pop().unwrap_or(Value::Unspecified)),
-                &Instruction::True => self.stack.push(Value::boolean(true)),
-                &Instruction::False => self.stack.push(Value::boolean(false)),
-                &Instruction::Nil => self.stack.push(Value::nil()),
+                &Instruction::Halt => {
+                    return Ok(self
+                        .stack
+                        .pop()
+                        .map(|e| e.to_owned())
+                        .unwrap_or(Value::Unspecified))
+                }
+                &Instruction::True => self.push(self.values.bool_true().clone()),
+                &Instruction::False => self.push(self.values.bool_false().clone()),
+                &Instruction::Nil => self.push(self.values.nil().clone()),
                 &Instruction::Get(addr) => {
                     let id = self.read_identifier(addr)?;
-                    if let Some(value) = self.toplevel.get(id) {
-                        self.stack.push(value.clone());
+                    if let Some(value) = self.toplevel.get(&id) {
+                        let cloned = value.clone();
+                        self.push(cloned);
                     } else {
-                        return self.runtime_error(&format!("Variable {} is unbound", id));
+                        return self.runtime_error(&format!(
+                            "Variable {} is unbound",
+                            self.values.unintern(&Value::Symbol(id.clone())).unwrap()
+                        ));
                     }
                 }
                 &Instruction::Set(addr) => {
-                    let value = self.pop();
-
-                    if let Some(v) = value {
-                        let id = self.read_identifier(addr)?.clone();
-                        self.toplevel.set(id, v);
+                    if let Some(v) = self.pop() {
+                        let id = self.read_identifier(addr)?;
+                        self.toplevel.set(id.clone(), v.to_owned());
+                        self.push(self.values.unspecified().clone());
                     } else {
                         return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
                     }
                 }
                 &Instruction::Const(addr) => {
                     let value = self.current_chunk.read_constant(addr);
+
                     match value {
-                        Value::String(s) => self.stack.push(self.strings.intern(s).clone()),
-                        _ => self.stack.push(value.clone()),
+                        Value::UninternedString(s) => {
+                            let interned = self.values.interned_string(&s);
+                            self.push(interned)
+                        }
+                        _ => self.push(value.clone()),
                     }
                 }
             }
         }
     }
 
-    fn read_identifier(&self, addr: ConstAddressType) -> Result<&String> {
+    fn read_identifier(&self, addr: ConstAddressType) -> Result<Symbol> {
         if let Value::Symbol(s) = self.current_chunk.read_constant(addr) {
-            Ok(s)
+            Ok(s.clone())
         } else {
             self.compiler_bug(&format!("Expected symbol at address: {}", addr))
         }
@@ -139,9 +141,8 @@ impl<'a> Instance<'a> {
         self.current_chunk.find_line(self.ip - 1).map(|e| e.2)
     }
 
-    fn peek(&'a self, distance: usize) -> &'a [Value] {
-        let from = self.stack.len() - distance;
-        &self.stack[from..]
+    fn push(&mut self, v: Value) {
+        self.stack.push(v)
     }
 
     fn pop(&mut self) -> Option<Value> {

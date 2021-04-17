@@ -5,9 +5,10 @@ pub mod scheme;
 
 use crate::compiler;
 use crate::compiler::source::*;
+use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
-use byte_code::chunk::Chunk;
 use instance::{Instance, TopLevel};
+use scheme::value;
 use scheme::value::Value;
 use scheme::writer::Writer;
 use thiserror::Error;
@@ -24,37 +25,50 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub struct VM {
     stack_size: usize,
-    writer: Writer,
+    values: value::Factory,
     toplevel: TopLevel,
+    writer: Writer,
 }
 
 impl VM {
     pub fn new() -> VM {
         VM {
             stack_size: 256,
-            writer: Writer {},
+            values: value::Factory::default(),
             toplevel: TopLevel::new(),
+            writer: Writer::new(),
         }
     }
 
     pub fn write(&self, value: &Value) -> String {
-        self.writer.write(value).to_string()
+        println!("{:?}", value);
+        self.writer.write(value, &self.values).to_string()
     }
 
     pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
         let mut source = StringSource::new(inp, context);
         let mut compiler = Compiler::new();
-
-        if let Some(chunk) = compiler.compile_expression(&mut source)? {
-            self.interprete(&chunk)
-        } else {
-            Ok(Value::Unspecified)
-        }
+        let unit = compiler.compile_expression(&mut source)?;
+        self.interprete(&unit)
     }
 
-    fn interprete(&mut self, chunk: &Chunk) -> Result<Value> {
-        Instance::interprete(chunk, self.stack_size, &mut self.toplevel)
+    fn interprete(&mut self, unit: &CompilationUnit) -> Result<Value> {
+        for str in &unit.strings {
+            self.values.interned_string(str);
+        }
+
+        for sym in &unit.symbols {
+            self.values.symbol(sym);
+        }
+
+        Instance::interprete(
+            &unit.code,
+            self.stack_size,
+            &mut self.toplevel,
+            &mut self.values,
+        )
     }
 }

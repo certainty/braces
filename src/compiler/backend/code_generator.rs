@@ -2,10 +2,12 @@ use crate::compiler::frontend::parser::expression::Identifier;
 use crate::compiler::frontend::parser::expression::{Expression, LiteralExpression};
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::SourceLocation;
+use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
 use crate::vm::disassembler::Disassembler;
+use crate::vm::scheme::value;
 use crate::vm::scheme::value::Value;
 use thiserror::Error;
 
@@ -15,24 +17,42 @@ pub enum Error {}
 type Result<T> = std::result::Result<T, Error>;
 
 pub struct CodeGenerator {
+    values: value::Factory,
     chunk: Chunk,
 }
 
 impl CodeGenerator {
     pub fn new() -> Self {
         CodeGenerator {
+            values: value::Factory::default(),
             chunk: Chunk::new(),
         }
     }
 
-    pub fn generate(&mut self, ast: &Expression) -> Result<&Chunk> {
+    pub fn generate(&mut self, ast: &Expression) -> Result<CompilationUnit> {
         self.emit_instructions(ast)?;
         self.current_chunk().write_instruction(Instruction::Halt);
 
         #[cfg(feature = "debug_code")]
         Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), "code");
 
-        Ok(self.current_chunk())
+        let unit = CompilationUnit::new(
+            self.values.symbol_set(),
+            self.values.string_set(),
+            self.current_chunk().clone(),
+        );
+
+        Ok(unit)
+    }
+
+    #[inline]
+    fn sym(&mut self, s: &str) -> Value {
+        self.values.symbol(s)
+    }
+
+    #[inline]
+    fn intern(&mut self, s: &str) -> Value {
+        self.values.interned_string(s)
     }
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
@@ -49,9 +69,9 @@ impl CodeGenerator {
     }
 
     fn emit_read_variable(&mut self, id: &Identifier, loc: &SourceLocation) -> Result<()> {
-        let const_addr = self
-            .current_chunk()
-            .add_constant(&Value::symbol(id.string()));
+        let id_sym = self.sym(&id.string());
+        let const_addr = self.current_chunk().add_constant(&id_sym);
+
         self.emit_instruction(Instruction::Get(const_addr), loc)
     }
 
@@ -62,9 +82,8 @@ impl CodeGenerator {
         loc: &SourceLocation,
     ) -> Result<()> {
         self.emit_instructions(expr)?;
-        let const_addr = self
-            .current_chunk()
-            .add_constant(&Value::symbol(id.string()));
+        let id_sym = self.sym(&id.string());
+        let const_addr = self.current_chunk().add_constant(&id_sym);
         self.emit_instruction(Instruction::Set(const_addr), loc)
     }
 
@@ -88,7 +107,14 @@ impl CodeGenerator {
             datum::Sexp::List(ls) if ls.is_empty() => {
                 self.emit_instruction(Instruction::Nil, &datum.location)?
             }
-            _ => self.emit_constant(&Value::from(datum), &datum.location)?,
+            datum::Sexp::String(s) => {
+                let interned = self.intern(s);
+                self.emit_constant(&interned, &datum.location)?;
+            }
+            _ => {
+                let value = self.values.from_datum(datum);
+                self.emit_constant(&value, &datum.location)?
+            }
         }
 
         Ok(())
