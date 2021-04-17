@@ -11,12 +11,24 @@ use crate::vm::scheme::value;
 use crate::vm::scheme::value::Value;
 use thiserror::Error;
 
+const MAX_LOCALS: usize = 256;
+
 #[derive(Error, Debug)]
-pub enum Error {}
+pub enum Error {
+    #[error("Too many locals defined")]
+    TooManyLocals,
+}
 
 type Result<T> = std::result::Result<T, Error>;
 
+pub struct Local {
+    name: Identifier,
+    depth: usize,
+}
+
 pub struct CodeGenerator {
+    scope_depth: usize,
+    locals: Vec<Local>,
     values: value::Factory,
     chunk: Chunk,
 }
@@ -24,6 +36,8 @@ pub struct CodeGenerator {
 impl CodeGenerator {
     pub fn new() -> Self {
         CodeGenerator {
+            scope_depth: 0,
+            locals: Vec::with_capacity(MAX_LOCALS),
             values: value::Factory::default(),
             chunk: Chunk::new(),
         }
@@ -55,6 +69,27 @@ impl CodeGenerator {
         self.values.interned_string(s)
     }
 
+    fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+    }
+
+    fn add_local(&mut self, name: Identifier) -> Result<()> {
+        if self.locals.len() >= MAX_LOCALS {
+            Err(Error::TooManyLocals)
+        } else {
+            let local = Local {
+                name,
+                depth: self.scope_depth,
+            };
+            self.locals.push(local);
+            Ok(())
+        }
+    }
+
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
         match ast {
             Expression::Identifier(id, loc) => self.emit_read_variable(id, loc)?,
@@ -63,7 +98,8 @@ impl CodeGenerator {
                 self.emit_lit(constant)?
             }
             Expression::Literal(LiteralExpression::Quotation(datum)) => self.emit_lit(datum)?,
-            Expression::Conditional(test, consequent, alternate, loc) => todo!(),
+            Expression::If(_if_expr, _loc) => todo!(),
+            Expression::Let(_let_expr, loc) => todo!(),
         }
         Ok(())
     }
