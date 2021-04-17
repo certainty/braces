@@ -1,18 +1,25 @@
 use super::value::{Factory, Value};
+use crate::compiler::frontend::parser::sexp;
+use std::collections::HashSet;
 
 /// The scheme writer is responsible to create external representations
 /// of any printable scheme value.
 ///
 /// The current implementation is built for correctness and needs to be
 /// tweaked a bit for better performance.
-///
 
 #[derive(Debug)]
-pub struct Writer;
+pub struct Writer {
+    symbol_special_initial: HashSet<char>,
+}
 
 impl Writer {
     pub fn new() -> Self {
-        Writer
+        let special_initial: HashSet<char> =
+            String::from(sexp::SYMBOL_SPECIAL_INITIAL).chars().collect();
+        Writer {
+            symbol_special_initial: special_initial,
+        }
     }
 
     pub fn write(&self, v: &Value, values: &Factory) -> String {
@@ -56,7 +63,7 @@ impl Writer {
 
         let first_char = &external.chars().next().unwrap();
 
-        if char::is_ascii_digit(first_char) {
+        if !(char::is_alphabetic(*first_char) || self.symbol_special_initial.contains(first_char)) {
             requires_delimiter = true;
         }
 
@@ -129,6 +136,7 @@ impl Writer {
             '|' => buf.push_str("\\|"),
             '\\' => buf.push_str("\\x5c;"),
             c if !char::is_ascii(&c) => buf.push_str(&format!("\\x{:x};", *c as u32)),
+            c if char::is_control(*c) => buf.push_str(&format!("\\x{:x};", *c as u32)),
             _ => buf.push(*c),
         }
     }
@@ -170,7 +178,7 @@ mod tests {
         let writer = Writer::new();
 
         let v = values.symbol("...");
-        assert_eq!(writer.write(&v, &values), "'...");
+        assert_eq!(writer.write(&v, &values), "'|...|");
 
         let v = values.symbol("foo bar");
         assert_eq!(writer.write(&v, &values), "'|foo bar|");
@@ -210,31 +218,42 @@ mod tests {
 
     #[test]
     fn test_read_is_writer_inverse_bugs() {
-        let input = Value::Char('\r');
-        assert_eq!(read_my_write(&input).unwrap(), input);
+        let mut values = Factory::default();
+
+        let input = values.character('\r').clone();
+        assert!(
+            read_my_write(&input, &mut values).is_ok(),
+            "expected read of write"
+        );
+
+        let input = values.symbol("@foo").clone();
+        assert!(
+            read_my_write(&input, &mut values).is_ok(),
+            "expected read of write"
+        );
+
+        let input = values.symbol(".foo").clone();
+        assert!(
+            read_my_write(&input, &mut values).is_ok(),
+            "expected read of write"
+        );
     }
 
     #[quickcheck]
     fn test_read_is_write_inverse(val: Value) -> bool {
-        read_my_write(&val).is_ok()
+        let mut values = Factory::default();
+        read_my_write(&val, &mut values).is_ok()
     }
 
     #[quickcheck]
     fn test_read_is_write_inverse_symbol(val: SymbolString) -> bool {
         let mut values = Factory::default();
-        let writer = Writer::new();
         let sym = values.symbol(val.0);
-        //let sym = values.symbol("\\'");
-        let external = writer.write(&sym, &values);
-        let mut source = StringSource::new(&external, "");
 
-        sexp::parse(&mut source)
-            .map(|e| values.from_datum(&e))
-            .is_ok()
+        read_my_write(&sym, &mut values).is_ok()
     }
 
-    fn read_my_write(val: &Value) -> sexp::Result<Value> {
-        let mut values = Factory::default();
+    fn read_my_write(val: &Value, values: &mut Factory) -> sexp::Result<Value> {
         let writer = Writer::new();
         let external = writer.write(&val, &values);
         let mut source = StringSource::new(&external, "");
