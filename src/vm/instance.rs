@@ -79,6 +79,9 @@ impl<'a> Instance<'a> {
                         .map(|e| e.to_owned())
                         .unwrap_or(Value::Unspecified))
                 }
+                &Instruction::Pop => {
+                    self.pop();
+                }
                 &Instruction::True => self.push(self.values.bool_true().clone()),
                 &Instruction::False => self.push(self.values.bool_false().clone()),
                 &Instruction::Nil => self.push(self.values.nil().clone()),
@@ -94,18 +97,28 @@ impl<'a> Instance<'a> {
                         ));
                     }
                 }
-                &Instruction::Set(addr) => {
-                    if let Some(v) = self.pop() {
-                        let id = self.read_identifier(addr)?;
-                        self.toplevel.set(id.clone(), v.to_owned());
-                        self.push(self.values.unspecified().clone());
+                &Instruction::GetLocal(addr) => {
+                    let slot = self.stack[addr as usize].clone();
+                    self.push(slot)
+                }
+                &Instruction::SetLocal(addr) => {
+                    if let Some(v) = self.peek(0) {
+                        self.stack[addr as usize] = v.clone();
                     } else {
-                        return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
+                        return self.compiler_bug(&format!(
+                            "Couldn't set local variable on address: {}",
+                            addr
+                        ));
                     }
+                }
+                &Instruction::Set(addr) => {
+                    self.define_value(addr)?;
+                }
+                &Instruction::Define(addr) => {
+                    self.define_value(addr)?;
                 }
                 &Instruction::Const(addr) => {
                     let value = self.current_chunk.read_constant(addr);
-
                     match value {
                         Value::UninternedString(s) => {
                             let interned = self.values.interned_string(&s);
@@ -118,6 +131,18 @@ impl<'a> Instance<'a> {
         }
     }
 
+    fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        if let Some(v) = self.pop() {
+            let id = self.read_identifier(addr)?;
+            self.toplevel.set(id.clone(), v.to_owned());
+            self.push(self.values.unspecified().clone());
+        } else {
+            return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
+        }
+
+        Ok(())
+    }
+
     fn read_identifier(&self, addr: ConstAddressType) -> Result<Symbol> {
         if let Value::Symbol(s) = self.current_chunk.read_constant(addr) {
             Ok(s.clone())
@@ -126,6 +151,7 @@ impl<'a> Instance<'a> {
         }
     }
 
+    #[inline]
     fn compiler_bug<T>(&self, message: &str) -> Result<T> {
         Err(Error::CompilerBug(message.to_string()))
     }
@@ -137,16 +163,24 @@ impl<'a> Instance<'a> {
         ))
     }
 
+    #[inline]
     fn line_number_for_current_instruction(&self) -> Option<LineNumber> {
         self.current_chunk.find_line(self.ip - 1).map(|e| e.2)
     }
 
+    #[inline]
     fn push(&mut self, v: Value) {
         self.stack.push(v)
     }
 
+    #[inline]
     fn pop(&mut self) -> Option<Value> {
         self.stack.pop()
+    }
+
+    #[inline]
+    fn peek(&self, slot: usize) -> Option<&Value> {
+        self.stack.get(self.stack.len() - 1 - slot)
     }
 
     #[inline]

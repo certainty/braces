@@ -19,6 +19,7 @@ fn repl() {
 
     loop {
         let readline = rl.readline(">> ");
+        println!("{:#?}", vm);
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());

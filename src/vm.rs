@@ -56,6 +56,7 @@ impl VM {
     }
 
     fn interprete(&mut self, unit: &CompilationUnit) -> Result<Value> {
+        // This won't work I think since the keys are going to be different with each compilation?
         for str in &unit.strings {
             self.values.interned_string(str);
         }

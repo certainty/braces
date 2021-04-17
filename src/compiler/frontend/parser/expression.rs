@@ -29,6 +29,10 @@ impl From<&str> for Identifier {
     }
 }
 
+pub trait HasSourceLocation {
+    fn source_location<'a>(&'a self) -> &'a SourceLocation;
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(Identifier, SourceLocation),
@@ -39,14 +43,28 @@ pub enum Expression {
     If(IfExpression, SourceLocation),
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct IfExpression {
-    test: Box<Expression>,
-    consequent: Box<Expression>,
-    alternate: Option<Box<Expression>>,
+impl HasSourceLocation for Expression {
+    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+        match self {
+            Self::Identifier(_, loc) => &loc,
+            Self::Literal(LiteralExpression::SelfEvaluating(datum)) => &datum.location,
+            Self::Literal(LiteralExpression::Quotation(datum)) => &datum.location,
+            Self::Assign(_, expr, loc) => &loc,
+            Self::Define(_, loc) => &loc,
+            Self::Let(_, loc) => &loc,
+            Self::If(_, loc) => &loc,
+        }
+    }
 }
 
-type BindingSpec = (Identifier, Expression);
+#[derive(Clone, PartialEq, Debug)]
+pub struct IfExpression {
+    pub test: Box<Expression>,
+    pub consequent: Box<Expression>,
+    pub alternate: Option<Box<Expression>>,
+}
+
+pub type BindingSpec = (Identifier, Expression);
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LetExpression {
@@ -55,8 +73,8 @@ pub enum LetExpression {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BodyExpression {
-    definitions: Vec<DefinitionExpression>,
-    sequence: Vec<Expression>,
+    pub definitions: Vec<DefinitionExpression>,
+    pub sequence: Vec<Expression>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -258,10 +276,7 @@ impl Expression {
                     definitions.push(expr);
                     cur = iter.next();
                 }
-                Err(_) => {
-                    println!("Nope not a definition");
-                    break;
-                }
+                Err(_) => break,
             }
         }
 
