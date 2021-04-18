@@ -177,7 +177,7 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn peek(&self, slot: usize) -> Option<&Value> {
-        self.stack.get(self.stack.len() - 1 - slot)
+        self.stack.get(self.stack.len() - slot - 1)
     }
 
     #[inline]

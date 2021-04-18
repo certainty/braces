@@ -79,11 +79,7 @@ impl CodeGenerator {
     fn end_scope(&mut self) {
         self.scope_depth -= 1;
 
-        if self.scope_depth == 0 {
-            return;
-        }
-
-        while self.locals[self.locals.len() - 1].depth > self.scope_depth {
+        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth > self.scope_depth {
             self.current_chunk().write_instruction(Instruction::Pop);
             self.locals.pop();
         }
