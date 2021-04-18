@@ -30,9 +30,9 @@ impl Writer {
         match v {
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
-            Value::Symbol(_) => self.write_symbol(values.unintern(&v).unwrap(), quote),
+            Value::Symbol(s) => self.write_symbol(s.as_str(), quote),
             Value::Char(c) => self.write_char(*c),
-            Value::InternedString(_) => self.write_string(values.unintern(&v).unwrap()),
+            Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
