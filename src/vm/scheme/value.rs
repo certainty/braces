@@ -4,7 +4,6 @@ pub mod list;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table;
 use crate::compiler::utils::string_table::StringTable;
-use lasso::Key;
 use std::convert::Into;
 use thiserror::Error;
 
@@ -20,7 +19,7 @@ pub enum Value {
     Bool(bool),
     Symbol(Symbol),
     Char(char),
-    InternedString(InternedString),
+    InternedString(string_table::Interned),
     UninternedString(std::string::String),
     ProperList(list::List),
     Unspecified,
@@ -28,27 +27,43 @@ pub enum Value {
 
 #[repr(transparent)]
 #[derive(Clone, PartialEq, Hash, Eq)]
-pub struct Symbol(string_table::Key);
+pub struct Symbol(string_table::Interned);
+
+impl Symbol {
+    pub fn as_str<'a>(&'a self) -> &'a str {
+        self.0.as_str()
+    }
+}
 
 impl std::fmt::Debug for Symbol {
     fn fmt(
         &self,
         formatter: &mut std::fmt::Formatter<'_>,
     ) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_fmt(format_args!("sym#{}", self.0.into_usize()))
+        formatter.write_fmt(format_args!("sym#({})", self.as_str()))
     }
 }
 
 #[repr(transparent)]
 #[derive(Clone, PartialEq)]
-pub struct InternedString(string_table::Key);
+pub struct InternedString(string_table::Interned);
+
+impl InternedString {
+    pub fn as_str<'a>(&'a self) -> &'a str {
+        self.0.as_str()
+    }
+}
 
 impl std::fmt::Debug for InternedString {
     fn fmt(
         &self,
         formatter: &mut std::fmt::Formatter<'_>,
     ) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_fmt(format_args!("str#{}", self.0.into_usize()))
+        formatter.write_fmt(format_args!(
+            "Interned({} @ {:p})",
+            self.as_str(),
+            self.as_str()
+        ))
     }
 }
 
@@ -96,14 +111,14 @@ impl Factory {
         Value::Char(c)
     }
 
-    pub fn symbol<T: AsRef<str>>(&mut self, v: T) -> Value {
-        let k = self.symbols.get_or_intern(v);
+    pub fn symbol<T: Into<std::string::String>>(&mut self, v: T) -> Value {
+        let k = self.symbols.get_or_intern(v.into());
         Value::Symbol(Symbol(k))
     }
 
-    pub fn interned_string<T: AsRef<str>>(&mut self, v: T) -> Value {
-        let k = self.strings.get_or_intern(v);
-        Value::InternedString(InternedString(k))
+    pub fn interned_string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
+        let k = self.strings.get_or_intern(v.into());
+        Value::InternedString(k)
     }
 
     pub fn string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
@@ -116,14 +131,6 @@ impl Factory {
         } else {
             let ls: list::List = vals.into();
             Value::ProperList(ls)
-        }
-    }
-
-    pub fn unintern<'a>(&'a self, value: &Value) -> std::result::Result<&'a str, Error> {
-        match value {
-            Value::InternedString(k) => Ok(self.strings.get(&k.0)),
-            Value::Symbol(k) => Ok(self.symbols.get(&k.0)),
-            _ => Err(Error::NotInterned),
         }
     }
 

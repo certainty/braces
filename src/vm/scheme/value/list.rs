@@ -3,11 +3,6 @@ use im::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
 
-lazy_static! {
-    pub static ref NIL: List = List::Nil;
-    pub static ref EMPTY: im::vector::Vector<Value> = Vector::new();
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum List {
     Nil,
@@ -15,8 +10,8 @@ pub enum List {
 }
 
 impl List {
-    pub fn nil() -> &'static List {
-        &NIL
+    pub fn nil() -> List {
+        Self::Nil
     }
 
     pub fn new() -> Self {
@@ -24,7 +19,10 @@ impl List {
     }
 
     pub fn is_null(&self) -> bool {
-        &self == &Self::nil()
+        match self {
+            Self::Nil => true,
+            _ => false,
+        }
     }
 
     #[inline]
@@ -72,10 +70,46 @@ impl List {
         }
     }
 
-    pub fn iter(&self) -> im::vector::Iter<Value> {
+    pub fn iter(&self) -> Iter {
         match self {
-            List::Nil => EMPTY.iter(),
-            List::Cons(e) => e.iter(),
+            List::Nil => Iter::empty(),
+            List::Cons(e) => Iter::new(e.iter()),
+        }
+    }
+}
+
+pub struct Iter<'a> {
+    is_empty: bool,
+    inner: Option<im::vector::Iter<'a, Value>>,
+}
+
+impl<'a> Iter<'a> {
+    fn empty() -> Iter<'a> {
+        Iter {
+            is_empty: true,
+            inner: None,
+        }
+    }
+
+    fn new(inner: im::vector::Iter<'a, Value>) -> Iter<'a> {
+        Iter {
+            is_empty: false,
+            inner: Some(inner),
+        }
+    }
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = &'a Value;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_empty {
+            None
+        } else {
+            match &mut self.inner {
+                Some(inner) => inner.next(),
+                _ => None,
+            }
         }
     }
 }

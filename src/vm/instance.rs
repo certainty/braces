@@ -91,10 +91,7 @@ impl<'a> Instance<'a> {
                         let cloned = value.clone();
                         self.push(cloned);
                     } else {
-                        return self.runtime_error(&format!(
-                            "Variable {} is unbound",
-                            self.values.unintern(&Value::Symbol(id.clone())).unwrap()
-                        ));
+                        return self.runtime_error(&format!("Variable {} is unbound", id.as_str()));
                     }
                 }
                 &Instruction::GetLocal(addr) => {
@@ -121,7 +118,7 @@ impl<'a> Instance<'a> {
                     let value = self.current_chunk.read_constant(addr);
                     match value {
                         Value::UninternedString(s) => {
-                            let interned = self.values.interned_string(&s);
+                            let interned = self.values.interned_string(s);
                             self.push(interned)
                         }
                         _ => self.push(value.clone()),
