@@ -59,7 +59,11 @@ impl std::fmt::Debug for InternedString {
         &self,
         formatter: &mut std::fmt::Formatter<'_>,
     ) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_fmt(format_args!("str#({})", self.as_str()))
+        formatter.write_fmt(format_args!(
+            "Interned({} @ {:p})",
+            self.as_str(),
+            self.as_str()
+        ))
     }
 }
 
