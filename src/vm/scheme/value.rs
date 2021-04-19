@@ -67,7 +67,7 @@ impl std::fmt::Debug for InternedString {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Factory {
     strings: StringTable,
     symbols: StringTable,
@@ -149,20 +149,24 @@ impl Factory {
         }
     }
 
-    pub fn absorb(&mut self, other: &Self) {
-        if self as *const _ == other as *const _ {
-            return ();
-        } else {
-            self.strings.absorb(&other.strings);
-            self.symbols.absorb(&other.symbols);
-        }
+    pub fn absorb(&mut self, other: Self) {
+        self.strings.absorb(other.strings);
+        self.symbols.absorb(other.symbols);
     }
 
-    pub fn symbol_set(&self) -> Vec<String> {
-        self.symbols.string_set()
+    pub fn interned_symbols(&self) -> Vec<Symbol> {
+        self.symbols
+            .interned_vec()
+            .iter()
+            .map(|e| Symbol(e.clone()))
+            .collect()
     }
 
-    pub fn string_set(&self) -> Vec<String> {
-        self.strings.string_set()
+    pub fn interned_strings(&self) -> Vec<InternedString> {
+        self.strings
+            .interned_vec()
+            .iter()
+            .map(|e| InternedString(e.clone()))
+            .collect()
     }
 }

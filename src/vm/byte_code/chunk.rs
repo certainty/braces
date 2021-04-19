@@ -30,8 +30,8 @@ impl Chunk {
         self.lines.push((from, to, line));
     }
 
-    pub fn add_constant(&mut self, value: &Value) -> ConstAddressType {
-        self.constants.push(value.clone());
+    pub fn add_constant(&mut self, value: Value) -> ConstAddressType {
+        self.constants.push(value);
         (self.constants.len() - 1) as ConstAddressType
     }
 

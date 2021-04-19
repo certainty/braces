@@ -53,11 +53,7 @@ impl CodeGenerator {
         #[cfg(feature = "debug_code")]
         Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), "code");
 
-        let unit = CompilationUnit::new(
-            self.values.symbol_set(),
-            self.values.string_set(),
-            self.current_chunk().clone(),
-        );
+        let unit = CompilationUnit::new(self.values.clone(), self.current_chunk().clone());
 
         Ok(unit)
     }
@@ -132,7 +128,7 @@ impl CodeGenerator {
             self.emit_instruction(Instruction::GetLocal(addr), loc)
         } else {
             let id_sym = self.sym(&id.string());
-            let const_addr = self.current_chunk().add_constant(&id_sym);
+            let const_addr = self.current_chunk().add_constant(id_sym);
             self.emit_instruction(Instruction::Get(const_addr), loc)
         }
     }
@@ -165,7 +161,7 @@ impl CodeGenerator {
             DefinitionExpression::DefineSimple(id, expr) => {
                 self.emit_instructions(expr)?;
                 let id_sym = self.sym(&id.string());
-                let const_addr = self.current_chunk().add_constant(&id_sym);
+                let const_addr = self.current_chunk().add_constant(id_sym);
                 self.emit_instruction(Instruction::Define(const_addr), loc)
             }
             DefinitionExpression::Begin(_inner) => todo!(),
@@ -187,12 +183,12 @@ impl CodeGenerator {
         } else {
             // top level variable
             let id_sym = self.sym(&id.string());
-            let const_addr = self.current_chunk().add_constant(&id_sym);
+            let const_addr = self.current_chunk().add_constant(id_sym);
             self.emit_instruction(Instruction::Set(const_addr), loc)
         }
     }
 
-    fn emit_constant(&mut self, value: &Value, loc: &SourceLocation) -> Result<()> {
+    fn emit_constant(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
         let const_addr = self.current_chunk().add_constant(value);
         let inst_addr = self
             .current_chunk()
@@ -214,12 +210,11 @@ impl CodeGenerator {
             }
             datum::Sexp::String(s) => {
                 let interned = self.intern(s);
-                println!("Interned {} to {:?}", s, interned);
-                self.emit_constant(&interned, &datum.location)?;
+                self.emit_constant(interned, &datum.location)?;
             }
             _ => {
                 let value = self.values.from_datum(datum);
-                self.emit_constant(&value, &datum.location)?
+                self.emit_constant(value, &datum.location)?
             }
         }
 
