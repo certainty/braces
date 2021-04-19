@@ -109,7 +109,7 @@ impl<'a> Instance<'a> {
                     }
                 }
                 &Instruction::Set(addr) => {
-                    self.define_value(addr)?;
+                    self.set_value(addr)?;
                 }
                 &Instruction::Define(addr) => {
                     self.define_value(addr)?;
@@ -133,6 +133,25 @@ impl<'a> Instance<'a> {
             let id = self.read_identifier(addr)?;
             self.toplevel.set(id.clone(), v.to_owned());
             self.push(self.values.unspecified().clone());
+        } else {
+            return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
+        }
+
+        Ok(())
+    }
+
+    fn set_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        if let Some(v) = self.pop() {
+            let id = self.read_identifier(addr)?;
+            if !self.toplevel.get(&id).is_some() {
+                return self.runtime_error(&format!(
+                    "Can't set! {} because it's undefined",
+                    id.as_str()
+                ));
+            } else {
+                self.toplevel.set(id.clone(), v.to_owned());
+                self.push(self.values.unspecified().clone());
+            }
         } else {
             return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
         }

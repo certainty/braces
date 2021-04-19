@@ -29,6 +29,12 @@ pub struct Local {
     depth: usize,
 }
 
+impl Local {
+    pub fn new(name: Identifier, scope: usize) -> Self {
+        Local { name, depth: scope }
+    }
+}
+
 pub struct CodeGenerator {
     scope_depth: usize,
     locals: Vec<Local>,
@@ -85,11 +91,7 @@ impl CodeGenerator {
         if self.locals.len() >= MAX_LOCALS {
             Err(Error::TooManyLocals)
         } else {
-            let local = Local {
-                name,
-                depth: self.scope_depth,
-            };
-            self.locals.push(local);
+            self.locals.push(Local::new(name, self.scope_depth));
             Ok((self.locals.len() - 1) as ConstAddressType)
         }
     }

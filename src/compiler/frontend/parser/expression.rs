@@ -147,6 +147,7 @@ impl Expression {
         Expression::Let(LetExpression::Let(bindings, Box::new(body)), loc)
     }
 
+    /// Parse a single datum into an expression
     fn parse_expression(datum: &Datum) -> Result<Expression> {
         match datum.sexp() {
             Sexp::Symbol(s) => Ok(Self::identifier(s.to_string(), datum.location.clone())),
