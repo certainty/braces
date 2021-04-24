@@ -1,9 +1,9 @@
 use crate::compiler::frontend::parser::expression::{
-    BindingSpec, BodyExpression, DefinitionExpression, Expression, HasSourceLocation, Identifier,
-    LetExpression, LiteralExpression,
+    BindingSpec, BodyExpression, DefinitionExpression, Expression, Identifier, LetExpression,
+    LiteralExpression,
 };
 use crate::compiler::frontend::parser::sexp::datum;
-use crate::compiler::source_location::SourceLocation;
+use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::chunk::ConstAddressType;

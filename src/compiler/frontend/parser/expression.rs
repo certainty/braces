@@ -2,11 +2,13 @@ pub mod error;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::frontend::parser::Parser;
 use crate::compiler::source::Source;
-use crate::compiler::source_location::SourceLocation;
+use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use error::Error;
 
 type Result<T> = std::result::Result<T, Error>;
 
+// Do we really need this type?
+// Don't we need source information?
 #[repr(transparent)]
 #[derive(Clone, PartialEq, Debug)]
 pub struct Identifier(String);
@@ -29,10 +31,6 @@ impl From<&str> for Identifier {
     }
 }
 
-pub trait HasSourceLocation {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation;
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(Identifier, SourceLocation),
@@ -49,7 +47,7 @@ impl HasSourceLocation for Expression {
             Self::Identifier(_, loc) => &loc,
             Self::Literal(LiteralExpression::SelfEvaluating(datum)) => &datum.location,
             Self::Literal(LiteralExpression::Quotation(datum)) => &datum.location,
-            Self::Assign(_, expr, loc) => &loc,
+            Self::Assign(_, _expr, loc) => &loc,
             Self::Define(_, loc) => &loc,
             Self::Let(_, loc) => &loc,
             Self::If(_, loc) => &loc,
@@ -90,20 +88,30 @@ pub enum LiteralExpression {
 }
 
 impl Expression {
+    /// Parse a single datum into a an expression.
+    ///
+    /// It either succeeds or returns an error indicating
+    /// what went wrong.
     pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
         let parser = Parser;
         let ast = parser.parse_datum(source)?;
         Self::parse_expression(&ast)
     }
 
+    /// Create a constant expression
     pub fn constant(datum: &Datum) -> Expression {
         Expression::Literal(LiteralExpression::SelfEvaluating(datum.clone()))
     }
 
+    /// Create a quotation expression
+    ///
+    /// Quoted values are special in the sense that they maintain a reference
+    /// to the quote `Datum`. They're treated as unevaluated expressions.
     pub fn quoted_value(datum: &Datum) -> Expression {
         Expression::Literal(LiteralExpression::Quotation(datum.clone()))
     }
 
+    /// Create an assignment expression
     pub fn assign(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
         Expression::Assign(id, Box::new(expr), loc)
     }
@@ -116,6 +124,8 @@ impl Expression {
         Expression::Identifier(Identifier(str), loc)
     }
 
+    /// Create body expression, which is used in expressions introducing new
+    /// scopes like <let>, <begin> and <lambda>
     pub fn to_body_expression(&self) -> BodyExpression {
         BodyExpression {
             definitions: vec![],
@@ -139,6 +149,7 @@ impl Expression {
         )
     }
 
+    /// Create and expression for core-let
     pub fn let_bind(
         bindings: Vec<BindingSpec>,
         body: BodyExpression,
@@ -148,6 +159,22 @@ impl Expression {
     }
 
     /// Parse a single datum into an expression
+    ///
+    ///
+    /// Ref: r7rs 7.1.3
+    /// ```grammar
+    /// <expression> =>
+    ///   <identifier>         |
+    ///   <literal>            |
+    ///   <procedure call>     |
+    ///   <lambda expression>  |
+    ///   <conditional>        |
+    ///   <assignment>         |
+    ///   <derived expression> |
+    ///   <macro use>          |
+    ///   <macro block>        |
+    ///   <includer>           |
+    /// ```
     fn parse_expression(datum: &Datum) -> Result<Expression> {
         match datum.sexp() {
             Sexp::Symbol(s) => Ok(Self::identifier(s.to_string(), datum.location.clone())),
@@ -173,6 +200,16 @@ impl Expression {
         }
     }
 
+    /// Parse an if-expression
+    ///
+    /// Ref: r7rs 7.1.3
+    ///
+    /// ```grammar
+    /// <conditional> -> (if <test> <consequent> <alternate>)
+    /// <test>        -> <expression>
+    /// <consequent>  -> <expression>
+    /// <alternate>   -> <expression> | <empty>
+    /// ```
     fn parse_conditional(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
         match &ls[..] {
             [test, consequent, alternate] => {
@@ -205,6 +242,13 @@ impl Expression {
         }
     }
 
+    /// Parse a set! expression
+    ///
+    /// Ref: r7rs 7.1.3
+    ///
+    /// ```grammar
+    /// <assignment> -> (set! <IDENTIFIER> <expression>)
+    /// ```
     fn parse_assignment(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
         match &ls[..] {
             [_, identifier, expr] => Ok(Expression::assign(
@@ -216,6 +260,20 @@ impl Expression {
         }
     }
 
+    /// Parse a let expression
+    ///
+    /// Ref: r7rs 7.1.3 (derived expression)
+    ///
+    /// ```grammar
+    /// <derived expression> ->
+    ///   (let <IDENTIFIER> (<binding spec>*) <body>)
+    ///
+    /// <binding spec> -> (<IDENTIFIER> <expression>)
+    /// <body>         -> <definition>* <sequence>
+    /// <sequence>     -> <command>* <expression>
+    /// <command>      -> <expression>
+    ///
+    /// ```
     fn parse_let(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
         match &ls[..] {
             [_, binding_spec, body @ ..] => Ok(Expression::let_bind(
@@ -232,7 +290,13 @@ impl Expression {
             ),
         }
     }
-
+    /// Parse a let expression
+    ///
+    /// Ref: r7rs 7.1.3 (derived expression)
+    ///
+    /// ```grammar
+    /// <binding spec> -> (<IDENTIFIER> <expression>)
+    /// ```
     fn parse_binding_specs(datum: &Datum) -> Result<Vec<BindingSpec>> {
         match datum.sexp() {
             Sexp::List(ls) => ls.iter().map(Self::parse_binding_spec).collect(),
@@ -256,6 +320,7 @@ impl Expression {
         }
     }
 
+    /// Parses the datum as an identifier and fails if it's not a valid identifier
     fn parse_identifier(datum: &Datum) -> Result<Identifier> {
         let id_expr = Self::parse_expression(datum)?;
         if let Expression::Identifier(id, _) = id_expr {
@@ -265,6 +330,15 @@ impl Expression {
         }
     }
 
+    /// Parse a body
+    ///
+    /// Ref: r7rs 7.1.3
+    ///
+    /// ```grammar
+    /// <body>         -> <definition>* <sequence>
+    /// <sequence>     -> <command>* <expression>
+    /// <command>      -> <expression>
+    /// ```
     fn parse_body(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
         let mut definitions: Vec<DefinitionExpression> = vec![];
         let mut iter = datum.iter();
@@ -299,7 +373,19 @@ impl Expression {
             sequence,
         })
     }
-
+    /// Parse a define expression
+    ///
+    /// Ref: r7rs 7.1.6
+    ///
+    /// ```grammar
+    /// <definition> ->
+    ///   (define <IDENTIFIER> <expression>)                                         |
+    ///   (define (<IDENTIFIER> <def formals>) <body>)                               |
+    ///   <syntax definition>                                                        |
+    ///   (define-values <formals> <body>)                                           |
+    ///   (define-record-type <IDENTIFIER> <constructor> <IDENTIFIER> <field spec>*) |
+    ///   (begin <definition>*)
+    /// ```
     fn parse_definition(datum: &Datum) -> Result<DefinitionExpression> {
         match datum.sexp() {
             Sexp::List(ls) => match Self::head_symbol(&ls) {
