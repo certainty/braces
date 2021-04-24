@@ -136,6 +136,10 @@ impl Factory {
         }
     }
 
+    pub fn procedure(&mut self, v: lambda::Procedure) -> Value {
+        Value::Procedure(v)
+    }
+
     pub fn from_datum(&mut self, d: &Datum) -> Value {
         match &d.sexp {
             Sexp::Bool(true) => self.bool_true().clone(),

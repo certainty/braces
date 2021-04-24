@@ -1,6 +1,6 @@
 use crate::compiler::frontend::parser::expression::{
-    BindingSpec, BodyExpression, DefinitionExpression, Expression, Identifier, LetExpression,
-    LiteralExpression,
+    BindingSpec, BodyExpression, DefinitionExpression, Expression, Formals, Identifier,
+    LambdaExpression, LetExpression, LiteralExpression,
 };
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -69,6 +69,28 @@ impl CodeGenerator {
         Ok(unit)
     }
 
+    fn generate_named_procedure(
+        &mut self,
+        name: String,
+        arity: value::lambda::Arity,
+        ast: &Expression,
+    ) -> Result<value::lambda::Procedure> {
+        let mut generator = CodeGenerator::new();
+        let unit = generator.generate(ast)?;
+        Ok(value::lambda::Procedure::named(name, arity, unit.code))
+    }
+
+    fn generate_lambda(
+        &mut self,
+        arity: value::lambda::Arity,
+        ast: &BodyExpression,
+        loc: &SourceLocation,
+    ) -> Result<value::lambda::Procedure> {
+        let mut generator = CodeGenerator::new();
+        generator.emit_body(ast, loc)?;
+        Ok(value::lambda::Procedure::lambda(arity, generator.chunk))
+    }
+
     #[inline]
     fn sym(&mut self, s: &str) -> Value {
         self.values.symbol(s)
@@ -126,9 +148,23 @@ impl CodeGenerator {
                 self.end_scope();
             }
             Expression::Define(definition, loc) => self.emit_definition(definition, &loc)?,
-            Expression::Lambda(_lambda, _loc) => todo!(),
+            Expression::Lambda(expr, loc) => self.emit_lambda(expr, &loc)?,
         }
         Ok(())
+    }
+
+    fn emit_lambda(&mut self, expr: &LambdaExpression, loc: &SourceLocation) -> Result<()> {
+        self.begin_scope();
+
+        let arity = match &expr.formals {
+            Formals::RestArg(_) => value::lambda::Arity::Variadic,
+            Formals::VarArg(head, tail) => value::lambda::Arity::FixedWithRest(head.len()),
+            Formals::ArgList(args) => value::lambda::Arity::Fixed(args.len()),
+        };
+
+        let lambda = self.generate_lambda(arity, &expr.body, &loc)?;
+        let proc = self.values.procedure(lambda);
+        self.emit_constant(proc, &loc)
     }
 
     fn emit_read_variable(&mut self, id: &Identifier, loc: &SourceLocation) -> Result<()> {
