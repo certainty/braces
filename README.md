@@ -1,7 +1,5 @@
 # Braces
-
-[![Build Status](https://travis-ci.com/certainty/braces.svg?token=4u7ZeAMZynyk9xmAA6Tm&branch=main)](https://travis-ci.com/certainty/braces)
-
+![Build Status](https://https://github.com/certainty/braces/blob/switch-to-actions/.github/workflows/rust.yml/badge.svg?branch=main)
 
 > Brace for impact
 
@@ -21,8 +19,8 @@
   - [x] string
   - [x] quoted constants
   
-- [ ] variables
+- [x] variables
 - [ ] conditionals
 - [ ] lambda expression
 - [ ] procedure call
-- [ ] assignment
+- [x] assignment
