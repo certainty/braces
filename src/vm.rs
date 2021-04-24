@@ -52,17 +52,11 @@ impl VM {
         let mut source = StringSource::new(inp, context);
         let mut compiler = Compiler::new();
         let unit = compiler.compile_expression(&mut source)?;
-        self.interprete(&unit)
+        self.interprete(unit)
     }
 
-    fn interprete(&mut self, unit: &CompilationUnit) -> Result<Value> {
-        for str in &unit.strings {
-            self.values.interned_string(str);
-        }
-
-        for sym in &unit.symbols {
-            self.values.symbol(sym);
-        }
+    fn interprete(&mut self, unit: CompilationUnit) -> Result<Value> {
+        self.values.absorb(unit.values);
 
         Instance::interprete(
             &unit.code,

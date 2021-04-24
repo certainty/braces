@@ -16,3 +16,7 @@ impl SourceLocation {
         }
     }
 }
+
+pub trait HasSourceLocation {
+    fn source_location<'a>(&'a self) -> &'a SourceLocation;
+}

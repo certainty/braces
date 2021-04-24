@@ -41,14 +41,25 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Halt => self.disassemble_simple("OP_HALT", address),
+            &Instruction::Pop => self.disassemble_simple("OP_POP", address),
             &Instruction::True => self.disassemble_simple("OP_TRUE", address),
             &Instruction::False => self.disassemble_simple("OP_FALSE", address),
             &Instruction::Nil => self.disassemble_simple("OP_NIL", address),
             &Instruction::Get(const_address) => {
                 self.disassemble_constant(chunk, "OP_GET", address, const_address)
             }
+            &Instruction::GetLocal(_const_address) => {
+                self.disassemble_code_at(chunk, "OP_GET_LOCAL", address)
+            }
             &Instruction::Set(const_address) => {
                 self.disassemble_constant(chunk, "OP_SET", address, const_address)
+            }
+            &Instruction::SetLocal(_const_address) => {
+                self.disassemble_code_at(chunk, "OP_SET_LOCAL", address)
+            }
+
+            &Instruction::Define(const_address) => {
+                self.disassemble_constant(chunk, "OP_DEFINE", address, const_address)
             }
             &Instruction::Const(const_address) => {
                 self.disassemble_constant(chunk, "OP_CONST", address, const_address)
@@ -58,6 +69,14 @@ impl<T: Write> Disassembler<T> {
 
     fn disassemble_simple(&mut self, name: &str, address: usize) -> usize {
         self.writer.write_fmt(format_args!("{}\n", name)).unwrap();
+        address + 1
+    }
+
+    fn disassemble_code_at(&mut self, chunk: &Chunk, name: &str, address: usize) -> usize {
+        let code = &chunk.code[address];
+        self.writer
+            .write_fmt(format_args!("{:<16} {:?} \n", name, code))
+            .unwrap();
         address + 1
     }
 

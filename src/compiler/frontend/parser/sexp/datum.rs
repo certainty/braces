@@ -1,4 +1,4 @@
-use crate::compiler::source_location::SourceLocation;
+use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Sexp {
@@ -65,6 +65,12 @@ impl Datum {
     }
 
     pub fn location(&self) -> &SourceLocation {
+        &self.location
+    }
+}
+
+impl HasSourceLocation for Datum {
+    fn source_location<'a>(&'a self) -> &'a SourceLocation {
         &self.location
     }
 }

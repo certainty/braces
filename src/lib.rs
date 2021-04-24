@@ -1,8 +1,6 @@
 extern crate im;
-extern crate thiserror;
-
-#[macro_use]
 extern crate lazy_static;
+extern crate thiserror;
 
 extern crate nom;
 extern crate nom_locate;
