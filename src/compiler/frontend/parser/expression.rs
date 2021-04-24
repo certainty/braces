@@ -131,6 +131,10 @@ impl Expression {
         Expression::Assign(id, Box::new(expr), loc)
     }
 
+    pub fn lambda(formals: Formals, body: BodyExpression, loc: SourceLocation) -> Expression {
+        Expression::Lambda(LambdaExpression { formals, body }, loc)
+    }
+
     pub fn define(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
         Expression::Define(DefinitionExpression::DefineSimple(id, Box::new(expr)), loc)
     }
@@ -341,7 +345,30 @@ impl Expression {
 
     fn parse_lambda(expr: &Vec<Datum>, loc: &SourceLocation) -> Result<LambdaExpression> {
         match &expr[..] {
-            _ => todo!(),
+            [_, formals, body @ ..] => {
+                let formals = Self::parse_formals(formals, loc)?;
+                let body = Self::parse_body(body, loc)?;
+                Ok(LambdaExpression { formals, body })
+            }
+            _ => Error::parse_error("Expected (lambda <formals> <body>)", loc.clone()),
+        }
+    }
+
+    fn parse_formals(datum: &Datum, loc: &SourceLocation) -> Result<Formals> {
+        match datum.sexp() {
+            Sexp::List(ls) => {
+                let identifiers: Result<Vec<Identifier>> =
+                    ls.iter().map(Self::parse_identifier).collect();
+                Ok(Formals::ArgList(identifiers?))
+            }
+            Sexp::ImproperList(head, tail) => {
+                let identifiers: Result<Vec<Identifier>> =
+                    head.iter().map(Self::parse_identifier).collect();
+                let rest = Self::parse_identifier(tail);
+
+                Ok(Formals::VarArg(identifiers?, rest?))
+            }
+            _ => Ok(Formals::RestArg(Self::parse_identifier(datum)?)),
         }
     }
 
@@ -533,6 +560,51 @@ mod tests {
                 location(1, 1),
             ),
         )
+    }
+
+    #[test]
+    fn test_parse_lambda() {
+        assert_parse_as(
+            "(lambda all #t)",
+            Expression::lambda(
+                Formals::RestArg(Identifier::from("all")),
+                Expression::constant(&make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
+                location(1, 1),
+            ),
+        );
+
+        assert_parse_as(
+            "(lambda (x y) #t)",
+            Expression::lambda(
+                Formals::ArgList(vec![Identifier::from("x"), Identifier::from("y")]),
+                Expression::constant(&make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
+                location(1, 1),
+            ),
+        );
+
+        assert_parse_as(
+            "(lambda () #t)",
+            Expression::lambda(
+                Formals::ArgList(vec![]),
+                Expression::constant(&make_datum(Sexp::Bool(true), 1, 12)).to_body_expression(),
+                location(1, 1),
+            ),
+        );
+
+        assert_parse_as(
+            "(lambda (x y . z) #t)",
+            Expression::lambda(
+                Formals::VarArg(
+                    vec![Identifier::from("x"), Identifier::from("y")],
+                    Identifier::from("z"),
+                ),
+                Expression::constant(&make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
+                location(1, 1),
+            ),
+        );
+
+        assert_parse_error("(lambda #t)");
+        assert_parse_error("(lambda (foo . bar . baz) #t)");
     }
 
     fn assert_parse_as(inp: &str, exp: Expression) {
