@@ -62,33 +62,37 @@ impl CodeGenerator {
         self.emit_return()?;
 
         #[cfg(feature = "debug_code")]
-        Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), "code");
-
+        Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), &"toplevel");
         let unit = CompilationUnit::new(self.values.clone(), self.current_chunk().clone());
 
         Ok(unit)
     }
 
-    fn generate_named_procedure(
-        &mut self,
-        name: String,
-        arity: value::lambda::Arity,
-        ast: &Expression,
-    ) -> Result<value::lambda::Procedure> {
-        let mut generator = CodeGenerator::new();
-        let unit = generator.generate(ast)?;
-        Ok(value::lambda::Procedure::named(name, arity, unit.code))
-    }
-
-    fn generate_lambda(
-        &mut self,
+    fn generate_procedure(
+        name: Option<String>,
         arity: value::lambda::Arity,
         ast: &BodyExpression,
         loc: &SourceLocation,
     ) -> Result<value::lambda::Procedure> {
         let mut generator = CodeGenerator::new();
+        // generate code to access locals
+        // generate the body
         generator.emit_body(ast, loc)?;
-        Ok(value::lambda::Procedure::lambda(arity, generator.chunk))
+        generator.emit_return()?;
+
+        #[cfg(feature = "debug_code")]
+        let proc_name = name.clone().unwrap_or(String::from("lambda"));
+        #[cfg(feature = "debug_code")]
+        Disassembler::new(std::io::stdout()).disassemble(&generator.chunk, &proc_name);
+
+        match name {
+            Some(name) => Ok(value::lambda::Procedure::named(
+                name,
+                arity,
+                generator.chunk,
+            )),
+            _ => Ok(value::lambda::Procedure::lambda(arity, generator.chunk)),
+        }
     }
 
     #[inline]
@@ -158,11 +162,11 @@ impl CodeGenerator {
 
         let arity = match &expr.formals {
             Formals::RestArg(_) => value::lambda::Arity::Variadic,
-            Formals::VarArg(head, tail) => value::lambda::Arity::FixedWithRest(head.len()),
+            Formals::VarArg(head, _) => value::lambda::Arity::FixedWithRest(head.len()),
             Formals::ArgList(args) => value::lambda::Arity::Fixed(args.len()),
         };
 
-        let lambda = self.generate_lambda(arity, &expr.body, &loc)?;
+        let lambda = Self::generate_procedure(None, arity, &expr.body, &loc)?;
         let proc = self.values.procedure(lambda);
         self.emit_constant(proc, &loc)
     }

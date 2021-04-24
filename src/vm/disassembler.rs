@@ -1,5 +1,6 @@
 use super::byte_code::chunk::{AddressType, Chunk, ConstAddressType};
 use super::byte_code::Instruction;
+use super::scheme::value;
 use std::io::Write;
 
 pub struct Disassembler<T: Write> {
@@ -92,11 +93,21 @@ impl<T: Write> Disassembler<T> {
         let constant = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}        '{:?}' mem[{:p}]\n",
-                name, constant_address, constant, &constant
+                "{:<16} {:04}        '{}' mem[{:p}]\n",
+                name,
+                constant_address,
+                &self.disassemble_value(constant),
+                &constant
             ))
             .unwrap();
 
         address + 1
+    }
+
+    fn disassemble_value(&self, value: &value::Value) -> String {
+        match value {
+            value::Value::Procedure(_proc) => String::from("<procedure>"),
+            _ => format!("{:?}", value),
+        }
     }
 }

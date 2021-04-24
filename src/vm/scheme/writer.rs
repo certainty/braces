@@ -123,12 +123,12 @@ impl Writer {
 
     fn write_formals(&self, arity: &lambda::Arity) -> String {
         match arity {
-            lambda::Arity::Fixed(count) => (1..*count)
+            lambda::Arity::Fixed(count) => (0..*count)
                 .map(|i| format!("x{}", i))
                 .collect::<Vec<String>>()
                 .join(" "),
             lambda::Arity::FixedWithRest(count) => {
-                let fixed_args: Vec<String> = (1..*count).map(|i| format!("x{}", i)).collect();
+                let fixed_args: Vec<String> = (0..*count).map(|i| format!("x{}", i)).collect();
                 format!("{} . rest", fixed_args.join(" "))
             }
             lambda::Arity::Variadic => " . args".to_string(),
