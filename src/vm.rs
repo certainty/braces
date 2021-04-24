@@ -59,7 +59,7 @@ impl VM {
         self.values.absorb(unit.values);
 
         Instance::interprete(
-            &unit.code,
+            unit.proc,
             self.stack_size,
             &mut self.toplevel,
             &mut self.values,

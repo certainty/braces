@@ -25,6 +25,15 @@ pub enum Procedure {
     Lambda(Lambda),
 }
 
+impl Procedure {
+    pub fn code<'a>(&'a self) -> &'a Chunk {
+        match self {
+            Procedure::Named(proc) => &proc.lambda.chunk,
+            Procedure::Lambda(proc) => &proc.chunk,
+        }
+    }
+}
+
 // for now no procedure is equal unless it is itself
 impl PartialEq for Lambda {
     fn eq(&self, other: &Lambda) -> bool {

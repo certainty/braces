@@ -23,6 +23,10 @@ impl Chunk {
         }
     }
 
+    pub fn size(&self) -> usize {
+        self.code.len()
+    }
+
     //TODO: make this work when called multiple time with the same addresses
     //in that case it shouldn't just push but expand the interval it matches
 

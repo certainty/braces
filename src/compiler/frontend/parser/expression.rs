@@ -40,6 +40,7 @@ pub enum Expression {
     Let(LetExpression, SourceLocation),
     If(IfExpression, SourceLocation),
     Lambda(LambdaExpression, SourceLocation),
+    Apply(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
 }
 
 impl HasSourceLocation for Expression {
@@ -53,6 +54,7 @@ impl HasSourceLocation for Expression {
             Self::Let(_, loc) => &loc,
             Self::If(_, loc) => &loc,
             Self::Lambda(_, loc) => &loc,
+            Self::Apply(_, _, loc) => &loc,
         }
     }
 }
@@ -143,6 +145,18 @@ impl Expression {
         Expression::Identifier(Identifier(str), loc)
     }
 
+    pub fn apply(
+        operator: Expression,
+        operands: Vec<Expression>,
+        loc: SourceLocation,
+    ) -> Expression {
+        Expression::Apply(
+            Box::new(operator),
+            operands.iter().map(|e| Box::new(e.clone())).collect(),
+            loc,
+        )
+    }
+
     /// Create body expression, which is used in expressions introducing new
     /// scopes like <let>, <begin> and <lambda>
     pub fn to_body_expression(&self) -> BodyExpression {
@@ -213,13 +227,26 @@ impl Expression {
                     Self::parse_definition(&datum)?,
                     datum.location.clone(),
                 )),
-                other => {
-                    println!("{:?}", other);
-                    todo!()
-                }
+                other => Self::parse_apply(&ls, &datum.location),
             },
-
             _ => todo!(),
+        }
+    }
+
+    fn parse_apply(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
+        match &ls[..] {
+            [operator, operands @ ..] => {
+                let operatored_expr = Self::parse_expression(&operator);
+                let operands_expr: Result<Vec<Expression>> =
+                    operands.iter().map(Self::parse_expression).collect();
+
+                Ok(Expression::apply(
+                    operatored_expr?,
+                    operands_expr?,
+                    loc.clone(),
+                ))
+            }
+            _ => Error::parse_error("expected (<operator> <operand>*)", loc.clone()),
         }
     }
 

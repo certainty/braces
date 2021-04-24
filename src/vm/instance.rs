@@ -32,44 +32,63 @@ impl TopLevel {
     }
 }
 
-pub struct Instance<'a> {
+#[derive(Debug)]
+pub struct CallFrame {
+    proc: value::lambda::Procedure,
     ip: AddressType,
-    current_chunk: &'a Chunk,
-    values: &'a mut value::Factory,
-    toplevel: &'a mut TopLevel,
-    // could be tweaked to store references or owned values
-    stack: Vec<Value>,
-    #[cfg(feature = "debug_vm")]
-    disassembler: Disassembler<std::io::Stdout>,
+    base: usize,
 }
 
+impl CallFrame {
+    pub fn new(base: usize, proc: value::lambda::Procedure) -> Self {
+        CallFrame {
+            base: base,
+            ip: 0,
+            proc: proc,
+        }
+    }
+
+    pub fn code(&self) -> &Chunk {
+        self.proc.code()
+    }
+}
+
+pub struct Instance<'a> {
+    values: &'a mut value::Factory,
+    toplevel: &'a mut TopLevel,
+    frames: Vec<CallFrame>,
+    // could be tweaked to store references or owned values
+    stack: Vec<Value>,
+}
+
+// TODO:
+// The vm isn't optimised for performance yet.
+// There are several things that could be more efficient using unsafe pointer code
+// Most notably access to the stack and the callstack (including ip increments)
 impl<'a> Instance<'a> {
     pub fn interprete<'b>(
-        chunk: &Chunk,
+        proc: value::lambda::Procedure,
         stack_size: usize,
         toplevel: &mut TopLevel,
         values: &mut value::Factory,
     ) -> Result<Value> {
         Instance {
+            frames: vec![CallFrame::new(0, proc)],
             stack: Vec::with_capacity(stack_size),
             toplevel,
-            current_chunk: &chunk,
             values: values,
-            ip: 0,
-            #[cfg(feature = "debug_vm")]
-            disassembler: Disassembler::new(std::io::stdout()),
         }
         .run()
     }
 
     fn run(&mut self) -> Result<Value> {
         #[cfg(feature = "debug_vm")]
-        self.disassembler
-            .disassemble(self.current_chunk, "DEBUG DISASS");
+        self.disassemble_frame();
 
         loop {
             #[cfg(feature = "debug_vm")]
             self.debug_cycle();
+            std::thread::sleep_ms(2000);
 
             match self.next_instruction() {
                 &Instruction::Return => {
@@ -83,7 +102,14 @@ impl<'a> Instance<'a> {
                 &Instruction::Pop => {
                     self.pop();
                 }
-
+                &Instruction::Call(args) => match &self.peek(args) {
+                    &Some(value::Value::Procedure(proc)) => {
+                        self.apply(proc.clone(), args)?;
+                    }
+                    _ => {
+                        return self.runtime_error(&format!("Operator is not a callable object"));
+                    }
+                },
                 &Instruction::Break => (),
                 &Instruction::True => self.push(self.values.bool_true().clone()),
                 &Instruction::False => self.push(self.values.bool_false().clone()),
@@ -98,12 +124,14 @@ impl<'a> Instance<'a> {
                     }
                 }
                 &Instruction::GetLocal(addr) => {
-                    let slot = self.stack[addr as usize].clone();
+                    let base = self.current_frame().base;
+                    let slot = self.stack[base + (addr as usize)].clone();
                     self.push(slot)
                 }
                 &Instruction::SetLocal(addr) => {
+                    let base = self.current_frame().base;
                     if let Some(v) = self.peek(0) {
-                        self.stack[addr as usize] = v.clone();
+                        self.stack[base + (addr as usize)] = v.clone();
                     } else {
                         return self.compiler_bug(&format!(
                             "Couldn't set local variable on address: {}",
@@ -118,17 +146,20 @@ impl<'a> Instance<'a> {
                     self.define_value(addr)?;
                 }
                 &Instruction::Const(addr) => {
-                    let value = self.current_chunk.read_constant(addr);
+                    let chunk = self.current_frame().code();
+                    let value = chunk.read_constant(addr);
                     match value {
-                        Value::UninternedString(s) => {
-                            let interned = self.values.interned_string(s);
-                            self.push(interned)
-                        }
                         _ => self.push(value.clone()),
                     }
                 }
             }
         }
+    }
+
+    fn apply(&mut self, proc: value::lambda::Procedure, arg_count: usize) -> Result<()> {
+        let base = self.stack.len() - 1 - arg_count - 1;
+        self.frames.push(CallFrame::new(base, proc));
+        Ok(())
     }
 
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
@@ -162,8 +193,10 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
-    fn read_identifier(&self, addr: ConstAddressType) -> Result<Symbol> {
-        if let Value::Symbol(s) = self.current_chunk.read_constant(addr) {
+    fn read_identifier(&mut self, addr: ConstAddressType) -> Result<Symbol> {
+        let chunk = self.current_frame().code();
+
+        if let Value::Symbol(s) = chunk.read_constant(addr) {
             Ok(s.clone())
         } else {
             self.compiler_bug(&format!("Expected symbol at address: {}", addr))
@@ -175,7 +208,7 @@ impl<'a> Instance<'a> {
         Err(Error::CompilerBug(message.to_string()))
     }
 
-    fn runtime_error<T>(&self, message: &str) -> Result<T> {
+    fn runtime_error<T>(&mut self, message: &str) -> Result<T> {
         Err(Error::RuntimeError(
             message.to_string(),
             self.line_number_for_current_instruction().unwrap_or(0),
@@ -183,8 +216,9 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn line_number_for_current_instruction(&self) -> Option<LineNumber> {
-        self.current_chunk.find_line(self.ip - 1).map(|e| e.2)
+    fn line_number_for_current_instruction(&mut self) -> Option<LineNumber> {
+        let frame = self.current_frame();
+        frame.code().find_line(frame.ip - 1).map(|e| e.2)
     }
 
     #[inline]
@@ -204,16 +238,33 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn next_instruction(&mut self) -> &Instruction {
-        let instruction = self.current_chunk.read_instruction(self.ip);
-        self.ip = self.ip + 1;
+        let mut frame = self.current_mut_frame();
+        let instruction = frame.proc.code().read_instruction(frame.ip);
+        frame.ip = frame.ip + 1;
         instruction
+    }
+
+    // TODO: replace with faster variant that returns a mut ptr
+    #[inline]
+    fn current_mut_frame(&mut self) -> &mut CallFrame {
+        let index = self.frames.len() - 1;
+        &mut self.frames[index]
+    }
+
+    #[inline]
+    fn current_frame(&self) -> &CallFrame {
+        let index = self.frames.len() - 1;
+        &self.frames[index]
     }
 
     #[cfg(feature = "debug_vm")]
     fn debug_cycle(&mut self) {
+        let mut disassembler = Disassembler::new(std::io::stdout());
+        let frame = self.current_frame();
+        let chunk = self.current_frame().code();
+
         self.print_stack();
-        self.disassembler
-            .disassemble_instruction(&self.current_chunk, self.ip);
+        disassembler.disassemble_instruction(chunk, frame.ip);
     }
 
     #[cfg(feature = "debug_vm")]
@@ -223,5 +274,12 @@ impl<'a> Instance<'a> {
             print!("[{:?}]", value);
         }
         println!("")
+    }
+
+    #[cfg(feature = "debug_vm")]
+    fn disassemble_frame(&self) {
+        let mut disassembler = Disassembler::new(std::io::stdout());
+        let chunk = self.current_frame().code();
+        disassembler.disassemble(chunk, "DEBUG DISASS");
     }
 }

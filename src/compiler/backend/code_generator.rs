@@ -33,6 +33,13 @@ impl Local {
     pub fn new(name: Identifier, scope: usize) -> Self {
         Local { name, depth: scope }
     }
+
+    pub fn for_vm() -> Self {
+        Local {
+            name: Identifier::from(""),
+            depth: 0,
+        }
+    }
 }
 
 pub enum Target {
@@ -49,23 +56,26 @@ pub struct CodeGenerator {
 
 impl CodeGenerator {
     pub fn new() -> Self {
+        let mut locals = Vec::with_capacity(MAX_LOCALS);
+        locals.push(Local::for_vm()); // first slot is reserved for VM use
+
         CodeGenerator {
             scope_depth: 0,
-            locals: Vec::with_capacity(MAX_LOCALS),
+            locals: locals,
             values: value::Factory::default(),
             chunk: Chunk::new(),
         }
     }
 
     pub fn generate(&mut self, ast: &Expression) -> Result<CompilationUnit> {
-        self.emit_instructions(ast)?;
-        self.emit_return()?;
+        let proc = Self::generate_procedure(
+            Some("toplevel".to_string()),
+            value::lambda::Arity::Fixed(0),
+            &ast.to_body_expression(),
+            ast.source_location(),
+        )?;
 
-        #[cfg(feature = "debug_code")]
-        Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), &"toplevel");
-        let unit = CompilationUnit::new(self.values.clone(), self.current_chunk().clone());
-
-        Ok(unit)
+        Ok(CompilationUnit::new(self.values.clone(), proc))
     }
 
     fn generate_procedure(
@@ -153,7 +163,24 @@ impl CodeGenerator {
             }
             Expression::Define(definition, loc) => self.emit_definition(definition, &loc)?,
             Expression::Lambda(expr, loc) => self.emit_lambda(expr, &loc)?,
+            Expression::Apply(operator, operands, loc) => {
+                self.emit_apply(operator, operands, &loc)?
+            }
         }
+        Ok(())
+    }
+
+    fn emit_apply(
+        &mut self,
+        operator: &Box<Expression>,
+        operands: &Vec<Box<Expression>>,
+        loc: &SourceLocation,
+    ) -> Result<()> {
+        self.emit_instructions(&operator)?;
+        for operand in operands {
+            self.emit_instructions(operand)?;
+        }
+        self.emit_instruction(Instruction::Call(operands.len()), loc)?;
         Ok(())
     }
 
