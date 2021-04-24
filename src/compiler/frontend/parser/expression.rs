@@ -39,6 +39,7 @@ pub enum Expression {
     Define(DefinitionExpression, SourceLocation),
     Let(LetExpression, SourceLocation),
     If(IfExpression, SourceLocation),
+    Lambda(LambdaExpression, SourceLocation),
 }
 
 impl HasSourceLocation for Expression {
@@ -51,6 +52,7 @@ impl HasSourceLocation for Expression {
             Self::Define(_, loc) => &loc,
             Self::Let(_, loc) => &loc,
             Self::If(_, loc) => &loc,
+            Self::Lambda(_, loc) => &loc,
         }
     }
 }
@@ -73,6 +75,19 @@ pub enum LetExpression {
 pub struct BodyExpression {
     pub definitions: Vec<DefinitionExpression>,
     pub sequence: Vec<Expression>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct LambdaExpression {
+    pub formals: Formals,
+    pub body: BodyExpression,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Formals {
+    ArgList(Vec<Identifier>),
+    RestArg(Identifier),
+    VarArg(Vec<Identifier>, Identifier),
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -186,6 +201,10 @@ impl Expression {
                 Some("set!") => Self::parse_assignment(&ls, &datum.location),
                 Some("if") => Self::parse_conditional(&ls, &datum.location),
                 Some("let") => Self::parse_let(&ls, &datum.location),
+                Some("lambda") => Ok(Expression::Lambda(
+                    Self::parse_lambda(&ls, &datum.location)?,
+                    datum.location.clone(),
+                )),
                 Some("define") => Ok(Expression::Define(
                     Self::parse_definition(&datum)?,
                     datum.location.clone(),
@@ -317,6 +336,12 @@ impl Expression {
                 "Expected list of exactly two elements for binding. (<identifier> <expression>)",
                 datum.location.clone()
             )
+        }
+    }
+
+    fn parse_lambda(expr: &Vec<Datum>, loc: &SourceLocation) -> Result<LambdaExpression> {
+        match &expr[..] {
+            _ => todo!(),
         }
     }
 

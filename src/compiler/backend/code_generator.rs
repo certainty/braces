@@ -35,6 +35,11 @@ impl Local {
     }
 }
 
+pub enum Target {
+    TopLevel,
+    Procedure,
+}
+
 pub struct CodeGenerator {
     scope_depth: usize,
     locals: Vec<Local>,
@@ -54,7 +59,7 @@ impl CodeGenerator {
 
     pub fn generate(&mut self, ast: &Expression) -> Result<CompilationUnit> {
         self.emit_instructions(ast)?;
-        self.current_chunk().write_instruction(Instruction::Halt);
+        self.emit_return()?;
 
         #[cfg(feature = "debug_code")]
         Disassembler::new(std::io::stdout()).disassemble(self.current_chunk(), "code");
@@ -121,6 +126,7 @@ impl CodeGenerator {
                 self.end_scope();
             }
             Expression::Define(definition, loc) => self.emit_definition(definition, &loc)?,
+            Expression::Lambda(_lambda, _loc) => todo!(),
         }
         Ok(())
     }
@@ -151,6 +157,11 @@ impl CodeGenerator {
         for expr in &body.sequence {
             self.emit_instructions(&expr)?;
         }
+        Ok(())
+    }
+
+    fn emit_return(&mut self) -> Result<()> {
+        self.current_chunk().write_instruction(Instruction::Return);
         Ok(())
     }
 

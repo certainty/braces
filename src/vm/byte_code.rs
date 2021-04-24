@@ -10,7 +10,9 @@ pub enum Instruction {
     Get(ConstAddressType),
     GetLocal(ConstAddressType),
     Const(ConstAddressType),
-    Halt,
+    Break, // Reserved for future use
+    Return,
+    Nop, // do nothing
     Pop,
     Nil,
     True,

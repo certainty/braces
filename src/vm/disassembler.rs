@@ -40,7 +40,9 @@ impl<T: Write> Disassembler<T> {
         }
 
         match &chunk.code[address] {
-            &Instruction::Halt => self.disassemble_simple("OP_HALT", address),
+            &Instruction::Return => self.disassemble_simple("OP_RET", address),
+            &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
+            &Instruction::Break => self.disassemble_simple("OP_BREAK", address),
             &Instruction::Pop => self.disassemble_simple("OP_POP", address),
             &Instruction::True => self.disassemble_simple("OP_TRUE", address),
             &Instruction::False => self.disassemble_simple("OP_FALSE", address),

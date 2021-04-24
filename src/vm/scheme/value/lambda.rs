@@ -37,3 +37,18 @@ impl PartialEq for NamedLambda {
         (self as *const _) == (other as *const _)
     }
 }
+
+impl Procedure {
+    pub fn thunk(chunk: Chunk) -> Procedure {
+        Self::lambda(Arity::Fixed(0), chunk)
+    }
+
+    pub fn lambda(arity: Arity, chunk: Chunk) -> Procedure {
+        Procedure::Lambda(Lambda { arity, chunk })
+    }
+
+    pub fn named(name: String, arity: Arity, chunk: Chunk) -> Procedure {
+        let lambda = Lambda { arity, chunk };
+        Procedure::Named(NamedLambda { name, lambda })
+    }
+}

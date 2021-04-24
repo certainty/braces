@@ -72,16 +72,19 @@ impl<'a> Instance<'a> {
             self.debug_cycle();
 
             match self.next_instruction() {
-                &Instruction::Halt => {
+                &Instruction::Return => {
                     return Ok(self
                         .stack
                         .pop()
                         .map(|e| e.to_owned())
                         .unwrap_or(Value::Unspecified))
                 }
+                &Instruction::Nop => (),
                 &Instruction::Pop => {
                     self.pop();
                 }
+
+                &Instruction::Break => (),
                 &Instruction::True => self.push(self.values.bool_true().clone()),
                 &Instruction::False => self.push(self.values.bool_false().clone()),
                 &Instruction::Nil => self.push(self.values.nil().clone()),
