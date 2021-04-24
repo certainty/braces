@@ -1,3 +1,4 @@
+use super::value::lambda;
 use super::value::{Factory, Value};
 use crate::compiler::frontend::parser::sexp;
 use std::collections::HashSet;
@@ -34,6 +35,7 @@ impl Writer {
             Value::Char(c) => self.write_char(*c),
             Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
+            Value::Procedure(proc) => self.write_procedure(&proc),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -104,6 +106,33 @@ impl Writer {
 
         external.push('"');
         external
+    }
+
+    fn write_procedure(&self, proc: &lambda::Procedure) -> String {
+        match proc {
+            lambda::Procedure::Named(named_lambda) => format!(
+                "#<procedure ({} {})>",
+                named_lambda.name,
+                self.write_formals(&named_lambda.lambda.arity)
+            ),
+            lambda::Procedure::Lambda(lambda) => {
+                format!("#<procedure ({})>", self.write_formals(&lambda.arity))
+            }
+        }
+    }
+
+    fn write_formals(&self, arity: &lambda::Arity) -> String {
+        match arity {
+            lambda::Arity::Fixed(count) => (1..*count)
+                .map(|i| format!("x{}", i))
+                .collect::<Vec<String>>()
+                .join(" "),
+            lambda::Arity::FixedWithRest(count) => {
+                let fixed_args: Vec<String> = (1..*count).map(|i| format!("x{}", i)).collect();
+                format!("{} . rest", fixed_args.join(" "))
+            }
+            lambda::Arity::Variadic => " . args".to_string(),
+        }
     }
 
     #[inline]

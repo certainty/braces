@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub mod arbitrary;
+pub mod lambda;
 pub mod list;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table;
@@ -22,6 +23,7 @@ pub enum Value {
     InternedString(string_table::Interned),
     UninternedString(std::string::String),
     ProperList(list::List),
+    Procedure(lambda::Procedure),
     Unspecified,
 }
 
