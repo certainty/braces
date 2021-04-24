@@ -7,6 +7,7 @@ pub enum Sexp {
     String(String),
     Char(char),
     List(Vec<Datum>),
+    ImproperList(Vec<Datum>, Box<Datum>),
     Vector(Vec<Datum>),
     ByteVector(Vec<u8>),
 }
@@ -34,6 +35,15 @@ impl Sexp {
         I::Item: Into<Datum>,
     {
         Self::List(elements.into_iter().map(Into::into).collect())
+    }
+
+    pub fn improper_list<I>(elements: I, element: Datum) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<Datum>,
+    {
+        let elts = elements.into_iter().map(Into::into).collect();
+        Self::ImproperList(elts, Box::new(element))
     }
 
     pub fn vector<I>(elements: I) -> Self

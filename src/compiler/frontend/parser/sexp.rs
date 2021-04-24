@@ -12,7 +12,7 @@ use nom::character::complete::{anychar, char, line_ending, one_of};
 use nom::combinator::{map, map_opt, map_res, value, verify};
 use nom::error::{context, ErrorKind, ParseError, VerboseError};
 use nom::multi::many_till;
-use nom::multi::{fold_many0, many0};
+use nom::multi::{fold_many0, many0, many1};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
@@ -62,6 +62,7 @@ fn parse_compound_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     context(
         "compund datum",
         alt((
+            context("improper list", parse_improper_list),
             context("list", parse_proper_list),
             context("abbreviation", parse_abbreviation),
         )),
@@ -100,10 +101,13 @@ where
     value((), parser)
 }
 
-////////////////////////
-// Boolean parser
-////////////////////////
-
+/// Boolean parser
+///
+/// Ref: r7rs 7.1.1
+///
+/// ```grammar
+/// <BOOLEAN> -> #t | #f | #true | #false
+/// ```
 fn parse_boolean<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let bool_literal = alt((
         value(true, tag("#true")),
@@ -115,10 +119,7 @@ fn parse_boolean<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     map_datum(bool_literal, Sexp::boolean)(input)
 }
 
-////////////////////////
-// Character parser
-////////////////////////
-
+/// Character parser
 fn parse_character<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let char_literal = preceded(
         tag("#\\"),
@@ -407,9 +408,11 @@ fn parse_explicit_sign<'a>(input: Input<'a>) -> ParseResult<'a, char> {
     alt((char('+'), char('-')))(input)
 }
 
-/////////////////////////////
-// proper list
-/////////////////////////////
+/// Parse proper list
+/// Ref: r7rs 7.1.2
+/// ```grammar
+/// <list> -> (<datum>*)  | (<datum>+ . <datum>)
+/// ```
 
 #[inline]
 fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
@@ -421,6 +424,34 @@ fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let list = delimited(char('('), many0(list_elements), char(')'));
 
     map_datum(list, Sexp::list)(input)
+}
+
+/// Parse improper list
+///
+/// Ref: r7rs 7.1.2
+/// ```grammar
+/// <list> -> (<datum>*)  | (<datum>+ . <datum>)
+/// ```
+
+#[inline]
+fn parse_improper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+    let improper_head = many1(delimited(
+        parse_inter_token_space,
+        parse_datum,
+        parse_inter_token_space,
+    ));
+
+    let improper_tail = delimited(
+        parse_inter_token_space,
+        parse_datum,
+        parse_inter_token_space,
+    );
+    let improper_elements = tuple((improper_head, char('.'), improper_tail));
+    let improper_list = delimited(char('('), improper_elements, char(')'));
+
+    map_datum(improper_list, |(improper_head, _, improper_tail)| {
+        Sexp::improper_list(improper_head, improper_tail)
+    })(input)
 }
 
 ////////////////////////////
@@ -660,6 +691,29 @@ mod tests {
                 1,
                 2,
             )]),
+        );
+    }
+
+    #[test]
+    fn test_read_improper_list() {
+        assert_parse_as(
+            "(#t  .  #f)",
+            Sexp::improper_list(
+                vec![make_datum(Sexp::boolean(true), 1, 2)],
+                make_datum(Sexp::boolean(false), 1, 9),
+            ),
+        );
+
+        assert_parse_as(
+            "(#t #f #t .  #f)",
+            Sexp::improper_list(
+                vec![
+                    make_datum(Sexp::boolean(true), 1, 2),
+                    make_datum(Sexp::boolean(false), 1, 5),
+                    make_datum(Sexp::boolean(true), 1, 8),
+                ],
+                make_datum(Sexp::boolean(false), 1, 14),
+            ),
         );
     }
 
