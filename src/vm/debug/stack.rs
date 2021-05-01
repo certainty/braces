@@ -1,4 +1,3 @@
-use crate::vm::scheme::value;
 use crate::vm::scheme::value::Value;
 use crate::vm::stack::Stack;
 

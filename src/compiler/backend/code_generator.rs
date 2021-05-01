@@ -164,6 +164,8 @@ impl CodeGenerator {
             }
             Expression::Define(definition, loc) => self.emit_definition(definition, &loc)?,
             Expression::Lambda(expr, loc) => self.emit_lambda(expr, &loc)?,
+            Expression::Begin(first, rest, _) => self.emit_begin(first, rest)?,
+            Expression::Command(expr, _) => self.emit_instructions(expr)?,
             Expression::Apply(operator, operands, loc) => {
                 self.emit_apply(operator, operands, &loc)?
             }
@@ -182,6 +184,16 @@ impl CodeGenerator {
             self.emit_instructions(operand)?;
         }
         self.emit_instruction(Instruction::Call(operands.len()), loc)?;
+        Ok(())
+    }
+
+    fn emit_begin(&mut self, first: &Box<Expression>, rest: &Vec<Box<Expression>>) -> Result<()> {
+        self.begin_scope();
+        self.emit_instructions(first)?;
+        for exp in rest {
+            self.emit_instructions(&*exp)?;
+        }
+        self.end_scope();
         Ok(())
     }
 

@@ -41,6 +41,8 @@ pub enum Expression {
     If(IfExpression, SourceLocation),
     Lambda(LambdaExpression, SourceLocation),
     Apply(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
+    Command(Box<Expression>, SourceLocation),
+    Begin(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
 }
 
 impl HasSourceLocation for Expression {
@@ -55,6 +57,8 @@ impl HasSourceLocation for Expression {
             Self::If(_, loc) => &loc,
             Self::Lambda(_, loc) => &loc,
             Self::Apply(_, _, loc) => &loc,
+            Self::Command(_, loc) => &loc,
+            Self::Begin(_, _, loc) => &loc,
         }
     }
 }
@@ -141,6 +145,14 @@ impl Expression {
         Expression::Define(DefinitionExpression::DefineSimple(id, Box::new(expr)), loc)
     }
 
+    pub fn begin(first: Expression, rest: Vec<Expression>, loc: SourceLocation) -> Expression {
+        Expression::Begin(
+            Box::new(first),
+            rest.iter().map(|e| Box::new(e.clone())).collect(),
+            loc,
+        )
+    }
+
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
         Expression::Identifier(Identifier(str), loc)
     }
@@ -223,6 +235,7 @@ impl Expression {
                     Self::parse_lambda(&ls, &datum.location)?,
                     datum.location.clone(),
                 )),
+                Some("begin") => Self::parse_begin(&ls, datum.location.clone()),
                 Some("define") => Ok(Expression::Define(
                     Self::parse_definition(&datum)?,
                     datum.location.clone(),
@@ -490,6 +503,29 @@ impl Expression {
         }
     }
 
+    fn parse_begin(exprs: &Vec<Datum>, loc: SourceLocation) -> Result<Expression> {
+        match &exprs[..] {
+            [_, first, rest @ ..] => {
+                let parsed_first = Self::parse_command_or_definition(first).map(Box::new);
+                let parsed_exprs: Result<Vec<Box<Expression>>> = rest
+                    .iter()
+                    .map(|e| Self::parse_command_or_definition(e).map(Box::new))
+                    .collect();
+
+                Ok(Expression::Begin(parsed_first?, parsed_exprs?, loc))
+            }
+            _ => Error::parse_error("Expected (define <command-or-definition+>)", loc),
+        }
+    }
+
+    fn parse_command_or_definition(datum: &Datum) -> Result<Expression> {
+        let maybe_definition =
+            Self::parse_definition(&datum).map(|e| Expression::Define(e, datum.location.clone()));
+        let maybe_command = Self::parse_expression(&datum);
+
+        maybe_command.or(maybe_definition)
+    }
+
     #[inline]
     fn parse_quoted_datum(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
         match &ls[..] {
@@ -632,6 +668,18 @@ mod tests {
 
         assert_parse_error("(lambda #t)");
         assert_parse_error("(lambda (foo . bar . baz) #t)");
+    }
+
+    #[test]
+    fn test_parse_begin() {
+        assert_parse_as(
+            "(begin #t)",
+            Expression::begin(
+                Expression::constant(&make_datum(Sexp::Bool(true), 1, 8)),
+                vec![],
+                location(1, 1),
+            ),
+        )
     }
 
     fn assert_parse_as(inp: &str, exp: Expression) {
