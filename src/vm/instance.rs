@@ -58,9 +58,6 @@ impl<'a> Instance<'a> {
     }
 
     fn run(&mut self) -> Result<Value> {
-        #[cfg(feature = "debug_vm")]
-        self.disassemble_frame();
-
         loop {
             #[cfg(feature = "debug_vm")]
             self.debug_cycle();
@@ -181,6 +178,9 @@ impl<'a> Instance<'a> {
     fn apply(&mut self, args: usize) -> Result<()> {
         if let value::Value::Procedure(proc) = self.peek(args).clone() {
             self.push_frame(proc.clone(), args)?;
+
+            #[cfg(feature = "debug_vm")]
+            self.disassemble_frame();
         } else {
             return self.runtime_error(&format!("Operator is not a callable object"));
         }
@@ -249,7 +249,6 @@ impl<'a> Instance<'a> {
 
     // print the stack better
     fn print_stack(&self) {
-        println!("   ==== Stack ====\n");
         println!("{}", debug::stack::pretty_print(&self.stack));
     }
 
@@ -257,6 +256,8 @@ impl<'a> Instance<'a> {
     fn disassemble_frame(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
         let chunk = self.active_frame().code();
+        println!("\n");
         disassembler.disassemble(chunk, "ACTIVE FRAME");
+        println!("\n");
     }
 }

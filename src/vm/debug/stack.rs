@@ -16,15 +16,13 @@ pub fn pretty_print(stack: &Stack<Value>) -> String {
     }
 
     for current in values.iter() {
-        out.push_str("   ");
         out.push_str(&"-".repeat(longest_value + 4));
         out.push_str(&format!(
-            "\n   | {:width$} |\n",
+            "\n| {:width$} |\n",
             current,
             width = longest_value
         ));
     }
-    out.push_str("   ");
     out.push_str(&"-".repeat(longest_value + 4));
     out.push('\n');
     out
