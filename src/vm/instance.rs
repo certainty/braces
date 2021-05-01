@@ -1,5 +1,6 @@
 use super::byte_code::Instruction;
 use super::call_frame::*;
+use super::debug;
 #[cfg(feature = "debug_vm")]
 use super::disassembler::Disassembler;
 use super::global::*;
@@ -12,12 +13,10 @@ use crate::vm::byte_code::chunk::ConstAddressType;
 use std::rc::Rc;
 
 const FRAMES_MAX: usize = 64;
-const STACK_MAX: usize = FRAMES_MAX * 256;
 
 type Result<T> = std::result::Result<T, Error>;
 
 type ValueStack = Stack<Value>;
-type ValueFrame = stack::Frame<Value>;
 type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
@@ -59,8 +58,9 @@ impl<'a> Instance<'a> {
     }
 
     fn run(&mut self) -> Result<Value> {
-        //#[cfg(feature = "debug_vm")]
-        //self.disassemble_frame();
+        #[cfg(feature = "debug_vm")]
+        self.disassemble_frame();
+
         loop {
             #[cfg(feature = "debug_vm")]
             self.debug_cycle();
@@ -86,15 +86,15 @@ impl<'a> Instance<'a> {
                 &Instruction::Get(addr) => {
                     let id = self.read_identifier(addr)?;
 
-                    if let Some(value) = self.toplevel.get(&id) {
-                        self.push(value.clone())?;
+                    if let Some(value) = self.toplevel.get_owned(&id) {
+                        self.push(value)?;
                     } else {
                         return self.runtime_error(&format!("Variable {} is unbound", id.as_str()));
                     }
                 }
                 &Instruction::GetLocal(addr) => {
-                    let value = self.active_frame().get_slot(addr);
-                    self.push(value.clone())?
+                    let value = self.active_frame().get_slot(addr).clone();
+                    self.push(value)?
                 }
                 &Instruction::SetLocal(addr) => {
                     self.active_mut_frame().set_slot(addr, self.peek(0).clone())
@@ -151,8 +151,11 @@ impl<'a> Instance<'a> {
     #[inline]
     fn pop_frame(&mut self) -> usize {
         self.call_stack.pop();
-        self.active_frame = self.call_stack.top_mut_ptr();
-        self.call_stack.len()
+        let len = self.call_stack.len();
+        if len > 0 {
+            self.active_frame = self.call_stack.top_mut_ptr();
+        }
+        len
     }
 
     #[inline]
@@ -176,17 +179,10 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
-        let is_callable = match self.peek(0) {
-            value::Value::Procedure(proc) => true,
-            _ => false,
-        };
-
-        if !is_callable {
-            return self.runtime_error(&format!("Operator is not a callable object"));
-        }
-
-        if let value::Value::Procedure(proc) = self.peek(0) {
+        if let value::Value::Procedure(proc) = self.peek(args).clone() {
             self.push_frame(proc.clone(), args)?;
+        } else {
+            return self.runtime_error(&format!("Operator is not a callable object"));
         }
 
         Ok(())
@@ -245,36 +241,22 @@ impl<'a> Instance<'a> {
     #[cfg(feature = "debug_vm")]
     fn debug_cycle(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
-        let chunk = unsafe { (*self.frame).code() };
+        let chunk = self.active_frame().code();
 
         self.print_stack();
-        //disassembler.disassemble_instruction(chunk, self.ip_address());
+        disassembler.disassemble_instruction(chunk, self.active_frame().ip);
     }
 
     // print the stack better
     fn print_stack(&self) {
-        println!("==== Stack ====\n");
-        print!("     ");
-        let mut longest_value = 0;
-        let mut values: Vec<String> = vec![];
-
-        for value in self.stack.as_vec().iter().rev() {
-            let v = format!("{:?}", value);
-            longest_value = std::cmp::max(longest_value, v.len());
-            values.push(v);
-        }
-
-        for current in values {
-            print!("[{:width$}]", current, width = longest_value);
-        }
-
-        println!("\n");
+        println!("   ==== Stack ====\n");
+        println!("{}", debug::stack::pretty_print(&self.stack));
     }
 
     #[cfg(feature = "debug_vm")]
     fn disassemble_frame(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
-        let chunk = self.current_frame().code();
-        disassembler.disassemble(chunk, "FRAME");
+        let chunk = self.active_frame().code();
+        disassembler.disassemble(chunk, "ACTIVE FRAME");
     }
 }

@@ -8,7 +8,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct CallFrame {
     pub proc: Rc<Procedure>,
-    ip: usize,
+    pub ip: usize,
     slots: Frame<Value>,
 }
 

@@ -1,7 +1,5 @@
 // Implementations of the value and call stack used by the VM
 // Most of the functionality here is unchecked and/or unsafe to be more efficient.
-use std::rc::Rc;
-
 const DEFAULT_FRAMES_MAX: usize = 64;
 const DEFAULT_STACK_MAX: usize = DEFAULT_FRAMES_MAX * 256;
 
@@ -59,11 +57,19 @@ impl<V> Stack<V> {
     }
 
     pub fn top_mut_ptr<'a>(&'a mut self) -> *mut V {
-        unsafe { self.repr.as_mut_ptr().add(self.repr.len() - 1) }
+        unsafe {
+            self.repr
+                .as_mut_ptr()
+                .add(std::cmp::max(self.repr.len() - 1, 0))
+        }
     }
 
     pub fn as_mut_ptr(&mut self) -> *mut V {
         self.repr.as_mut_ptr()
+    }
+
+    pub fn frame_from(&mut self, base: usize) -> Frame<V> {
+        Frame::from(self.as_mut_ptr(), base)
     }
 
     pub fn len(&self) -> usize {
@@ -162,7 +168,7 @@ mod tests {
         stack.push(Value::Char('c'));
         stack.push(Value::Char('d'));
 
-        let frame = Frame::from(stack, 1);
+        let frame = stack.frame_from(1);
 
         assert_eq!(frame.get(0), &Value::Bool(false));
         assert_eq!(frame.get(1), &Value::Char('c'));
@@ -177,7 +183,7 @@ mod tests {
         stack.push(Value::Char('c'));
         stack.push(Value::Char('d'));
 
-        let mut frame = Frame::from(stack, 1);
+        let mut frame = stack.frame_from(1);
         frame.set(0, Value::Bool(true));
         frame.set(2, Value::Char('y'));
 

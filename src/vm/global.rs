@@ -20,4 +20,8 @@ impl TopLevel {
     pub fn get(&self, k: &Symbol) -> Option<&Value> {
         self.bindings.get(k)
     }
+
+    pub fn get_owned(&self, k: &Symbol) -> Option<Value> {
+        self.bindings.get(k).map(|e| e.clone())
+    }
 }
