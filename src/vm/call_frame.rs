@@ -30,7 +30,7 @@ impl CallFrame {
 
     #[inline]
     pub fn get_slot(&self, address: ConstAddressType) -> &Value {
-        self.slots.get(address as usize)
+        self.slots.get((address - 1) as usize)
     }
 
     #[inline]

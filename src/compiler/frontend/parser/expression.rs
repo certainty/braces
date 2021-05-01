@@ -96,6 +96,20 @@ pub enum Formals {
     VarArg(Vec<Identifier>, Identifier),
 }
 
+impl Formals {
+    pub fn identifiers(&self) -> Vec<Identifier> {
+        match self {
+            Formals::ArgList(ids) => ids.to_vec(),
+            Formals::RestArg(id) => vec![id.clone()],
+            Formals::VarArg(ids, other) => {
+                let mut ret = ids.clone();
+                ret.push(other.clone());
+                ret
+            }
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum DefinitionExpression {
     DefineSimple(Identifier, Box<Expression>),

@@ -90,6 +90,7 @@ impl<'a> Instance<'a> {
                     }
                 }
                 &Instruction::GetLocal(addr) => {
+                    println!("Get Local {:?}", self.active_frame());
                     let value = self.active_frame().get_slot(addr).clone();
                     self.push(value)?
                 }
@@ -157,7 +158,7 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn push_frame(&mut self, proc: Rc<value::lambda::Procedure>, arg_count: usize) -> Result<()> {
-        let base = self.stack.len() - arg_count;
+        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
         let frame = CallFrame::new(stack::Frame::from(self.stack.as_mut_ptr(), base), proc);
         self.call_stack.push(frame);
         self.active_frame = self.call_stack.top_mut_ptr();

@@ -24,6 +24,7 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub struct Local {
     name: Identifier,
     depth: usize,
@@ -44,7 +45,7 @@ impl Local {
 
 pub enum Target {
     TopLevel,
-    Procedure,
+    Procedure(Option<String>),
 }
 
 pub struct CodeGenerator {
@@ -68,25 +69,23 @@ impl CodeGenerator {
     }
 
     pub fn generate(&mut self, ast: &Expression) -> Result<CompilationUnit> {
-        let proc = Self::generate_procedure(
-            Some("toplevel".to_string()),
-            value::lambda::Arity::Exactly(0),
-            &ast.to_body_expression(),
-            ast.source_location(),
-        )?;
-
+        let proc = Self::generate_top_level(&ast.to_body_expression(), ast.source_location())?;
         Ok(CompilationUnit::new(self.values.clone(), proc))
     }
 
     fn generate_procedure(
         name: Option<String>,
         arity: value::lambda::Arity,
+        formals: &Formals,
         ast: &BodyExpression,
         loc: &SourceLocation,
     ) -> Result<value::lambda::Procedure> {
         let mut generator = CodeGenerator::new();
-        // generate code to access locals
-        // generate the body
+        generator.begin_scope();
+
+        for argument in formals.identifiers() {
+            generator.declare_variable(&argument)?;
+        }
         generator.emit_body(ast, loc)?;
         generator.emit_return()?;
 
@@ -104,6 +103,22 @@ impl CodeGenerator {
             )),
             _ => Ok(value::lambda::Procedure::lambda(arity, generator.chunk)),
         }
+    }
+
+    fn generate_top_level(
+        ast: &BodyExpression,
+        loc: &SourceLocation,
+    ) -> Result<value::lambda::Procedure> {
+        let mut generator = CodeGenerator::new();
+        generator.emit_body(ast, loc)?;
+        generator.emit_return()?;
+
+        #[cfg(feature = "debug_code")]
+        {
+            Disassembler::new(std::io::stdout()).disassemble(&generator.chunk, "toplevel");
+        }
+
+        Ok(value::lambda::Procedure::thunk(generator.chunk))
     }
 
     #[inline]
@@ -198,20 +213,20 @@ impl CodeGenerator {
     }
 
     fn emit_lambda(&mut self, expr: &LambdaExpression, loc: &SourceLocation) -> Result<()> {
-        self.begin_scope();
-
         let arity = match &expr.formals {
             Formals::RestArg(_) => value::lambda::Arity::Many,
             Formals::VarArg(head, _) => value::lambda::Arity::AtLeast(head.len()),
             Formals::ArgList(args) => value::lambda::Arity::Exactly(args.len()),
         };
 
-        let lambda = Self::generate_procedure(None, arity, &expr.body, &loc)?;
+        let lambda = Self::generate_procedure(None, arity, &expr.formals, &expr.body, &loc)?;
         let proc = self.values.procedure(lambda);
         self.emit_constant(proc, &loc)
     }
 
     fn emit_read_variable(&mut self, id: &Identifier, loc: &SourceLocation) -> Result<()> {
+        self.declare_variable(id)?;
+
         if let Some(addr) = self.resolve_local(id) {
             self.emit_instruction(Instruction::GetLocal(addr), loc)
         } else {
@@ -219,6 +234,16 @@ impl CodeGenerator {
             let const_addr = self.current_chunk().add_constant(id_sym);
             self.emit_instruction(Instruction::Get(const_addr), loc)
         }
+    }
+
+    fn declare_variable(&mut self, id: &Identifier) -> Result<()> {
+        if self.scope_depth == 0 {
+            return Ok(());
+        }
+        // TODO make sure the variable isn't bound in this scope yet
+
+        self.add_local(id.clone())?;
+        Ok(())
     }
 
     fn emit_bindings(&mut self, bindings: &Vec<BindingSpec>) -> Result<()> {
