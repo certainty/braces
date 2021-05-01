@@ -6,6 +6,7 @@ use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table;
 use crate::compiler::utils::string_table::StringTable;
 use std::convert::Into;
+use std::rc::Rc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -23,7 +24,7 @@ pub enum Value {
     InternedString(string_table::Interned),
     UninternedString(std::string::String),
     ProperList(list::List),
-    Procedure(lambda::Procedure),
+    Procedure(Rc<lambda::Procedure>),
     Unspecified,
 }
 
@@ -137,7 +138,7 @@ impl Factory {
     }
 
     pub fn procedure(&mut self, v: lambda::Procedure) -> Value {
-        Value::Procedure(v)
+        Value::Procedure(Rc::new(v))
     }
 
     pub fn from_datum(&mut self, d: &Datum) -> Value {

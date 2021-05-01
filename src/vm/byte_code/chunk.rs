@@ -27,6 +27,10 @@ impl Chunk {
         self.code.as_ptr()
     }
 
+    pub fn at(&self, index: usize) -> &Instruction {
+        &self.code[index]
+    }
+
     pub fn size(&self) -> usize {
         self.code.len()
     }

@@ -1,12 +1,12 @@
 // Implementations of the value and call stack used by the VM
 // Most of the functionality here is unchecked and/or unsafe to be more efficient.
-
-use super::scheme::value::Value;
+use std::rc::Rc;
 
 const DEFAULT_FRAMES_MAX: usize = 64;
 const DEFAULT_STACK_MAX: usize = DEFAULT_FRAMES_MAX * 256;
 
 // the stack implementation for the VM
+#[derive(Debug)]
 pub struct Stack<V> {
     cap: usize,
     repr: Vec<V>,
@@ -58,11 +58,23 @@ impl<V> Stack<V> {
         self.peek(0)
     }
 
+    pub fn top_mut_ptr<'a>(&'a mut self) -> *mut V {
+        unsafe { self.repr.as_mut_ptr().add(self.repr.len() - 1) }
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut V {
+        self.repr.as_mut_ptr()
+    }
+
+    pub fn len(&self) -> usize {
+        self.repr.len()
+    }
+
     fn set(&mut self, index: usize, v: V) {
         self.repr[index] = v
     }
 
-    fn get(&self, index: usize) -> &V {
+    fn get<'a>(&'a self, index: usize) -> &'a V {
         &self.repr[index]
     }
 
@@ -72,36 +84,39 @@ impl<V> Stack<V> {
     }
 }
 
-// A stack frame is a windowed view into a stack
-// You can get and set values in that frame
-struct Frame<'a, V> {
-    base: usize,
-    stack: &'a mut Stack<V>,
-}
-
-impl<'a, V> Frame<'a, V> {
-    pub fn from<'b>(stack: &'b mut Stack<V>, base: usize) -> Frame<'b, V> {
-        Frame { base, stack }
-    }
-
-    pub fn get(&'a self, index: usize) -> &'a V {
-        self.stack.get(self.base + index)
-    }
-
-    pub fn set(&mut self, index: usize, v: V) {
-        self.stack.set(self.base + index, v)
-    }
-}
-
 impl<V> Default for Stack<V> {
     fn default() -> Stack<V> {
         Stack::new(DEFAULT_STACK_MAX)
     }
 }
 
+// A stack frame is a windowed view into a stack
+// You can get and set values in that frame
+// Note that the Frame owns the stack for the time it lives and it may give it back
+#[derive(Debug)]
+pub struct Frame<V> {
+    base: usize,
+    slots: *mut V,
+}
+
+impl<V> Frame<V> {
+    pub fn from(slots: *mut V, base: usize) -> Frame<V> {
+        Self { base, slots }
+    }
+
+    pub fn get<'a>(&'a self, index: usize) -> &'a V {
+        unsafe { &*self.slots.add(self.base + index) }
+    }
+
+    pub fn set(&mut self, index: usize, v: V) {
+        unsafe { (*self.slots.add(self.base + index)) = v }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vm::Value;
 
     #[test]
     fn test_stack_push() {
@@ -147,7 +162,7 @@ mod tests {
         stack.push(Value::Char('c'));
         stack.push(Value::Char('d'));
 
-        let frame = Frame::from(&mut stack, 1);
+        let frame = Frame::from(stack, 1);
 
         assert_eq!(frame.get(0), &Value::Bool(false));
         assert_eq!(frame.get(1), &Value::Char('c'));
@@ -162,7 +177,7 @@ mod tests {
         stack.push(Value::Char('c'));
         stack.push(Value::Char('d'));
 
-        let mut frame = Frame::from(&mut stack, 1);
+        let mut frame = Frame::from(stack, 1);
         frame.set(0, Value::Bool(true));
         frame.set(2, Value::Char('y'));
 

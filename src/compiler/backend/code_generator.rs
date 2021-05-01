@@ -181,7 +181,7 @@ impl CodeGenerator {
         for operand in operands {
             self.emit_instructions(operand)?;
         }
-        self.emit_instruction(Instruction::Call(operands.len() as isize), loc)?;
+        self.emit_instruction(Instruction::Call(operands.len()), loc)?;
         Ok(())
     }
 
