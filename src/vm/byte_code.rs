@@ -10,7 +10,7 @@ pub enum Instruction {
     Get(ConstAddressType),
     GetLocal(ConstAddressType),
     Const(ConstAddressType),
-    Call(usize), // number of arguments
+    Call(isize), // number of arguments
     Break,       // Reserved for future use
     Return,
     Nop, // do nothing

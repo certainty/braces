@@ -19,7 +19,10 @@ impl<T: Write> Disassembler<T> {
             .write_fmt(format_args!("== {} ==\n", context))
             .unwrap();
 
+        //println!("{:?}", chunk.code);
         while address < chunk.code.len() {
+            //println!("address: {}, len: {}", address, chunk.code.len());
+            //std::thread::sleep_ms(2000);
             address = self.disassemble_instruction(chunk, address);
         }
         self.writer.write("\n".as_bytes()).unwrap();
@@ -43,7 +46,9 @@ impl<T: Write> Disassembler<T> {
         match &chunk.code[address] {
             &Instruction::Return => self.disassemble_simple("OP_RET", address),
             &Instruction::Call(args) => {
-                self.disassemble_code_at(chunk, "OP_CALL", address - args - 1)
+                self.disassemble_simple("OP_CALL", address)
+                // This creates an endless loop
+                //self.disassemble_code_at(chunk, "OP_CALL", address - (args as usize) - 1)
             }
             &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
             &Instruction::Break => self.disassemble_simple("OP_BREAK", address),

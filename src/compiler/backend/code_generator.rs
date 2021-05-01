@@ -70,7 +70,7 @@ impl CodeGenerator {
     pub fn generate(&mut self, ast: &Expression) -> Result<CompilationUnit> {
         let proc = Self::generate_procedure(
             Some("toplevel".to_string()),
-            value::lambda::Arity::Fixed(0),
+            value::lambda::Arity::Exactly(0),
             &ast.to_body_expression(),
             ast.source_location(),
         )?;
@@ -91,9 +91,10 @@ impl CodeGenerator {
         generator.emit_return()?;
 
         #[cfg(feature = "debug_code")]
-        let proc_name = name.clone().unwrap_or(String::from("lambda"));
-        #[cfg(feature = "debug_code")]
-        Disassembler::new(std::io::stdout()).disassemble(&generator.chunk, &proc_name);
+        {
+            let proc_name = name.clone().unwrap_or(String::from("lambda"));
+            Disassembler::new(std::io::stdout()).disassemble(&generator.chunk, &proc_name);
+        }
 
         match name {
             Some(name) => Ok(value::lambda::Procedure::named(
@@ -180,7 +181,7 @@ impl CodeGenerator {
         for operand in operands {
             self.emit_instructions(operand)?;
         }
-        self.emit_instruction(Instruction::Call(operands.len()), loc)?;
+        self.emit_instruction(Instruction::Call(operands.len() as isize), loc)?;
         Ok(())
     }
 
@@ -188,9 +189,9 @@ impl CodeGenerator {
         self.begin_scope();
 
         let arity = match &expr.formals {
-            Formals::RestArg(_) => value::lambda::Arity::Variadic,
-            Formals::VarArg(head, _) => value::lambda::Arity::FixedWithRest(head.len()),
-            Formals::ArgList(args) => value::lambda::Arity::Fixed(args.len()),
+            Formals::RestArg(_) => value::lambda::Arity::Many,
+            Formals::VarArg(head, _) => value::lambda::Arity::AtLeast(head.len()),
+            Formals::ArgList(args) => value::lambda::Arity::Exactly(args.len()),
         };
 
         let lambda = Self::generate_procedure(None, arity, &expr.body, &loc)?;

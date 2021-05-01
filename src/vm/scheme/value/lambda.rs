@@ -2,9 +2,9 @@ use crate::vm::byte_code::chunk::Chunk;
 
 #[derive(Debug, Clone)]
 pub enum Arity {
-    Fixed(usize),
-    FixedWithRest(usize),
-    Variadic,
+    Exactly(usize),
+    AtLeast(usize),
+    Many,
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +32,13 @@ impl Procedure {
             Procedure::Lambda(proc) => &proc.chunk,
         }
     }
+
+    pub fn arity<'a>(&'a self) -> &'a Arity {
+        match self {
+            Procedure::Named(proc) => &proc.lambda.arity,
+            Procedure::Lambda(proc) => &proc.arity,
+        }
+    }
 }
 
 // for now no procedure is equal unless it is itself
@@ -49,7 +56,7 @@ impl PartialEq for NamedLambda {
 
 impl Procedure {
     pub fn thunk(chunk: Chunk) -> Procedure {
-        Self::lambda(Arity::Fixed(0), chunk)
+        Self::lambda(Arity::Exactly(0), chunk)
     }
 
     pub fn lambda(arity: Arity, chunk: Chunk) -> Procedure {

@@ -1,13 +1,18 @@
 pub mod byte_code;
+pub mod call_frame;
+pub mod debug;
 pub mod disassembler;
+pub mod global;
 pub mod instance;
 pub mod scheme;
+pub mod stack;
 
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
-use instance::{Instance, TopLevel};
+use global::TopLevel;
+use instance::Instance;
 use scheme::value;
 use scheme::value::Value;
 use scheme::writer::Writer;

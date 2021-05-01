@@ -23,6 +23,10 @@ impl Chunk {
         }
     }
 
+    pub fn as_ptr(&self) -> *const Instruction {
+        self.code.as_ptr()
+    }
+
     pub fn size(&self) -> usize {
         self.code.len()
     }

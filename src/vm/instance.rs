@@ -1,64 +1,26 @@
-use super::byte_code::chunk::{AddressType, Chunk};
 use super::byte_code::Instruction;
+use super::call_frame::*;
 #[cfg(feature = "debug_vm")]
 use super::disassembler::Disassembler;
+use super::global::*;
 use super::scheme::value;
 use super::scheme::value::{Symbol, Value};
 use super::Error;
-use crate::vm::byte_code::chunk::ConstAddressType;
-use crate::vm::byte_code::chunk::LineNumber;
-use rustc_hash::FxHashMap;
+use crate::vm::byte_code::chunk::{AddressType, ConstAddressType, LineNumber};
+use arrayvec::ArrayVec;
+
+const FRAMES_MAX: usize = 64;
+const STACK_MAX: usize = FRAMES_MAX * 256;
 
 type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug)]
-pub struct TopLevel {
-    bindings: FxHashMap<Symbol, Value>,
-}
-
-impl TopLevel {
-    pub fn new() -> Self {
-        Self {
-            bindings: FxHashMap::default(),
-        }
-    }
-
-    pub fn set(&mut self, k: Symbol, v: Value) {
-        self.bindings.insert(k, v);
-    }
-
-    pub fn get(&self, k: &Symbol) -> Option<&Value> {
-        self.bindings.get(k)
-    }
-}
-
-#[derive(Debug)]
-pub struct CallFrame {
-    proc: value::lambda::Procedure,
-    ip: AddressType,
-    base: usize,
-}
-
-impl CallFrame {
-    pub fn new(base: usize, proc: value::lambda::Procedure) -> Self {
-        CallFrame {
-            base: base,
-            ip: 0,
-            proc: proc,
-        }
-    }
-
-    pub fn code(&self) -> &Chunk {
-        self.proc.code()
-    }
-}
 
 pub struct Instance<'a> {
     values: &'a mut value::Factory,
     toplevel: &'a mut TopLevel,
-    frames: Vec<CallFrame>,
-    // could be tweaked to store references or owned values
-    stack: Vec<Value>,
+    frames: ArrayVec<CallFrame, FRAMES_MAX>,
+    frame: *mut CallFrame,
+    stack: ArrayVec<Value, STACK_MAX>,
+    stack_top: *mut Value,
 }
 
 // TODO:
@@ -68,135 +30,197 @@ pub struct Instance<'a> {
 impl<'a> Instance<'a> {
     pub fn interprete<'b>(
         proc: value::lambda::Procedure,
-        stack_size: usize,
+        _stack_size: usize,
         toplevel: &mut TopLevel,
         values: &mut value::Factory,
     ) -> Result<Value> {
+        let mut stack = ArrayVec::<_, STACK_MAX>::new();
+        let mut frames = ArrayVec::<_, FRAMES_MAX>::new();
+        let frame = frames.as_mut_ptr();
+        let stack_top = stack.as_mut_ptr();
+        frames.push(CallFrame::new(stack.as_mut_ptr(), proc));
+
         Instance {
-            frames: vec![CallFrame::new(0, proc)],
-            stack: Vec::with_capacity(stack_size),
+            frames,
+            frame,
+            stack,
+            stack_top,
             toplevel,
-            values: values,
+            values,
         }
         .run()
     }
 
     fn run(&mut self) -> Result<Value> {
-        #[cfg(feature = "debug_vm")]
-        self.disassemble_frame();
-
+        //#[cfg(feature = "debug_vm")]
+        //self.disassemble_frame();
         loop {
             #[cfg(feature = "debug_vm")]
             self.debug_cycle();
-            std::thread::sleep_ms(2000);
 
             match self.next_instruction() {
-                &Instruction::Return => {
-                    return Ok(self
-                        .stack
-                        .pop()
-                        .map(|e| e.to_owned())
-                        .unwrap_or(Value::Unspecified))
-                }
                 &Instruction::Nop => (),
+                &Instruction::Break => (),
                 &Instruction::Pop => {
                     self.pop();
                 }
-                &Instruction::Call(args) => match &self.peek(args) {
-                    &Some(value::Value::Procedure(proc)) => {
-                        self.apply(proc.clone(), args)?;
+                &Instruction::True => self.push(self.values.bool_true().clone())?,
+                &Instruction::False => self.push(self.values.bool_false().clone())?,
+                &Instruction::Nil => self.push(self.values.nil().clone())?,
+                &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
+                &Instruction::Return => {
+                    let value = self.pop();
+                    if self.pop_frame() <= 0 {
+                        return Ok(value);
+                    } else {
+                        self.push(value)?
                     }
-                    _ => {
-                        return self.runtime_error(&format!("Operator is not a callable object"));
-                    }
-                },
-                &Instruction::Break => (),
-                &Instruction::True => self.push(self.values.bool_true().clone()),
-                &Instruction::False => self.push(self.values.bool_false().clone()),
-                &Instruction::Nil => self.push(self.values.nil().clone()),
+                }
                 &Instruction::Get(addr) => {
                     let id = self.read_identifier(addr)?;
+
                     if let Some(value) = self.toplevel.get(&id) {
-                        let cloned = value.clone();
-                        self.push(cloned);
+                        self.push(value.clone())?;
                     } else {
                         return self.runtime_error(&format!("Variable {} is unbound", id.as_str()));
                     }
                 }
                 &Instruction::GetLocal(addr) => {
-                    let base = self.current_frame().base;
-                    let slot = self.stack[base + (addr as usize)].clone();
-                    self.push(slot)
+                    let value = unsafe { (*self.frame).get_slot(addr) };
+                    self.push(value.clone())?
                 }
-                &Instruction::SetLocal(addr) => {
-                    let base = self.current_frame().base;
-                    if let Some(v) = self.peek(0) {
-                        self.stack[base + (addr as usize)] = v.clone();
-                    } else {
-                        return self.compiler_bug(&format!(
-                            "Couldn't set local variable on address: {}",
-                            addr
-                        ));
-                    }
-                }
-                &Instruction::Set(addr) => {
-                    self.set_value(addr)?;
-                }
-                &Instruction::Define(addr) => {
-                    self.define_value(addr)?;
-                }
-                &Instruction::Const(addr) => {
-                    let chunk = self.current_frame().code();
-                    let value = chunk.read_constant(addr);
-                    match value {
-                        _ => self.push(value.clone()),
-                    }
-                }
+                &Instruction::SetLocal(addr) => unsafe {
+                    (*self.frame).set_slot(addr, self.peek(0).clone());
+                },
+                &Instruction::Set(addr) => self.set_value(addr)?,
+                &Instruction::Define(addr) => self.define_value(addr)?,
+                &Instruction::Call(args) => self.apply(args)?,
             }
         }
     }
 
-    fn apply(&mut self, proc: value::lambda::Procedure, arg_count: usize) -> Result<()> {
-        let base = self.stack.len() - 1 - arg_count - 1;
-        self.frames.push(CallFrame::new(base, proc));
+    #[inline]
+    fn next_instruction(&mut self) -> &Instruction {
+        unsafe {
+            let inst = &*(*self.frame).ip;
+            (*self.frame).ip = (*self.frame).ip.offset(1);
+            inst
+        }
+    }
+
+    #[inline]
+    fn read_constant(&self, addr: ConstAddressType) -> &Value {
+        self.current_frame().code().read_constant(addr)
+    }
+
+    //
+    // Stack operations ->
+    //
+    #[inline]
+    fn stack_reset(&mut self) -> Result<()> {
+        self.stack.truncate(0);
+        self.stack_top = self.stack.as_mut_ptr();
+
+        self.frames.truncate(0);
+        self.frame = self.frames.as_mut_ptr();
         Ok(())
     }
 
-    fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
-        if let Some(v) = self.pop() {
-            let id = self.read_identifier(addr)?;
-            self.toplevel.set(id.clone(), v.to_owned());
-            self.push(self.values.unspecified().clone());
-        } else {
-            return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
-        }
+    #[inline]
+    fn push(&mut self, v: Value) -> Result<()> {
+        println!("Pushing {:?}", v);
+        self.stack.push(v);
+        unsafe { self.stack_top = self.stack_top.add(1) };
+        println!("Stack ptr: {:?} Value: {:?}", self.stack_top, unsafe {
+            &*self.stack_top
+        });
+        Ok(())
+    }
 
+    #[inline]
+    fn pop(&mut self) -> Value {
+        let value = self.stack.pop().unwrap();
+        unsafe { self.stack_top = self.stack_top.sub(1) };
+        value
+    }
+
+    #[inline]
+    fn peek(&self, distance: isize) -> &Value {
+        //unsafe { &(*self.stack_top.sub(distance as usize)) }
+        &self.stack[self.stack.len() - (distance as usize) - 1]
+    }
+    //
+    // <- Stack operations
+    //
+
+    //
+    // Call stack operations
+    //
+
+    #[inline]
+    fn pop_frame(&mut self) -> usize {
+        self.frames.pop();
+        unsafe { self.frame = self.frame.offset(-1) }
+        self.frames.len()
+    }
+
+    #[inline]
+    fn push_frame(&mut self, proc: value::lambda::Procedure, arg_count: isize) -> Result<()> {
+        let slots = unsafe { self.stack_top.sub(arg_count as usize) };
+        let frame = CallFrame::new(slots, proc);
+        self.frames.push(frame);
+        unsafe { self.frame = self.frame.offset(1) };
+        Ok(())
+    }
+
+    #[inline]
+    fn current_frame(&self) -> &CallFrame {
+        unsafe { &(*self.frame) }
+    }
+
+    #[inline]
+    fn apply(&mut self, args: isize) -> Result<()> {
+        println!("Reading procedure from: {}", args);
+        match self.peek(args) {
+            value::Value::Procedure(proc) => {
+                // super expensive to clone the chunk
+                println!("DONE!");
+                self.push_frame(proc.clone(), args)
+            }
+            other => {
+                return self
+                    .runtime_error(&format!("Operator is not a callable object: {:?}", other))
+            }
+        }
+    }
+
+    fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        let v = self.pop();
+        let id = self.read_identifier(addr)?;
+        self.toplevel.set(id.clone(), v.to_owned());
+        self.push(self.values.unspecified().clone())?;
         Ok(())
     }
 
     fn set_value(&mut self, addr: ConstAddressType) -> Result<()> {
-        if let Some(v) = self.pop() {
-            let id = self.read_identifier(addr)?;
-            if !self.toplevel.get(&id).is_some() {
-                return self.runtime_error(&format!(
-                    "Can't set! {} because it's undefined",
-                    id.as_str()
-                ));
-            } else {
-                self.toplevel.set(id.clone(), v.to_owned());
-                self.push(self.values.unspecified().clone());
-            }
+        let v = self.pop();
+        let id = self.read_identifier(addr)?;
+
+        if !self.toplevel.get(&id).is_some() {
+            return self.runtime_error(&format!(
+                "Can't set! {} because it's undefined",
+                id.as_str()
+            ));
         } else {
-            return self.compiler_bug(&format!("Expected symbol at address: {}", addr));
+            self.toplevel.set(id.clone(), v.to_owned());
+            self.push(self.values.unspecified().clone())?;
         }
 
         Ok(())
     }
 
     fn read_identifier(&mut self, addr: ConstAddressType) -> Result<Symbol> {
-        let chunk = self.current_frame().code();
-
-        if let Value::Symbol(s) = chunk.read_constant(addr) {
+        if let Value::Symbol(s) = self.read_constant(addr) {
             Ok(s.clone())
         } else {
             self.compiler_bug(&format!("Expected symbol at address: {}", addr))
@@ -204,82 +228,68 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn compiler_bug<T>(&self, message: &str) -> Result<T> {
-        Err(Error::CompilerBug(message.to_string()))
+    fn compiler_bug<T>(&mut self, message: &str) -> Result<T> {
+        let result = Err(Error::CompilerBug(message.to_string()));
+        self.stack_reset()?;
+        result
     }
 
     fn runtime_error<T>(&mut self, message: &str) -> Result<T> {
-        Err(Error::RuntimeError(
+        let result = Err(Error::RuntimeError(
             message.to_string(),
             self.line_number_for_current_instruction().unwrap_or(0),
-        ))
+        ));
+
+        self.stack_reset()?;
+        result
     }
 
     #[inline]
     fn line_number_for_current_instruction(&mut self) -> Option<LineNumber> {
-        let frame = self.current_frame();
-        frame.code().find_line(frame.ip - 1).map(|e| e.2)
+        let address = self.ip_address();
+        self.current_frame().code().find_line(address).map(|e| e.2)
     }
 
     #[inline]
-    fn push(&mut self, v: Value) {
-        self.stack.push(v)
-    }
-
-    #[inline]
-    fn pop(&mut self) -> Option<Value> {
-        self.stack.pop()
-    }
-
-    #[inline]
-    fn peek(&self, slot: usize) -> Option<&Value> {
-        self.stack.get(self.stack.len() - slot - 1)
-    }
-
-    #[inline]
-    fn next_instruction(&mut self) -> &Instruction {
-        let mut frame = self.current_mut_frame();
-        let instruction = frame.proc.code().read_instruction(frame.ip);
-        frame.ip = frame.ip + 1;
-        instruction
-    }
-
-    // TODO: replace with faster variant that returns a mut ptr
-    #[inline]
-    fn current_mut_frame(&mut self) -> &mut CallFrame {
-        let index = self.frames.len() - 1;
-        &mut self.frames[index]
-    }
-
-    #[inline]
-    fn current_frame(&self) -> &CallFrame {
-        let index = self.frames.len() - 1;
-        &self.frames[index]
+    fn ip_address(&self) -> AddressType {
+        let base = self.current_frame().code().as_ptr() as usize;
+        let ip = self.current_frame().ip as usize;
+        ip - base
     }
 
     #[cfg(feature = "debug_vm")]
     fn debug_cycle(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
-        let frame = self.current_frame();
-        let chunk = self.current_frame().code();
+        let chunk = unsafe { (*self.frame).code() };
 
         self.print_stack();
-        disassembler.disassemble_instruction(chunk, frame.ip);
+        //disassembler.disassemble_instruction(chunk, self.ip_address());
     }
 
-    #[cfg(feature = "debug_vm")]
+    // print the stack better
     fn print_stack(&self) {
+        println!("==== Stack ====\n");
         print!("     ");
-        for value in self.stack.iter() {
-            print!("[{:?}]", value);
+        let mut longest_value = 0;
+        let mut values: Vec<String> = vec![];
+
+        for value in self.stack.iter().rev() {
+            let v = format!("{:?}", value);
+            longest_value = std::cmp::max(longest_value, v.len());
+            values.push(v);
         }
-        println!("")
+
+        for current in values {
+            print!("[{:width$}]", current, width = longest_value);
+        }
+
+        println!("\n");
     }
 
     #[cfg(feature = "debug_vm")]
-    fn disassemble_frame(&self) {
+    fn disassemble_frame(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
         let chunk = self.current_frame().code();
-        disassembler.disassemble(chunk, "DEBUG DISASS");
+        disassembler.disassemble(chunk, "FRAME");
     }
 }
