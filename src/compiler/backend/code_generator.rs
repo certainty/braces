@@ -43,28 +43,40 @@ impl Local {
     }
 }
 
+#[derive(Debug)]
 pub enum Target {
     TopLevel,
-    Procedure(Option<String>),
+    Procedure,
 }
 
 pub struct CodeGenerator {
     scope_depth: usize,
     locals: Vec<Local>,
     values: value::Factory,
+    target: Target,
     chunk: Chunk,
 }
 
 impl CodeGenerator {
-    pub fn new() -> Self {
+    pub fn new(target: Target) -> Self {
         let mut locals = Vec::with_capacity(MAX_LOCALS);
         locals.push(Local::for_vm()); // first slot is reserved for VM use
 
         CodeGenerator {
             scope_depth: 0,
-            locals: locals,
+            locals,
+            target,
             values: value::Factory::default(),
             chunk: Chunk::new(),
+        }
+    }
+
+    pub fn generate_program(&mut self, ast: Vec<Expression>) -> Result<CompilationUnit> {
+        if let Some(location) = ast.first().map(|e| e.source_location().clone()) {
+            let proc = Self::generate_top_level(&Expression::body(ast), &location)?;
+            Ok(CompilationUnit::new(self.values.clone(), proc))
+        } else {
+            todo!()
         }
     }
 
@@ -80,20 +92,15 @@ impl CodeGenerator {
         ast: &BodyExpression,
         loc: &SourceLocation,
     ) -> Result<value::lambda::Procedure> {
-        let mut generator = CodeGenerator::new();
-        generator.begin_scope();
+        let mut generator = CodeGenerator::new(Target::Procedure);
 
+        generator.begin_scope();
         for argument in formals.identifiers() {
             generator.declare_variable(&argument)?;
         }
         generator.emit_body(ast, loc)?;
         generator.emit_return()?;
-
-        #[cfg(feature = "debug_code")]
-        {
-            let proc_name = name.clone().unwrap_or(String::from("lambda"));
-            Disassembler::new(std::io::stdout()).disassemble(&generator.chunk, &proc_name);
-        }
+        generator.end_scope();
 
         match name {
             Some(name) => Ok(value::lambda::Procedure::named(
@@ -109,14 +116,9 @@ impl CodeGenerator {
         ast: &BodyExpression,
         loc: &SourceLocation,
     ) -> Result<value::lambda::Procedure> {
-        let mut generator = CodeGenerator::new();
+        let mut generator = CodeGenerator::new(Target::TopLevel);
         generator.emit_body(ast, loc)?;
         generator.emit_return()?;
-
-        #[cfg(feature = "debug_code")]
-        {
-            Disassembler::new(std::io::stdout()).disassemble(&generator.chunk, "toplevel");
-        }
 
         Ok(value::lambda::Procedure::thunk(generator.chunk))
     }

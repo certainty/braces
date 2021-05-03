@@ -6,7 +6,7 @@ pub mod source_location;
 pub mod utils;
 use crate::vm::scheme::value;
 use backend::code_generator;
-use backend::code_generator::CodeGenerator;
+use backend::code_generator::{CodeGenerator, Target};
 use frontend::parser::Parser;
 use source::Source;
 use thiserror::Error;
@@ -43,9 +43,15 @@ impl Compiler {
         Compiler { parser: Parser }
     }
 
+    pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
+        let ast = self.parser.parse_program(source)?;
+        let mut code_gen = CodeGenerator::new(Target::TopLevel);
+        Ok(code_gen.generate(&ast)?)
+    }
+
     pub fn compile_expression<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
         let ast = self.parser.parse_expression(source)?;
-        let mut code_gen = CodeGenerator::new();
+        let mut code_gen = CodeGenerator::new(Target::TopLevel);
 
         Ok(code_gen.generate(&ast)?)
     }

@@ -38,6 +38,19 @@ pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Datum> {
     Ok(datum)
 }
 
+pub fn parse_sequence<'a, T: Source>(source: &'a mut T) -> Result<Vec<Datum>> {
+    let source_type = source.source_type();
+    let source_str = source.as_str()?;
+    let input = Input::new_extra(source_str, source_type);
+    let (rest, datum) = context("program", many1(parse_datum))(input)?;
+
+    if rest.is_empty() {
+        Ok(datum)
+    } else {
+        Err(ReadError::IncompleteInput)
+    }
+}
+
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let datum = context("datum", alt((parse_simple_datum, parse_compound_datum)));
 

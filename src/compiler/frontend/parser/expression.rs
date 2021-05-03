@@ -123,13 +123,17 @@ pub enum LiteralExpression {
 }
 
 impl Expression {
+    pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
+        let ast = Parser.parse_datum_sequence(source)?;
+        ast.iter().map(Self::parse_expression).collect()
+    }
+
     /// Parse a single datum into a an expression.
     ///
     /// It either succeeds or returns an error indicating
     /// what went wrong.
     pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
-        let parser = Parser;
-        let ast = parser.parse_datum(source)?;
+        let ast = Parser.parse_datum(source)?;
         Self::parse_expression(&ast)
     }
 
@@ -169,6 +173,13 @@ impl Expression {
 
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
         Expression::Identifier(Identifier(str), loc)
+    }
+
+    pub fn body(sequence: Vec<Expression>) -> BodyExpression {
+        BodyExpression {
+            definitions: vec![],
+            sequence,
+        }
     }
 
     pub fn apply(
@@ -533,11 +544,11 @@ impl Expression {
     }
 
     fn parse_command_or_definition(datum: &Datum) -> Result<Expression> {
-        let maybe_definition =
-            Self::parse_definition(&datum).map(|e| Expression::Define(e, datum.location.clone()));
-        let maybe_command = Self::parse_expression(&datum);
-
-        maybe_command.or(maybe_definition)
+        match Self::parse_definition(&datum).map(|e| Expression::Define(e, datum.location.clone()))
+        {
+            Ok(expr) => Ok(expr),
+            Err(_) => Self::parse_expression(&datum),
+        }
     }
 
     #[inline]
