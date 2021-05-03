@@ -5,6 +5,7 @@ use super::debug;
 use super::disassembler::Disassembler;
 use super::global::*;
 use super::scheme::value;
+use super::scheme::value::lambda::Procedure;
 use super::scheme::value::{Symbol, Value};
 use super::stack;
 use super::stack::Stack;
@@ -12,10 +13,19 @@ use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
 use std::rc::Rc;
 
+//////////////////////////////////////////////////
+// Welcome the call stack
+/////////////////////////////////////////////////
+
+// A callframe is a piece of control data
+// that is associated with every live-function
+//
+//
+pub struct CallFrame {
+    function: Rc<Procedure>, // the function that is currently executed
+}
+
 const FRAMES_MAX: usize = 64;
-
-type Result<T> = std::result::Result<T, Error>;
-
 type ValueStack = Stack<Value>;
 type CallStack = Stack<CallFrame>;
 
@@ -27,6 +37,11 @@ pub struct Instance<'a> {
     active_frame: *mut CallFrame,
 }
 
+////////////////////////////////////////////////////////
+// VM Implementation
+///////////////////////////////////////////////////////
+
+type Result<T> = std::result::Result<T, Error>;
 // TODO:
 // The vm isn't optimised for performance yet.
 // There are several things that could be more efficient using unsafe pointer code
@@ -40,10 +55,14 @@ impl<'a> Instance<'a> {
     ) -> Result<Value> {
         let mut stack = ValueStack::new(stack_size);
         let mut call_stack = CallStack::new(FRAMES_MAX);
+        let proc = Rc::new(proc);
+
+        stack.push(Value::Procedure(proc.clone()));
         call_stack.push(CallFrame::new(
             stack::Frame::from(stack.as_mut_ptr(), 0),
-            Rc::new(proc),
+            proc.clone(),
         ));
+
         let active_frame = call_stack.top_mut_ptr();
 
         let mut instance = Instance {
