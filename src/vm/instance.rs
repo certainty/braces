@@ -21,9 +21,9 @@ use std::rc::Rc;
 // that is associated with every live-function
 //
 //
-pub struct CallFrame {
-    function: Rc<Procedure>, // the function that is currently executed
-}
+//pub struct CallFrame {
+//    function: Rc<Procedure>, // the function that is currently executed
+//}
 
 const FRAMES_MAX: usize = 64;
 type ValueStack = Stack<Value>;

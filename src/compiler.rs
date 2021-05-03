@@ -46,7 +46,7 @@ impl Compiler {
     pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
         let ast = self.parser.parse_program(source)?;
         let mut code_gen = CodeGenerator::new(Target::TopLevel);
-        Ok(code_gen.generate(&ast)?)
+        Ok(code_gen.generate_program(ast)?)
     }
 
     pub fn compile_expression<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
