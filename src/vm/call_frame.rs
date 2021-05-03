@@ -1,41 +1,26 @@
-use super::byte_code::chunk::{Chunk, ConstAddressType, LineNumber};
-use super::byte_code::Instruction;
+use super::byte_code::chunk::{Chunk, LineNumber};
 use super::scheme::value::lambda::Procedure;
-use super::scheme::value::Value;
-use super::stack::Frame;
 use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct CallFrame {
     pub proc: Rc<Procedure>,
     pub ip: usize,
-    slots: Frame<Value>,
+    pub stack_base: usize,
 }
 
 impl CallFrame {
-    pub fn new(slots: Frame<Value>, proc: Rc<Procedure>) -> Self {
-        Self { ip: 0, slots, proc }
-    }
-
-    pub fn next_instruction(&mut self) -> &Instruction {
-        let inst = self.proc.code().at(self.ip);
-        self.ip += 1;
-        inst
+    pub fn new(proc: Rc<Procedure>, stack_base: usize) -> Self {
+        Self {
+            ip: 0,
+            stack_base,
+            proc,
+        }
     }
 
     #[inline]
     pub fn code(&self) -> &Chunk {
         self.proc.code()
-    }
-
-    #[inline]
-    pub fn get_slot(&self, address: ConstAddressType) -> &Value {
-        self.slots.get((address - 1) as usize)
-    }
-
-    #[inline]
-    pub fn set_slot(&mut self, address: ConstAddressType, value: Value) {
-        self.slots.set(address as usize, value)
     }
 
     #[inline]

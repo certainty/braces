@@ -76,7 +76,7 @@ impl<V> Stack<V> {
         self.repr.len()
     }
 
-    fn set(&mut self, index: usize, v: V) {
+    pub fn set(&mut self, index: usize, v: V) {
         self.repr[index] = v
     }
 

@@ -26,7 +26,8 @@ use std::rc::Rc;
 //}
 
 const FRAMES_MAX: usize = 64;
-type ValueStack = Stack<Value>;
+type StackValue = Rc<Value>;
+type ValueStack = Stack<StackValue>;
 type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
@@ -42,37 +43,46 @@ pub struct Instance<'a> {
 ///////////////////////////////////////////////////////
 
 type Result<T> = std::result::Result<T, Error>;
+
 // TODO:
 // The vm isn't optimised for performance yet.
 // There are several things that could be more efficient using unsafe pointer code
 // Most notably access to the stack and the callstack (including ip increments)
 impl<'a> Instance<'a> {
-    pub fn interprete<'b>(
+    pub fn new(
         proc: value::lambda::Procedure,
         stack_size: usize,
-        toplevel: &mut TopLevel,
-        values: &mut value::Factory,
-    ) -> Result<Value> {
+        toplevel: &'a mut TopLevel,
+        values: &'a mut value::Factory,
+    ) -> Self {
         let mut stack = ValueStack::new(stack_size);
         let mut call_stack = CallStack::new(FRAMES_MAX);
-        let proc = Rc::new(proc);
+        let initial_procedure = Rc::new(proc);
 
-        stack.push(Value::Procedure(proc.clone()));
-        call_stack.push(CallFrame::new(
-            stack::Frame::from(stack.as_mut_ptr(), 0),
-            proc.clone(),
-        ));
+        // the first value on the stack is the initial procedure
+        stack.push(Rc::new(Value::Procedure(initial_procedure.clone())));
+
+        // the first active stack frame is that of the current procedure
+        call_stack.push(CallFrame::new(initial_procedure.clone(), 0));
 
         let active_frame = call_stack.top_mut_ptr();
 
-        let mut instance = Instance {
+        Self {
             values,
             stack,
             call_stack,
             toplevel,
             active_frame,
-        };
+        }
+    }
 
+    pub fn interprete(
+        proc: value::lambda::Procedure,
+        stack_size: usize,
+        toplevel: &'a mut TopLevel,
+        values: &'a mut value::Factory,
+    ) -> Result<Value> {
+        let mut instance = Self::new(proc, stack_size, toplevel, values);
         instance.run()
     }
 
@@ -87,14 +97,15 @@ impl<'a> Instance<'a> {
                 &Instruction::Pop => {
                     self.pop();
                 }
-                &Instruction::True => self.push(self.values.bool_true().clone())?,
-                &Instruction::False => self.push(self.values.bool_false().clone())?,
-                &Instruction::Nil => self.push(self.values.nil().clone())?,
-                &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
+                &Instruction::True => self.push_value(self.values.bool_true())?,
+                &Instruction::False => self.push_value(self.values.bool_false())?,
+                &Instruction::Nil => self.push_value(self.values.nil())?,
+                &Instruction::Const(addr) => self.push_value(self.read_constant(addr).clone())?,
                 &Instruction::Return => {
                     let value = self.pop();
+
                     if self.pop_frame() <= 0 {
-                        return Ok(value);
+                        return Ok((*value).clone());
                     } else {
                         self.push(value)?
                     }
@@ -103,19 +114,15 @@ impl<'a> Instance<'a> {
                     let id = self.read_identifier(addr)?;
 
                     if let Some(value) = self.toplevel.get_owned(&id) {
-                        self.push(value)?;
+                        self.push_value(value)?;
                     } else {
                         return self.runtime_error(&format!("Variable {} is unbound", id.as_str()));
                     }
                 }
                 &Instruction::GetLocal(addr) => {
-                    println!("Get Local {:?}", self.active_frame());
-                    let value = self.active_frame().get_slot(addr).clone();
-                    self.push(value)?
+                    self.push(self.frame_get_slot(addr))?;
                 }
-                &Instruction::SetLocal(addr) => {
-                    self.active_mut_frame().set_slot(addr, self.peek(0).clone())
-                }
+                &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0)),
                 &Instruction::Set(addr) => self.set_value(addr)?,
                 &Instruction::Define(addr) => self.define_value(addr)?,
                 &Instruction::Call(args) => self.apply(args)?,
@@ -125,7 +132,10 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn next_instruction(&mut self) -> &Instruction {
-        self.active_mut_frame().next_instruction()
+        let frame = self.active_mut_frame();
+        let ip = frame.ip;
+        frame.ip += 1;
+        frame.code().at(ip)
     }
 
     #[inline]
@@ -143,19 +153,25 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn push(&mut self, v: Value) -> Result<()> {
+    fn push_value(&mut self, v: Value) -> Result<()> {
+        self.stack.push(Rc::new(v));
+        Ok(())
+    }
+
+    #[inline]
+    fn push(&mut self, v: StackValue) -> Result<()> {
         self.stack.push(v);
         Ok(())
     }
 
     #[inline]
-    fn pop(&mut self) -> Value {
+    fn pop(&mut self) -> StackValue {
         self.stack.pop()
     }
 
     #[inline]
-    fn peek(&self, distance: usize) -> &Value {
-        self.stack.peek(distance)
+    fn peek(&self, distance: usize) -> StackValue {
+        self.stack.peek(distance).clone()
     }
     //
     // <- Stack operations
@@ -178,7 +194,7 @@ impl<'a> Instance<'a> {
     #[inline]
     fn push_frame(&mut self, proc: Rc<value::lambda::Procedure>, arg_count: usize) -> Result<()> {
         let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
-        let frame = CallFrame::new(stack::Frame::from(self.stack.as_mut_ptr(), base), proc);
+        let frame = CallFrame::new(proc, base);
         self.call_stack.push(frame);
         self.active_frame = self.call_stack.top_mut_ptr();
         Ok(())
@@ -195,24 +211,39 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn apply(&mut self, args: usize) -> Result<()> {
-        if let value::Value::Procedure(proc) = self.peek(args).clone() {
-            self.push_frame(proc.clone(), args)?;
+    fn frame_get_slot(&self, slot_address: ConstAddressType) -> StackValue {
+        self.peek(self.stack_frame_address(slot_address))
+    }
 
+    #[inline]
+    fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: StackValue) {
+        self.stack
+            .set(self.stack_frame_address(slot_address), value);
+    }
+
+    #[inline]
+    fn stack_frame_address(&self, slot_address: ConstAddressType) -> usize {
+        self.active_frame().stack_base + (slot_address as usize)
+    }
+
+    // specific VM instructions
+    #[inline]
+    fn apply(&mut self, args: usize) -> Result<()> {
+        if let value::Value::Procedure(proc) = &*self.peek(args) {
+            self.push_frame(proc.clone(), args)?;
             #[cfg(feature = "debug_vm")]
             self.disassemble_frame();
         } else {
             return self.runtime_error(&format!("Operator is not a callable object"));
         }
-
         Ok(())
     }
 
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
-        self.toplevel.set(id.clone(), v.to_owned());
-        self.push(self.values.unspecified().clone())?;
+        self.toplevel.set(id.clone(), (*v).clone());
+        self.push_value(self.values.unspecified())?;
         Ok(())
     }
 
@@ -226,8 +257,8 @@ impl<'a> Instance<'a> {
                 id.as_str()
             ));
         } else {
-            self.toplevel.set(id.clone(), v.to_owned());
-            self.push(self.values.unspecified().clone())?;
+            self.toplevel.set(id.clone(), (*v).clone());
+            self.push_value(self.values.unspecified())?;
         }
 
         Ok(())
@@ -257,6 +288,8 @@ impl<'a> Instance<'a> {
         ));
         result
     }
+
+    // Debug the VM
 
     #[cfg(feature = "debug_vm")]
     fn debug_cycle(&mut self) {

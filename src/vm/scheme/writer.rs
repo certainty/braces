@@ -186,10 +186,10 @@ mod tests {
         let writer = Writer::new();
 
         let v = values.bool_true();
-        assert_eq!(writer.write(v, &values), "#t");
+        assert_eq!(writer.write(&v, &values), "#t");
 
         let v = values.bool_false();
-        assert_eq!(writer.write(v, &values), "#f");
+        assert_eq!(writer.write(&v, &values), "#f");
     }
 
     #[test]

@@ -94,20 +94,20 @@ impl Default for Factory {
 }
 
 impl Factory {
-    pub fn bool_true<'a>(&'a self) -> &'a Value {
-        &self.true_value
+    pub fn bool_true(&self) -> Value {
+        self.true_value.clone()
     }
 
-    pub fn bool_false<'a>(&'a self) -> &'a Value {
-        &self.false_value
+    pub fn bool_false(&self) -> Value {
+        self.false_value.clone()
     }
 
-    pub fn nil<'a>(&'a self) -> &'a Value {
-        &self.nil_value
+    pub fn nil(&self) -> Value {
+        self.nil_value.clone()
     }
 
-    pub fn unspecified<'a>(&'a self) -> &'a Value {
-        &self.unspecified
+    pub fn unspecified(&self) -> Value {
+        self.unspecified.clone()
     }
 
     pub fn character(&self, c: char) -> Value {

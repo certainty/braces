@@ -1,9 +1,10 @@
 use crate::vm::scheme::value::Value;
 use crate::vm::stack::Stack;
+use std::rc::Rc;
 
 // Utilities to get insights into how the stacks are arranged
 
-pub fn pretty_print(stack: &Stack<Value>) -> String {
+pub fn pretty_print(stack: &Stack<Rc<Value>>) -> String {
     let mut out = String::new();
     let mut longest_value = 0;
     let mut values: Vec<String> = vec![];
