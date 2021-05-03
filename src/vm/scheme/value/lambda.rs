@@ -39,6 +39,14 @@ impl Procedure {
             Procedure::Lambda(proc) => &proc.arity,
         }
     }
+
+    pub fn name(&self) -> String {
+        if let Self::Named(named) = self {
+            named.name.clone()
+        } else {
+            String::from("lambda")
+        }
+    }
 }
 
 // for now no procedure is equal unless it is itself

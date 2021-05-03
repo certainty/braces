@@ -4,6 +4,7 @@ extern crate thiserror;
 extern crate nom;
 extern crate nom_locate;
 
+pub mod cmd;
 pub mod compiler;
 pub mod vm;
 

@@ -1,5 +1,4 @@
 pub mod byte_code;
-pub mod call_frame;
 pub mod debug;
 pub mod disassembler;
 pub mod global;
@@ -7,15 +6,16 @@ pub mod instance;
 pub mod scheme;
 pub mod stack;
 
-use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
+use crate::compiler::{self, source};
 use global::TopLevel;
 use instance::Instance;
 use scheme::value;
 use scheme::value::Value;
 use scheme::writer::Writer;
+use std::path::PathBuf;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -51,6 +51,13 @@ impl VM {
     pub fn write(&self, value: &Value) -> String {
         println!("{:?}", value);
         self.writer.write(value, &self.values).to_string()
+    }
+
+    pub fn run_file(&mut self, path: PathBuf) -> Result<Value> {
+        let mut source = FileSource::new(path);
+        let mut compiler = Compiler::new();
+        let unit = compiler.compile_program(&mut source)?;
+        self.interprete(unit)
     }
 
     pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {

@@ -38,7 +38,7 @@ anyhow = "1.0"
 im = "15.0"
 
 # compiler / interpreter
-clap-v3 = "3.0.0-beta.1"
+clap = "3.0.0-beta.2"
 rustyline = "8.0.0"
 hashbrown = "0.11"
 fasthash = "0.4.0"

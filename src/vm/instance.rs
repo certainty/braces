@@ -1,5 +1,5 @@
+use super::byte_code::chunk::{Chunk, LineNumber};
 use super::byte_code::Instruction;
-use super::call_frame::*;
 use super::debug;
 #[cfg(feature = "debug_vm")]
 use super::disassembler::Disassembler;
@@ -7,7 +7,6 @@ use super::global::*;
 use super::scheme::value;
 use super::scheme::value::lambda::Procedure;
 use super::scheme::value::{Symbol, Value};
-use super::stack;
 use super::stack::Stack;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
@@ -19,11 +18,35 @@ use std::rc::Rc;
 
 // A callframe is a piece of control data
 // that is associated with every live-function
-//
-//
-//pub struct CallFrame {
-//    function: Rc<Procedure>, // the function that is currently executed
-//}
+
+#[derive(Debug)]
+pub struct CallFrame {
+    pub proc: Rc<Procedure>,
+    pub ip: usize,
+    pub stack_base: usize,
+}
+
+impl CallFrame {
+    pub fn new(proc: Rc<Procedure>, stack_base: usize) -> Self {
+        Self {
+            ip: 0,
+            stack_base,
+            proc,
+        }
+    }
+
+    #[inline]
+    pub fn code(&self) -> &Chunk {
+        self.proc.code()
+    }
+
+    #[inline]
+    pub fn line_number_for_current_instruction(&self) -> Option<LineNumber> {
+        self.proc.code().find_line(self.ip).map(|e| e.2)
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
 
 const FRAMES_MAX: usize = 64;
 type StackValue = Rc<Value>;
@@ -87,6 +110,9 @@ impl<'a> Instance<'a> {
     }
 
     fn run(&mut self) -> Result<Value> {
+        #[cfg(feature = "debug_vm")]
+        self.disassemble_frame();
+
         loop {
             #[cfg(feature = "debug_vm")]
             self.debug_cycle();
@@ -308,9 +334,17 @@ impl<'a> Instance<'a> {
     #[cfg(feature = "debug_vm")]
     fn disassemble_frame(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
+        let base_addr = self.active_frame().stack_base;
         let chunk = self.active_frame().code();
+        let proc_name = self.active_frame().proc.name();
         println!("\n");
-        disassembler.disassemble(chunk, "ACTIVE FRAME");
+        disassembler.disassemble(
+            chunk,
+            &format!(
+                "ACTIVE FRAME (proc: {}, stack_base: {})",
+                proc_name, base_addr
+            ),
+        );
         println!("\n");
     }
 }
