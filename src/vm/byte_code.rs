@@ -5,9 +5,9 @@ use chunk::ConstAddressType;
 #[derive(Debug, Clone)]
 pub enum Instruction {
     Define(ConstAddressType),
-    Set(ConstAddressType),
+    SetGlobal(ConstAddressType),
     SetLocal(ConstAddressType),
-    Get(ConstAddressType),
+    GetGlobal(ConstAddressType),
     GetLocal(ConstAddressType),
     Const(ConstAddressType),
     Call(usize), // number of arguments

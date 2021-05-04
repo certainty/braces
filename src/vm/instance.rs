@@ -136,7 +136,7 @@ impl<'a> Instance<'a> {
                         self.push(value)?
                     }
                 }
-                &Instruction::Get(addr) => {
+                &Instruction::GetGlobal(addr) => {
                     let id = self.read_identifier(addr)?;
 
                     if let Some(value) = self.toplevel.get_owned(&id) {
@@ -149,7 +149,7 @@ impl<'a> Instance<'a> {
                     self.push(self.frame_get_slot(addr))?;
                 }
                 &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0)),
-                &Instruction::Set(addr) => self.set_value(addr)?,
+                &Instruction::SetGlobal(addr) => self.set_value(addr)?,
                 &Instruction::Define(addr) => self.define_value(addr)?,
                 &Instruction::Call(args) => self.apply(args)?,
             }

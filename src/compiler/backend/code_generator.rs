@@ -234,7 +234,7 @@ impl CodeGenerator {
         } else {
             let id_sym = self.sym(&id.string());
             let const_addr = self.current_chunk().add_constant(id_sym);
-            self.emit_instruction(Instruction::Get(const_addr), loc)
+            self.emit_instruction(Instruction::GetGlobal(const_addr), loc)
         }
     }
 
@@ -304,7 +304,7 @@ impl CodeGenerator {
             // top level variable
             let id_sym = self.sym(&id.string());
             let const_addr = self.current_chunk().add_constant(id_sym);
-            self.emit_instruction(Instruction::Set(const_addr), loc)
+            self.emit_instruction(Instruction::SetGlobal(const_addr), loc)
         }
     }
 

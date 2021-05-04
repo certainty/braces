@@ -56,14 +56,14 @@ impl<T: Write> Disassembler<T> {
             &Instruction::True => self.disassemble_simple("OP_TRUE", address),
             &Instruction::False => self.disassemble_simple("OP_FALSE", address),
             &Instruction::Nil => self.disassemble_simple("OP_NIL", address),
-            &Instruction::Get(const_address) => {
-                self.disassemble_constant(chunk, "OP_GET", address, const_address)
+            &Instruction::GetGlobal(const_address) => {
+                self.disassemble_constant(chunk, "OP_GET_GLOBAL", address, const_address)
             }
             &Instruction::GetLocal(_const_address) => {
                 self.disassemble_code_at(chunk, "OP_GET_LOCAL", address)
             }
-            &Instruction::Set(const_address) => {
-                self.disassemble_constant(chunk, "OP_SET", address, const_address)
+            &Instruction::SetGlobal(const_address) => {
+                self.disassemble_constant(chunk, "OP_SET_GLOBAL", address, const_address)
             }
             &Instruction::SetLocal(_const_address) => {
                 self.disassemble_code_at(chunk, "OP_SET_LOCAL", address)
