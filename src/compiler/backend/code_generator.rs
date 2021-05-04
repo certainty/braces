@@ -1,4 +1,3 @@
-use crate::compiler::frontend::parser::expression::body::BodyExpression;
 use crate::compiler::frontend::parser::expression::conditional::IfExpression;
 use crate::compiler::frontend::parser::expression::define::DefinitionExpression;
 use crate::compiler::frontend::parser::expression::identifier::Identifier;
@@ -8,6 +7,9 @@ use crate::compiler::frontend::parser::expression::literal::LiteralExpression;
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
     apply::ApplicationExpression, set::SetExpression,
+};
+use crate::compiler::frontend::parser::expression::{
+    body::BodyExpression, sequence::BeginExpression,
 };
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -195,8 +197,8 @@ impl CodeGenerator {
             }
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
-            Expression::Begin(first, rest, _) => self.emit_begin(first, rest)?,
-            Expression::Command(expr, _) => self.emit_instructions(expr)?,
+            Expression::Begin(expr) => self.emit_begin(expr)?,
+            Expression::Command(expr) => self.emit_instructions(expr)?,
             Expression::Apply(expr) => self.emit_apply(expr)?,
         }
         Ok(())
@@ -214,10 +216,10 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_begin(&mut self, first: &Box<Expression>, rest: &Vec<Box<Expression>>) -> Result<()> {
+    fn emit_begin(&mut self, expr: &BeginExpression) -> Result<()> {
         self.begin_scope();
-        self.emit_instructions(first)?;
-        for exp in rest {
+        self.emit_instructions(&expr.first)?;
+        for exp in &expr.rest {
             self.emit_instructions(&*exp)?;
         }
         self.end_scope();

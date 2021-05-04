@@ -3,6 +3,8 @@ extern crate thiserror;
 
 extern crate nom;
 extern crate nom_locate;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod cmd;
 pub mod compiler;

@@ -1,6 +1,7 @@
 use super::error::Error;
 use super::Expression;
 use super::Result;
+use super::SPECIAL_OPERATORS;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
@@ -35,25 +36,35 @@ pub fn parse(datum: &Datum) -> Result<Expression> {
     parse_apply(datum).map(Expression::Apply)
 }
 
+// TODO: make sure that operator is not special
 pub fn parse_apply(datum: &Datum) -> Result<ApplicationExpression> {
     match datum.sexp() {
-        Sexp::List(ls) => match &ls[..] {
-            [operator, operands @ ..] => {
-                let operatored_expr = Expression::parse_expression(&operator);
+        Sexp::List(ls) => {
+            if let [operator, operands @ ..] = &ls[..] {
+                let operator_expr = Expression::parse_expression(&operator)?;
+
+                if Expression::is_special_operator(&operator_expr) {
+                    return Error::parse_error(
+                        "Unexpected special operator",
+                        datum.source_location().clone(),
+                    );
+                }
+
                 let operands_expr: Result<Vec<Expression>> =
                     operands.iter().map(Expression::parse_expression).collect();
 
                 Ok(build(
-                    operatored_expr?,
+                    operator_expr,
                     operands_expr?,
                     datum.source_location().clone(),
                 ))
+            } else {
+                Error::parse_error(
+                    "expected (<operator> <operand>*)",
+                    datum.source_location().clone(),
+                )
             }
-            _ => Error::parse_error(
-                "expected (<operator> <operand>*)",
-                datum.source_location().clone(),
-            ),
-        },
+        }
 
         _ => Error::parse_error(
             "expected (<operator> <operand>*)",

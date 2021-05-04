@@ -8,6 +8,7 @@ pub mod lambda;
 pub mod letexp;
 pub mod literal;
 pub mod quotation;
+pub mod sequence;
 pub mod set;
 use self::{conditional::IfExpression, quotation::QuotationExpression, set::SetExpression};
 use crate::compiler::frontend::parser::{
@@ -24,8 +25,30 @@ use identifier::Identifier;
 use lambda::LambdaExpression;
 use letexp::{BindingSpec, LetExpression};
 use literal::LiteralExpression;
+use rustc_hash::FxHashSet;
+use sequence::BeginExpression;
 
 type Result<T> = std::result::Result<T, Error>;
+
+lazy_static! {
+    pub static ref SPECIAL_OPERATORS: FxHashSet<&'static str> = {
+        let mut set = FxHashSet::default();
+        set.insert("set!");
+        set.insert("lambda");
+        set.insert("define");
+        set.insert("if");
+        set.insert("cond");
+        set.insert("let");
+        set.insert("let*");
+        set.insert("letrec");
+        set.insert("letrec");
+        set.insert("let-values");
+        set.insert("values");
+        set.insert("define-values");
+        set.insert("begin");
+        set
+    };
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
@@ -38,8 +61,8 @@ pub enum Expression {
     Let(LetExpression),
     If(IfExpression),
     Apply(ApplicationExpression),
-    Command(Box<Expression>, SourceLocation),
-    Begin(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
+    Command(Box<Expression>),
+    Begin(BeginExpression),
 }
 
 impl HasSourceLocation for Expression {
@@ -54,8 +77,8 @@ impl HasSourceLocation for Expression {
             Self::If(expr) => expr.source_location(),
             Self::Lambda(proc) => proc.source_location(),
             Self::Apply(exp) => exp.source_location(),
-            Self::Command(_, loc) => &loc,
-            Self::Begin(_, _, loc) => &loc,
+            Self::Command(exp) => exp.source_location(),
+            Self::Begin(exp) => exp.source_location(),
         }
     }
 }
@@ -73,6 +96,16 @@ impl Expression {
     pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
         let ast = Parser.parse_datum(source)?;
         Self::parse_expression(&ast)
+    }
+
+    #[inline]
+    pub fn is_special_operator(op: &Expression) -> bool {
+        if let Expression::Identifier(id) = &op {
+            let name: &str = &id.string();
+            SPECIAL_OPERATORS.contains(name)
+        } else {
+            false
+        }
     }
 
     pub fn constant(datum: Datum) -> Expression {
@@ -100,11 +133,7 @@ impl Expression {
     }
 
     pub fn begin(first: Expression, rest: Vec<Expression>, loc: SourceLocation) -> Expression {
-        Expression::Begin(
-            Box::new(first),
-            rest.iter().map(|e| Box::new(e.clone())).collect(),
-            loc,
-        )
+        Expression::Begin(sequence::build(first, rest, loc))
     }
 
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
@@ -156,51 +185,17 @@ impl Expression {
     ///   <includer>           |
     /// ```
     fn parse_expression(datum: &Datum) -> Result<Expression> {
-        //let etest = literal::parse(datum).or_else(|_| quotation::parse(datum));
-
-        match datum.sexp() {
-            Sexp::Symbol(s) => Ok(Self::identifier(s.to_string(), datum.location.clone())),
-            Sexp::Bool(_) => Ok(Self::constant(datum.clone())),
-            Sexp::Char(_) => Ok(Self::constant(datum.clone())),
-            Sexp::String(_) => Ok(Self::constant(datum.clone())),
-            Sexp::List(ls) => match Self::head_symbol(&ls) {
-                Some("set!") => set::parse(datum),
-                Some("quote") => quotation::parse(datum),
-                Some("if") => conditional::parse(datum),
-                Some("let") => letexp::parse(datum),
-                Some("lambda") => lambda::parse(datum),
-                Some("begin") => Self::parse_begin(&ls, datum.location.clone()),
-                Some("define") => define::parse(datum),
-                other => apply::parse(datum),
-            },
-            _ => todo!(),
-        }
-    }
-
-    fn parse_begin(exprs: &Vec<Datum>, loc: SourceLocation) -> Result<Expression> {
-        match &exprs[..] {
-            [_, first, rest @ ..] => {
-                let parsed_first = Self::parse_command_or_definition(first).map(Box::new);
-                let parsed_exprs: Result<Vec<Box<Expression>>> = rest
-                    .iter()
-                    .map(|e| Self::parse_command_or_definition(e).map(Box::new))
-                    .collect();
-
-                Ok(Expression::Begin(parsed_first?, parsed_exprs?, loc))
-            }
-            _ => Error::parse_error("Expected (define <command-or-definition+>)", loc),
-        }
-    }
-
-    fn parse_command_or_definition(datum: &Datum) -> Result<Expression> {
-        define::parse(datum).or_else(|_| Self::parse_expression(datum))
-    }
-
-    fn head_symbol<'a>(ls: &'a Vec<Datum>) -> Option<&'a str> {
-        match ls.first().map(|e| e.sexp()) {
-            Some(Sexp::Symbol(s)) => Some(s.as_str()),
-            _ => None,
-        }
+        identifier::parse(datum)
+            .or_else(|_| literal::parse(datum))
+            .or_else(|_| lambda::parse(datum))
+            .or_else(|_| set::parse(datum))
+            .or_else(|_| quotation::parse(datum))
+            .or_else(|_| conditional::parse(datum))
+            .or_else(|_| letexp::parse(datum))
+            .or_else(|_| sequence::parse(datum))
+            .or_else(|_| define::parse(datum))
+            .or_else(|_| apply::parse(datum))
+            .or_else(|e| Err(e))
     }
 
     pub fn apply_special<'a>(datum: &'a Datum) -> Option<(&'a str, &'a [Datum])> {
@@ -212,24 +207,19 @@ impl Expression {
             _ => None,
         }
     }
+
+    fn head_symbol<'a>(ls: &'a Vec<Datum>) -> Option<&'a str> {
+        match ls.first().map(|e| e.sexp()) {
+            Some(Sexp::Symbol(s)) => Some(s.as_str()),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::compiler::source::{SourceType, StringSource};
-
-    #[test]
-    fn test_parse_begin() {
-        assert_parse_as(
-            "(begin #t)",
-            Expression::begin(
-                Expression::constant(make_datum(Sexp::Bool(true), 1, 8)),
-                vec![],
-                location(1, 1),
-            ),
-        )
-    }
 
     pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut source = StringSource::new(inp, "datum-parser-test");
@@ -240,11 +230,10 @@ mod tests {
 
     pub fn assert_parse_error(inp: &str) {
         let mut source = StringSource::new(inp, "datum-parser-test");
+        let result = Expression::parse_one(&mut source);
+        let message = format!("expected parse error but got {:?}", result);
 
-        assert!(
-            Expression::parse_one(&mut source).is_err(),
-            "expected parse error"
-        )
+        assert!(result.is_err(), message)
     }
 
     pub fn location(line: usize, col: usize) -> SourceLocation {
