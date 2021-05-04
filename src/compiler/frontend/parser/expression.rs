@@ -8,7 +8,8 @@ pub mod lambda;
 pub mod letexp;
 pub mod literal;
 pub mod quotation;
-use self::{conditional::IfExpression, quotation::QuotationExpression};
+pub mod set;
+use self::{conditional::IfExpression, quotation::QuotationExpression, set::SetExpression};
 use crate::compiler::frontend::parser::{
     sexp::datum::{Datum, Sexp},
     Parser,
@@ -33,7 +34,7 @@ pub enum Expression {
     Literal(LiteralExpression),
     Define(DefinitionExpression),
     Lambda(LambdaExpression),
-    Assign(Identifier, Box<Expression>, SourceLocation),
+    Assign(SetExpression),
     Let(LetExpression),
     If(IfExpression),
     Apply(ApplicationExpression),
@@ -47,7 +48,7 @@ impl HasSourceLocation for Expression {
             Self::Identifier(id) => id.source_location(),
             Self::Literal(exp) => exp.source_location(),
             Self::Quotation(exp) => exp.source_location(),
-            Self::Assign(_, _expr, loc) => &loc,
+            Self::Assign(exp) => exp.source_location(),
             Self::Define(def) => def.source_location(),
             Self::Let(exp) => exp.source_location(),
             Self::If(expr) => expr.source_location(),
@@ -74,7 +75,6 @@ impl Expression {
         Self::parse_expression(&ast)
     }
 
-    /// Create a constant expression
     pub fn constant(datum: Datum) -> Expression {
         Expression::Literal(literal::build(datum))
     }
@@ -83,9 +83,8 @@ impl Expression {
         Expression::Quotation(quotation::build_quote(datum))
     }
 
-    /// Create an assignment expression
     pub fn assign(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
-        Expression::Assign(id, Box::new(expr), loc)
+        Expression::Assign(set::build(id, expr, loc))
     }
 
     pub fn lambda(
@@ -165,7 +164,7 @@ impl Expression {
             Sexp::Char(_) => Ok(Self::constant(datum.clone())),
             Sexp::String(_) => Ok(Self::constant(datum.clone())),
             Sexp::List(ls) => match Self::head_symbol(&ls) {
-                Some("set!") => Self::parse_assignment(&ls, &datum.location),
+                Some("set!") => set::parse(datum),
                 Some("quote") => quotation::parse(datum),
                 Some("if") => conditional::parse(datum),
                 Some("let") => letexp::parse(datum),
@@ -175,41 +174,6 @@ impl Expression {
                 other => apply::parse(datum),
             },
             _ => todo!(),
-        }
-    }
-
-    fn parse_apply(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [operator, operands @ ..] => {
-                let operatored_expr = Self::parse_expression(&operator);
-                let operands_expr: Result<Vec<Expression>> =
-                    operands.iter().map(Self::parse_expression).collect();
-
-                Ok(Expression::apply(
-                    operatored_expr?,
-                    operands_expr?,
-                    loc.clone(),
-                ))
-            }
-            _ => Error::parse_error("expected (<operator> <operand>*)", loc.clone()),
-        }
-    }
-
-    /// Parse a set! expression
-    ///
-    /// Ref: r7rs 7.1.3
-    ///
-    /// ```grammar
-    /// <assignment> -> (set! <IDENTIFIER> <expression>)
-    /// ```
-    fn parse_assignment(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [_, identifier, expr] => Ok(Expression::assign(
-                identifier::parse_identifier(identifier)?,
-                Self::parse_expression(expr)?,
-                loc.clone(),
-            )),
-            _other => Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone()),
         }
     }
 
@@ -254,20 +218,6 @@ impl Expression {
 mod tests {
     use super::*;
     use crate::compiler::source::{SourceType, StringSource};
-
-    #[test]
-    fn test_parse_assignment() {
-        assert_parse_as(
-            "(set! foo #t)",
-            Expression::assign(
-                Identifier::synthetic("foo"),
-                Expression::constant(make_datum(Sexp::Bool(true), 1, 11)),
-                location(1, 1),
-            ),
-        );
-
-        assert_parse_error("(set! foo)");
-    }
 
     #[test]
     fn test_parse_begin() {

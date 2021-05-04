@@ -1,4 +1,3 @@
-use crate::compiler::frontend::parser::expression::apply::ApplicationExpression;
 use crate::compiler::frontend::parser::expression::body::BodyExpression;
 use crate::compiler::frontend::parser::expression::conditional::IfExpression;
 use crate::compiler::frontend::parser::expression::define::DefinitionExpression;
@@ -7,6 +6,9 @@ use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpre
 use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
 use crate::compiler::frontend::parser::expression::literal::LiteralExpression;
 use crate::compiler::frontend::parser::expression::Expression;
+use crate::compiler::frontend::parser::expression::{
+    apply::ApplicationExpression, set::SetExpression,
+};
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
@@ -181,7 +183,7 @@ impl CodeGenerator {
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
         match ast {
             Expression::Identifier(id) => self.emit_read_variable(id)?,
-            Expression::Assign(id, expr, loc) => self.emit_assignment(id, expr, loc)?,
+            Expression::Assign(expr) => self.emit_assignment(expr)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(_if_expr) => todo!(),
@@ -242,9 +244,10 @@ impl CodeGenerator {
     }
 
     fn emit_bindings(&mut self, bindings: &Vec<BindingSpec>) -> Result<()> {
-        for binding in bindings {
-            self.emit_assignment(&binding.0, &binding.1, &binding.1.source_location())?;
-        }
+        //TODO: turn this into proper local scope
+        // for binding in bindings {
+        //     self.emit_assignment(&binding.0, &binding.1, &binding.1.source_location())?;
+        // }
 
         Ok(())
     }
@@ -286,23 +289,18 @@ impl CodeGenerator {
         }
     }
 
-    fn emit_assignment(
-        &mut self,
-        id: &Identifier,
-        expr: &Expression,
-        loc: &SourceLocation,
-    ) -> Result<()> {
-        self.emit_instructions(expr)?;
+    fn emit_assignment(&mut self, expr: &SetExpression) -> Result<()> {
+        self.emit_instructions(&expr.value)?;
 
         if self.scope_depth > 0 {
             // local variable
-            let const_addr = self.register_local(id.clone())?;
-            self.emit_instruction(Instruction::SetLocal(const_addr), loc)
+            let const_addr = self.register_local(expr.name.clone())?;
+            self.emit_instruction(Instruction::SetLocal(const_addr), expr.source_location())
         } else {
             // top level variable
-            let id_sym = self.sym(&id.string());
+            let id_sym = self.sym(&expr.name.string());
             let const_addr = self.current_chunk().add_constant(id_sym);
-            self.emit_instruction(Instruction::SetGlobal(const_addr), loc)
+            self.emit_instruction(Instruction::SetGlobal(const_addr), expr.source_location())
         }
     }
 
