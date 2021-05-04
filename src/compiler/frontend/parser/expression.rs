@@ -3,8 +3,9 @@ pub mod conditional;
 pub mod error;
 pub mod identifier;
 pub mod lambda;
+pub mod literal;
 pub mod quotation;
-use self::conditional::IfExpression;
+use self::{conditional::IfExpression, quotation::QuotationExpression};
 use crate::compiler::frontend::parser::{
     sexp::datum::{Datum, Sexp},
     Parser,
@@ -14,12 +15,14 @@ use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use body::BodyExpression;
 use error::Error;
 use identifier::Identifier;
+use literal::LiteralExpression;
 
 type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(Identifier),
+    Quotation(QuotationExpression),
     Literal(LiteralExpression),
     Assign(Identifier, Box<Expression>, SourceLocation),
     Define(DefinitionExpression),
@@ -35,8 +38,8 @@ impl HasSourceLocation for Expression {
     fn source_location<'a>(&'a self) -> &'a SourceLocation {
         match self {
             Self::Identifier(id) => id.source_location(),
-            Self::Literal(LiteralExpression::SelfEvaluating(datum)) => &datum.location,
-            Self::Literal(LiteralExpression::Quotation(datum)) => &datum.location,
+            Self::Literal(exp) => exp.source_location(),
+            Self::Quotation(exp) => exp.source_location(),
             Self::Assign(_, _expr, loc) => &loc,
             Self::Define(def) => def.source_location(),
             Self::Let(_, loc) => &loc,
@@ -70,12 +73,6 @@ impl HasSourceLocation for DefinitionExpression {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum LiteralExpression {
-    SelfEvaluating(Datum),
-    Quotation(Datum),
-}
-
 impl Expression {
     pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
         let ast = Parser.parse_datum_sequence(source)?;
@@ -92,16 +89,12 @@ impl Expression {
     }
 
     /// Create a constant expression
-    pub fn constant(datum: &Datum) -> Expression {
-        Expression::Literal(LiteralExpression::SelfEvaluating(datum.clone()))
+    pub fn constant(datum: Datum) -> Expression {
+        Expression::Literal(literal::build(datum))
     }
 
-    /// Create a quotation expression
-    ///
-    /// Quoted values are special in the sense that they maintain a reference
-    /// to the quote `Datum`. They're treated as unevaluated expressions.
-    pub fn quoted_value(datum: &Datum) -> Expression {
-        Expression::Literal(LiteralExpression::Quotation(datum.clone()))
+    pub fn quoted_value(datum: Datum) -> Expression {
+        Expression::Quotation(quotation::build_quote(datum))
     }
 
     /// Create an assignment expression
@@ -114,7 +107,7 @@ impl Expression {
         body: BodyExpression,
         loc: SourceLocation,
     ) -> Expression {
-        Expression::Lambda(lambda::LambdaExpression::new(formals, body, loc))
+        Expression::Lambda(lambda::build(formals, body, loc))
     }
 
     pub fn define(id: Identifier, expr: Expression, _loc: SourceLocation) -> Expression {
@@ -182,14 +175,16 @@ impl Expression {
     ///   <includer>           |
     /// ```
     fn parse_expression(datum: &Datum) -> Result<Expression> {
+        //let etest = literal::parse(datum).or_else(|_| quotation::parse(datum));
+
         match datum.sexp() {
             Sexp::Symbol(s) => Ok(Self::identifier(s.to_string(), datum.location.clone())),
-            Sexp::Bool(_) => Ok(Self::constant(datum)),
-            Sexp::Char(_) => Ok(Self::constant(datum)),
-            Sexp::String(_) => Ok(Self::constant(datum)),
+            Sexp::Bool(_) => Ok(Self::constant(datum.clone())),
+            Sexp::Char(_) => Ok(Self::constant(datum.clone())),
+            Sexp::String(_) => Ok(Self::constant(datum.clone())),
             Sexp::List(ls) => match Self::head_symbol(&ls) {
-                Some("quote") => quotation::parse(datum),
                 Some("set!") => Self::parse_assignment(&ls, &datum.location),
+                Some("quote") => quotation::parse(datum),
                 Some("if") => Ok(Expression::If(conditional::parse(datum)?)),
                 Some("let") => Self::parse_let(&ls, &datum.location),
                 Some("lambda") => Ok(Expression::Lambda(lambda::parse(datum)?)),
@@ -430,12 +425,12 @@ mod tests {
     fn test_parse_literal_constant() {
         assert_parse_as(
             "#t",
-            Expression::constant(&make_datum(Sexp::Bool(true), 1, 1)),
+            Expression::constant(make_datum(Sexp::Bool(true), 1, 1)),
         );
 
         assert_parse_as(
             "\"foo\"",
-            Expression::constant(&make_datum(Sexp::string("foo"), 1, 1)),
+            Expression::constant(make_datum(Sexp::string("foo"), 1, 1)),
         );
     }
 
@@ -445,7 +440,7 @@ mod tests {
             "(set! foo #t)",
             Expression::assign(
                 Identifier::synthetic("foo"),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 11)),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 11)),
                 location(1, 1),
             ),
         );
@@ -460,9 +455,9 @@ mod tests {
             Expression::let_bind(
                 vec![(
                     Identifier::synthetic("x"),
-                    Expression::constant(&make_datum(Sexp::Bool(true), 1, 10)),
+                    Expression::constant(make_datum(Sexp::Bool(true), 1, 10)),
                 )],
-                Expression::constant(&make_datum(Sexp::Bool(false), 1, 15)).to_body_expression(),
+                Expression::constant(make_datum(Sexp::Bool(false), 1, 15)).to_body_expression(),
                 location(1, 1),
             ),
         )
@@ -474,7 +469,7 @@ mod tests {
             "(define x #t)",
             Expression::define(
                 Identifier::synthetic("x"),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 11)),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 11)),
                 location(1, 1),
             ),
         )
@@ -485,7 +480,7 @@ mod tests {
         assert_parse_as(
             "(begin #t)",
             Expression::begin(
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 8)),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 8)),
                 vec![],
                 location(1, 1),
             ),

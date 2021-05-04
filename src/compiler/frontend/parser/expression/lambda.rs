@@ -1,3 +1,4 @@
+use super::body;
 use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
@@ -14,13 +15,11 @@ pub struct LambdaExpression {
     location: SourceLocation,
 }
 
-impl LambdaExpression {
-    pub fn new(formals: Formals, body: BodyExpression, location: SourceLocation) -> Self {
-        Self {
-            formals,
-            body,
-            location,
-        }
+pub fn build(formals: Formals, body: BodyExpression, location: SourceLocation) -> LambdaExpression {
+    LambdaExpression {
+        formals,
+        body,
+        location,
     }
 }
 
@@ -67,7 +66,7 @@ pub fn parse(datum: &Datum) -> Result<LambdaExpression> {
     match Expression::apply_special(datum) {
         Some(("lambda", [formals, body @ ..])) => {
             let formals = parse_formals(formals)?;
-            let body = parse_body(body, &datum.source_location())?;
+            let body = body::parse(body, &datum.source_location())?;
             Ok(LambdaExpression {
                 formals,
                 body,
@@ -97,50 +96,6 @@ fn parse_formals(datum: &Datum) -> Result<Formals> {
     }
 }
 
-/// Parse a body
-///
-/// Ref: r7rs 7.1.3
-///
-/// ```grammar
-/// <body>         -> <definition>* <sequence>
-/// <sequence>     -> <command>* <expression>
-/// <command>      -> <expression>
-/// ```
-fn parse_body(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
-    let mut definitions: Vec<DefinitionExpression> = vec![];
-    let mut iter = datum.iter();
-    let mut cur = iter.next();
-
-    // parse definitions*
-    while cur.is_some() {
-        match Expression::parse_definition(cur.unwrap()) {
-            Ok(expr) => {
-                definitions.push(expr);
-                cur = iter.next();
-            }
-            Err(_) => break,
-        }
-    }
-
-    // nothing left to parse
-    if cur.is_none() {
-        return Error::parse_error(
-            "Invalid body definition. Expected (<definition>* sequence)",
-            loc.clone(),
-        );
-    }
-
-    //parse the rest as sequence
-    let mut sequence = vec![Expression::parse_expression(cur.unwrap())?];
-    let rest: Result<Vec<Expression>> = iter.map(Expression::parse_expression).collect();
-    sequence.extend(rest?);
-
-    Ok(BodyExpression {
-        definitions,
-        sequence,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,7 +108,7 @@ mod tests {
             "(lambda all #t)",
             Expression::lambda(
                 Formals::RestArg(Identifier::synthetic("all")),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
                 location(1, 1),
             ),
         );
@@ -162,7 +117,7 @@ mod tests {
             "(lambda (x y) #t)",
             Expression::lambda(
                 Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
                 location(1, 1),
             ),
         );
@@ -171,7 +126,7 @@ mod tests {
             "(lambda () #t)",
             Expression::lambda(
                 Formals::ArgList(vec![]),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 12)).to_body_expression(),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 12)).to_body_expression(),
                 location(1, 1),
             ),
         );
@@ -183,7 +138,7 @@ mod tests {
                     vec![Identifier::synthetic("x"), Identifier::synthetic("y")],
                     Identifier::synthetic("z"),
                 ),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
                 location(1, 1),
             ),
         );

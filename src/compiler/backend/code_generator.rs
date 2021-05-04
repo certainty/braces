@@ -2,8 +2,9 @@ use crate::compiler::frontend::parser::expression::body::BodyExpression;
 use crate::compiler::frontend::parser::expression::conditional::IfExpression;
 use crate::compiler::frontend::parser::expression::identifier::Identifier;
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
+use crate::compiler::frontend::parser::expression::literal::LiteralExpression;
 use crate::compiler::frontend::parser::expression::{
-    BindingSpec, DefinitionExpression, Expression, LetExpression, LiteralExpression,
+    BindingSpec, DefinitionExpression, Expression, LetExpression,
 };
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -180,10 +181,8 @@ impl CodeGenerator {
         match ast {
             Expression::Identifier(id) => self.emit_read_variable(id)?,
             Expression::Assign(id, expr, loc) => self.emit_assignment(id, expr, loc)?,
-            Expression::Literal(LiteralExpression::SelfEvaluating(constant)) => {
-                self.emit_lit(constant)?
-            }
-            Expression::Literal(LiteralExpression::Quotation(datum)) => self.emit_lit(datum)?,
+            Expression::Literal(lit) => self.emit_lit(lit.datum())?,
+            Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(_if_expr) => todo!(),
             Expression::Let(LetExpression::Let(bindings, body), _loc) => {
                 self.begin_scope();
