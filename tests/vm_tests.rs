@@ -23,4 +23,10 @@ fn test_vm_full_cycle() {
             .unwrap(),
         Value::Bool(false)
     );
+
+    assert_eq!(
+        vm.run_string("(define x (lambda (y) y)) (x #f)", "test")
+            .unwrap(),
+        Value::Bool(false)
+    );
 }

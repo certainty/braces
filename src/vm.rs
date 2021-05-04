@@ -63,7 +63,7 @@ impl VM {
     pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
         let mut source = StringSource::new(inp, context);
         let mut compiler = Compiler::new();
-        let unit = compiler.compile_expression(&mut source)?;
+        let unit = compiler.compile_program(&mut source)?;
         self.interprete(unit)
     }
 
