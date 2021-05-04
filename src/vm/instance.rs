@@ -48,7 +48,6 @@ impl CallFrame {
 
 //////////////////////////////////////////////////////////////////////////////
 
-const FRAMES_MAX: usize = 64;
 type StackValue = Rc<Value>;
 type ValueStack = Stack<StackValue>;
 type CallStack = Stack<CallFrame>;
@@ -74,12 +73,12 @@ type Result<T> = std::result::Result<T, Error>;
 impl<'a> Instance<'a> {
     pub fn new(
         proc: value::lambda::Procedure,
-        stack_size: usize,
+        call_stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Self {
-        let mut stack = ValueStack::new(stack_size);
-        let mut call_stack = CallStack::new(FRAMES_MAX);
+        let mut stack = ValueStack::new(call_stack_size * 255);
+        let mut call_stack = CallStack::new(call_stack_size);
         let initial_procedure = Rc::new(proc);
 
         // the first value on the stack is the initial procedure
@@ -246,7 +245,6 @@ impl<'a> Instance<'a> {
     #[inline]
     fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: StackValue) {
         let slot_address = self.active_frame().stack_base + (slot_address as usize);
-
         self.stack.set(slot_address, value);
     }
 
@@ -303,6 +301,7 @@ impl<'a> Instance<'a> {
         result
     }
 
+    // TODO: add a representation for stack trace and add it to the error
     fn runtime_error<T>(&self, message: &str) -> Result<T> {
         let result = Err(Error::RuntimeError(
             message.to_string(),

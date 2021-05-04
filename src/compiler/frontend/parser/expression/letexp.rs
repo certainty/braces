@@ -59,11 +59,6 @@ pub fn parse_let(datum: &Datum) -> Result<LetExpression> {
             body::parse(body, datum.source_location())?,
             datum.source_location().clone(),
         )),
-        Some(("let", [_name, _binding_spec, _body @ ..])) => Error::parse_error(
-            "Named let not yet supported",
-            datum.source_location().clone(),
-        ),
-
         _other => Error::parse_error(
             "Expected (let (<bindings>*) body) or (let name (<bindings*>) body)",
             datum.source_location().clone(),

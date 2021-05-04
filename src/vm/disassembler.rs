@@ -45,7 +45,7 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Return => self.disassemble_simple("OP_RET", address),
-            &Instruction::Call(args) => {
+            &Instruction::Call(_args) => {
                 self.disassemble_simple("OP_CALL", address)
                 // This creates an endless loop
                 //self.disassemble_code_at(chunk, "OP_CALL", address - (args as usize) - 1)

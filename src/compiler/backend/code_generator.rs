@@ -1,9 +1,7 @@
-use crate::compiler::frontend::parser::expression::conditional::IfExpression;
 use crate::compiler::frontend::parser::expression::define::DefinitionExpression;
 use crate::compiler::frontend::parser::expression::identifier::Identifier;
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
-use crate::compiler::frontend::parser::expression::literal::LiteralExpression;
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
     apply::ApplicationExpression, set::SetExpression,
@@ -245,7 +243,7 @@ impl CodeGenerator {
         }
     }
 
-    fn emit_bindings(&mut self, bindings: &Vec<BindingSpec>) -> Result<()> {
+    fn emit_bindings(&mut self, _bindings: &Vec<BindingSpec>) -> Result<()> {
         //TODO: turn this into proper local scope
         // for binding in bindings {
         //     self.emit_assignment(&binding.0, &binding.1, &binding.1.source_location())?;

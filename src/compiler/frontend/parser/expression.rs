@@ -195,7 +195,6 @@ impl Expression {
             .or_else(|_| sequence::parse(datum))
             .or_else(|_| define::parse(datum))
             .or_else(|_| apply::parse(datum))
-            .or_else(|e| Err(e))
     }
 
     pub fn apply_special<'a>(datum: &'a Datum) -> Option<(&'a str, &'a [Datum])> {

@@ -1,10 +1,9 @@
-use super::body;
 use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
 use super::Result;
-use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]

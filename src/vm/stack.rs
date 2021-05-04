@@ -23,7 +23,7 @@ impl<V> Stack<V> {
         if self.repr.len() < self.cap {
             self.repr.push(v)
         } else {
-            panic!("Value stack overflow")
+            panic!("Stack overflow")
         }
     }
 
@@ -78,10 +78,6 @@ impl<V> Stack<V> {
 
     pub fn set(&mut self, index: usize, v: V) {
         self.repr[index] = v
-    }
-
-    fn get<'a>(&'a self, index: usize) -> &'a V {
-        &self.repr[index]
     }
 
     // returns a vector of the stack elements in the order they appear on the stack from left to right

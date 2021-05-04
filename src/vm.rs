@@ -6,10 +6,10 @@ pub mod instance;
 pub mod scheme;
 pub mod stack;
 
+use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
-use crate::compiler::{self, source};
 use global::TopLevel;
 use instance::Instance;
 use scheme::value;

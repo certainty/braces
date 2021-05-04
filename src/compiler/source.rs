@@ -75,10 +75,6 @@ impl StringSource {
             label: label.to_string(),
         }
     }
-
-    fn as_str(&mut self) -> std::io::Result<&str> {
-        Ok(&self.internal)
-    }
 }
 
 impl Source for StringSource {
