@@ -1,3 +1,4 @@
+use crate::compiler::frontend::parser::expression::apply::ApplicationExpression;
 use crate::compiler::frontend::parser::expression::body::BodyExpression;
 use crate::compiler::frontend::parser::expression::conditional::IfExpression;
 use crate::compiler::frontend::parser::expression::define::DefinitionExpression;
@@ -5,7 +6,6 @@ use crate::compiler::frontend::parser::expression::identifier::Identifier;
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
 use crate::compiler::frontend::parser::expression::literal::LiteralExpression;
-
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -195,24 +195,20 @@ impl CodeGenerator {
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(first, rest, _) => self.emit_begin(first, rest)?,
             Expression::Command(expr, _) => self.emit_instructions(expr)?,
-            Expression::Apply(operator, operands, loc) => {
-                self.emit_apply(operator, operands, &loc)?
-            }
+            Expression::Apply(expr) => self.emit_apply(expr)?,
         }
         Ok(())
     }
 
-    fn emit_apply(
-        &mut self,
-        operator: &Box<Expression>,
-        operands: &Vec<Box<Expression>>,
-        loc: &SourceLocation,
-    ) -> Result<()> {
-        self.emit_instructions(&operator)?;
-        for operand in operands {
-            self.emit_instructions(operand)?;
+    fn emit_apply(&mut self, application: &ApplicationExpression) -> Result<()> {
+        self.emit_instructions(&application.operator)?;
+        for operand in &application.operands {
+            self.emit_instructions(&operand)?;
         }
-        self.emit_instruction(Instruction::Call(operands.len()), loc)?;
+        self.emit_instruction(
+            Instruction::Call(application.operands.len()),
+            application.source_location(),
+        )?;
         Ok(())
     }
 

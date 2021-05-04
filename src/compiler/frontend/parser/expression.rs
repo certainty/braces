@@ -1,3 +1,4 @@
+pub mod apply;
 pub mod body;
 pub mod conditional;
 pub mod define;
@@ -14,6 +15,7 @@ use crate::compiler::frontend::parser::{
 };
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use apply::ApplicationExpression;
 use body::BodyExpression;
 use define::DefinitionExpression;
 use error::Error;
@@ -34,7 +36,7 @@ pub enum Expression {
     Assign(Identifier, Box<Expression>, SourceLocation),
     Let(LetExpression),
     If(IfExpression),
-    Apply(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
+    Apply(ApplicationExpression),
     Command(Box<Expression>, SourceLocation),
     Begin(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
 }
@@ -50,7 +52,7 @@ impl HasSourceLocation for Expression {
             Self::Let(exp) => exp.source_location(),
             Self::If(expr) => expr.source_location(),
             Self::Lambda(proc) => proc.source_location(),
-            Self::Apply(_, _, loc) => &loc,
+            Self::Apply(exp) => exp.source_location(),
             Self::Command(_, loc) => &loc,
             Self::Begin(_, _, loc) => &loc,
         }
@@ -119,11 +121,7 @@ impl Expression {
         operands: Vec<Expression>,
         loc: SourceLocation,
     ) -> Expression {
-        Expression::Apply(
-            Box::new(operator),
-            operands.iter().map(|e| Box::new(e.clone())).collect(),
-            loc,
-        )
+        Expression::Apply(apply::build(operator, operands, loc))
     }
 
     /// Create body expression, which is used in expressions introducing new
@@ -174,7 +172,7 @@ impl Expression {
                 Some("lambda") => lambda::parse(datum),
                 Some("begin") => Self::parse_begin(&ls, datum.location.clone()),
                 Some("define") => define::parse(datum),
-                other => Self::parse_apply(&ls, &datum.location),
+                other => apply::parse(datum),
             },
             _ => todo!(),
         }
