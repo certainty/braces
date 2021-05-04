@@ -1,8 +1,10 @@
 pub mod body;
 pub mod conditional;
+pub mod define;
 pub mod error;
 pub mod identifier;
 pub mod lambda;
+pub mod letexp;
 pub mod literal;
 pub mod quotation;
 use self::{conditional::IfExpression, quotation::QuotationExpression};
@@ -13,8 +15,11 @@ use crate::compiler::frontend::parser::{
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use body::BodyExpression;
+use define::DefinitionExpression;
 use error::Error;
 use identifier::Identifier;
+use lambda::LambdaExpression;
+use letexp::{BindingSpec, LetExpression};
 use literal::LiteralExpression;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -24,11 +29,11 @@ pub enum Expression {
     Identifier(Identifier),
     Quotation(QuotationExpression),
     Literal(LiteralExpression),
-    Assign(Identifier, Box<Expression>, SourceLocation),
     Define(DefinitionExpression),
-    Let(LetExpression, SourceLocation),
+    Lambda(LambdaExpression),
+    Assign(Identifier, Box<Expression>, SourceLocation),
+    Let(LetExpression),
     If(IfExpression),
-    Lambda(lambda::LambdaExpression),
     Apply(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
     Command(Box<Expression>, SourceLocation),
     Begin(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
@@ -42,33 +47,12 @@ impl HasSourceLocation for Expression {
             Self::Quotation(exp) => exp.source_location(),
             Self::Assign(_, _expr, loc) => &loc,
             Self::Define(def) => def.source_location(),
-            Self::Let(_, loc) => &loc,
+            Self::Let(exp) => exp.source_location(),
             Self::If(expr) => expr.source_location(),
             Self::Lambda(proc) => proc.source_location(),
             Self::Apply(_, _, loc) => &loc,
             Self::Command(_, loc) => &loc,
             Self::Begin(_, _, loc) => &loc,
-        }
-    }
-}
-
-pub type BindingSpec = (Identifier, Expression);
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum LetExpression {
-    Let(Vec<BindingSpec>, Box<BodyExpression>),
-}
-#[derive(Clone, PartialEq, Debug)]
-pub enum DefinitionExpression {
-    DefineSimple(Identifier, Box<Expression>),
-    Begin(Vec<Box<DefinitionExpression>>),
-}
-
-impl HasSourceLocation for DefinitionExpression {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation {
-        match self {
-            DefinitionExpression::DefineSimple(_, exp) => exp.source_location(),
-            DefinitionExpression::Begin(exprs) => exprs.first().unwrap().source_location(),
         }
     }
 }
@@ -110,8 +94,8 @@ impl Expression {
         Expression::Lambda(lambda::build(formals, body, loc))
     }
 
-    pub fn define(id: Identifier, expr: Expression, _loc: SourceLocation) -> Expression {
-        Expression::Define(DefinitionExpression::DefineSimple(id, Box::new(expr)))
+    pub fn define(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
+        Expression::Define(define::build_simple(id, expr, loc))
     }
 
     pub fn begin(first: Expression, rest: Vec<Expression>, loc: SourceLocation) -> Expression {
@@ -154,7 +138,7 @@ impl Expression {
         body: BodyExpression,
         loc: SourceLocation,
     ) -> Expression {
-        Expression::Let(LetExpression::Let(bindings, Box::new(body)), loc)
+        Expression::Let(letexp::build_let(bindings, body, loc))
     }
 
     /// Parse a single datum into an expression
@@ -185,11 +169,11 @@ impl Expression {
             Sexp::List(ls) => match Self::head_symbol(&ls) {
                 Some("set!") => Self::parse_assignment(&ls, &datum.location),
                 Some("quote") => quotation::parse(datum),
-                Some("if") => Ok(Expression::If(conditional::parse(datum)?)),
-                Some("let") => Self::parse_let(&ls, &datum.location),
-                Some("lambda") => Ok(Expression::Lambda(lambda::parse(datum)?)),
+                Some("if") => conditional::parse(datum),
+                Some("let") => letexp::parse(datum),
+                Some("lambda") => lambda::parse(datum),
                 Some("begin") => Self::parse_begin(&ls, datum.location.clone()),
-                Some("define") => Ok(Expression::Define(Self::parse_definition(&datum)?)),
+                Some("define") => define::parse(datum),
                 other => Self::parse_apply(&ls, &datum.location),
             },
             _ => todo!(),
@@ -223,152 +207,11 @@ impl Expression {
     fn parse_assignment(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
         match &ls[..] {
             [_, identifier, expr] => Ok(Expression::assign(
-                identifier::parse(identifier)?,
+                identifier::parse_identifier(identifier)?,
                 Self::parse_expression(expr)?,
                 loc.clone(),
             )),
             _other => Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone()),
-        }
-    }
-
-    /// Parse a let expression
-    ///
-    /// Ref: r7rs 7.1.3 (derived expression)
-    ///
-    /// ```grammar
-    /// <derived expression> ->
-    ///   (let <IDENTIFIER> (<binding spec>*) <body>)
-    ///
-    /// <binding spec> -> (<IDENTIFIER> <expression>)
-    /// <body>         -> <definition>* <sequence>
-    /// <sequence>     -> <command>* <expression>
-    /// <command>      -> <expression>
-    ///
-    /// ```
-    fn parse_let(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [_, binding_spec, body @ ..] => Ok(Expression::let_bind(
-                Self::parse_binding_specs(binding_spec)?,
-                Self::parse_body(body, loc)?,
-                loc.clone(),
-            )),
-            [_, _name, _binding_spec, _body @ ..] => {
-                Error::parse_error("Named let not yet supported", loc.clone())
-            }
-            _other => Error::parse_error(
-                "Expected (let (<bindings>*) body) or (let name (<bindings*>) body)",
-                loc.clone(),
-            ),
-        }
-    }
-    /// Parse a let expression
-    ///
-    /// Ref: r7rs 7.1.3 (derived expression)
-    ///
-    /// ```grammar
-    /// <binding spec> -> (<IDENTIFIER> <expression>)
-    /// ```
-    fn parse_binding_specs(datum: &Datum) -> Result<Vec<BindingSpec>> {
-        match datum.sexp() {
-            Sexp::List(ls) => ls.iter().map(Self::parse_binding_spec).collect(),
-            _ => Error::parse_error("Expected list of binding specs", datum.location.clone()),
-        }
-    }
-
-    fn parse_binding_spec(datum: &Datum) -> Result<BindingSpec> {
-        match datum.sexp() {
-            Sexp::List(ls) => match &ls[..] {
-                [identifier, expr] => Ok((identifier::parse(identifier)?, Self::parse_expression(expr)?)),
-                _ => Error::parse_error(
-                    "Expected list of exactly two elements for binding. (<identifier> <expression>)",
-                    datum.location.clone(),
-                ),
-            },
-            _ => Error::parse_error(
-                "Expected list of exactly two elements for binding. (<identifier> <expression>)",
-                datum.location.clone()
-            )
-        }
-    }
-
-    /// Parse a body
-    ///
-    /// Ref: r7rs 7.1.3
-    ///
-    /// ```grammar
-    /// <body>         -> <definition>* <sequence>
-    /// <sequence>     -> <command>* <expression>
-    /// <command>      -> <expression>
-    /// ```
-    fn parse_body(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
-        let mut definitions: Vec<DefinitionExpression> = vec![];
-        let mut iter = datum.iter();
-        let mut cur = iter.next();
-
-        // parse definitions*
-        while cur.is_some() {
-            match Self::parse_definition(cur.unwrap()) {
-                Ok(expr) => {
-                    definitions.push(expr);
-                    cur = iter.next();
-                }
-                Err(_) => break,
-            }
-        }
-
-        // nothing left to parse
-        if cur.is_none() {
-            return Error::parse_error(
-                "Invalid body definition. Expected (<definition>* sequence)",
-                loc.clone(),
-            );
-        }
-
-        //parse the rest as sequence
-        let mut sequence = vec![Self::parse_expression(cur.unwrap())?];
-        let rest: Result<Vec<Expression>> = iter.map(Self::parse_expression).collect();
-        sequence.extend(rest?);
-
-        Ok(BodyExpression {
-            definitions,
-            sequence,
-        })
-    }
-    /// Parse a define expression
-    ///
-    /// Ref: r7rs 7.1.6
-    ///
-    /// ```grammar
-    /// <definition> ->
-    ///   (define <IDENTIFIER> <expression>)                                         |
-    ///   (define (<IDENTIFIER> <def formals>) <body>)                               |
-    ///   <syntax definition>                                                        |
-    ///   (define-values <formals> <body>)                                           |
-    ///   (define-record-type <IDENTIFIER> <constructor> <IDENTIFIER> <field spec>*) |
-    ///   (begin <definition>*)
-    /// ```
-    fn parse_definition(datum: &Datum) -> Result<DefinitionExpression> {
-        match datum.sexp() {
-            Sexp::List(ls) => match Self::head_symbol(&ls) {
-                Some("define") => match &ls[..] {
-                    [_, identifier, expr] => Ok(DefinitionExpression::DefineSimple(
-                        identifier::parse(&identifier)?,
-                        Box::new(Self::parse_expression(&expr)?),
-                    )),
-                    _ => todo!(),
-                },
-                Some("begin") => {
-                    let exprs: Result<Vec<Box<DefinitionExpression>>> = ls[1..]
-                        .iter()
-                        .map(Self::parse_definition)
-                        .map(|e| e.map(Box::new))
-                        .collect();
-
-                    Ok(DefinitionExpression::Begin(exprs?))
-                }
-                _ => Error::parse_error("Invalid definition", datum.location.clone()),
-            },
-            _ => Error::parse_error("Expected definition", datum.location.clone()),
         }
     }
 
@@ -388,10 +231,7 @@ impl Expression {
     }
 
     fn parse_command_or_definition(datum: &Datum) -> Result<Expression> {
-        match Self::parse_definition(&datum).map(Expression::Define) {
-            Ok(expr) => Ok(expr),
-            Err(_) => Self::parse_expression(&datum),
-        }
+        define::parse(datum).or_else(|_| Self::parse_expression(datum))
     }
 
     fn head_symbol<'a>(ls: &'a Vec<Datum>) -> Option<&'a str> {
@@ -417,23 +257,6 @@ mod tests {
     use super::*;
     use crate::compiler::source::{SourceType, StringSource};
 
-    // Literals
-    // See: r7rs page 12 for all examples of literals we need to support
-    // TODO: add support for the other literals once we support them
-
-    #[test]
-    fn test_parse_literal_constant() {
-        assert_parse_as(
-            "#t",
-            Expression::constant(make_datum(Sexp::Bool(true), 1, 1)),
-        );
-
-        assert_parse_as(
-            "\"foo\"",
-            Expression::constant(make_datum(Sexp::string("foo"), 1, 1)),
-        );
-    }
-
     #[test]
     fn test_parse_assignment() {
         assert_parse_as(
@@ -446,33 +269,6 @@ mod tests {
         );
 
         assert_parse_error("(set! foo)");
-    }
-
-    #[test]
-    fn test_parse_let_simple() {
-        assert_parse_as(
-            "(let ((x #t)) #f)",
-            Expression::let_bind(
-                vec![(
-                    Identifier::synthetic("x"),
-                    Expression::constant(make_datum(Sexp::Bool(true), 1, 10)),
-                )],
-                Expression::constant(make_datum(Sexp::Bool(false), 1, 15)).to_body_expression(),
-                location(1, 1),
-            ),
-        )
-    }
-
-    #[test]
-    fn test_parse_define() {
-        assert_parse_as(
-            "(define x #t)",
-            Expression::define(
-                Identifier::synthetic("x"),
-                Expression::constant(make_datum(Sexp::Bool(true), 1, 11)),
-                location(1, 1),
-            ),
-        )
     }
 
     #[test]

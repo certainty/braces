@@ -1,6 +1,8 @@
+use super::define;
+use super::define::DefinitionExpression;
 use super::error::Error;
+use super::Expression;
 use super::Result;
-use super::{DefinitionExpression, Expression};
 use crate::compiler::source_location::SourceLocation;
 use crate::compiler::{frontend::parser::sexp::datum::Datum, source_location::HasSourceLocation};
 
@@ -63,7 +65,7 @@ pub fn parse(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
 
     // parse definitions*
     while cur.is_some() {
-        match Expression::parse_definition(cur.unwrap()) {
+        match define::parse_definition(cur.unwrap()) {
             Ok(expr) => {
                 definitions.push(expr);
                 cur = iter.next();

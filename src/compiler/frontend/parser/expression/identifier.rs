@@ -1,7 +1,7 @@
 use super::error::Error;
 use super::Expression;
 use super::Result;
-use crate::compiler::frontend::parser::sexp::datum::Datum;
+use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::SourceType;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
@@ -45,13 +45,14 @@ impl HasSourceLocation for Identifier {
     }
 }
 
-/// Parses the datum as an identifier and fails if it's not a valid identifier
-pub fn parse(datum: &Datum) -> Result<Identifier> {
-    let id_expr = Expression::parse_expression(datum)?;
-    if let Expression::Identifier(id) = id_expr {
-        Ok(id)
-    } else {
-        Error::parse_error("Expected identifier", datum.location.clone())
+pub fn parse(datum: &Datum) -> Result<Expression> {
+    parse_identifier(datum).map(Expression::Identifier)
+}
+
+pub fn parse_identifier(datum: &Datum) -> Result<Identifier> {
+    match datum.sexp() {
+        Sexp::Symbol(s) => Ok(Identifier::new(s, datum.source_location().clone())),
+        _ => Error::parse_error("Expected identifier", datum.source_location().clone()),
     }
 }
 

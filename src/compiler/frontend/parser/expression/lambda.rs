@@ -1,9 +1,10 @@
 use super::body;
+use super::body::BodyExpression;
 use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
+use super::Expression;
 use super::Result;
-use super::{BodyExpression, DefinitionExpression, Expression};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::vm::scheme::value::lambda::Arity;
@@ -13,14 +14,6 @@ pub struct LambdaExpression {
     pub formals: Formals,
     pub body: BodyExpression,
     location: SourceLocation,
-}
-
-pub fn build(formals: Formals, body: BodyExpression, location: SourceLocation) -> LambdaExpression {
-    LambdaExpression {
-        formals,
-        body,
-        location,
-    }
 }
 
 impl HasSourceLocation for LambdaExpression {
@@ -62,7 +55,20 @@ impl Formals {
     }
 }
 
-pub fn parse(datum: &Datum) -> Result<LambdaExpression> {
+pub fn build(formals: Formals, body: BodyExpression, location: SourceLocation) -> LambdaExpression {
+    LambdaExpression {
+        formals,
+        body,
+        location,
+    }
+}
+
+#[inline]
+pub fn parse(datum: &Datum) -> Result<Expression> {
+    parse_lambda(datum).map(Expression::Lambda)
+}
+
+pub fn parse_lambda(datum: &Datum) -> Result<LambdaExpression> {
     match Expression::apply_special(datum) {
         Some(("lambda", [formals, body @ ..])) => {
             let formals = parse_formals(formals)?;
@@ -83,16 +89,18 @@ pub fn parse(datum: &Datum) -> Result<LambdaExpression> {
 fn parse_formals(datum: &Datum) -> Result<Formals> {
     match datum.sexp() {
         Sexp::List(ls) => {
-            let identifiers: Result<Vec<Identifier>> = ls.iter().map(identifier::parse).collect();
+            let identifiers: Result<Vec<Identifier>> =
+                ls.iter().map(identifier::parse_identifier).collect();
             Ok(Formals::ArgList(identifiers?))
         }
         Sexp::ImproperList(head, tail) => {
-            let identifiers: Result<Vec<Identifier>> = head.iter().map(identifier::parse).collect();
-            let rest = identifier::parse(tail);
+            let identifiers: Result<Vec<Identifier>> =
+                head.iter().map(identifier::parse_identifier).collect();
+            let rest = identifier::parse_identifier(tail);
 
             Ok(Formals::VarArg(identifiers?, rest?))
         }
-        _ => Ok(Formals::RestArg(identifier::parse(datum)?)),
+        _ => Ok(Formals::RestArg(identifier::parse_identifier(datum)?)),
     }
 }
 

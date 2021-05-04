@@ -34,6 +34,7 @@ pub fn build_quote(datum: Datum) -> QuotationExpression {
 /// Quoted values are special in the sense that they maintain a reference
 /// to the quote `Datum`. They're treated as unevaluated expressions.
 
+#[inline]
 pub fn parse(datum: &Datum) -> Result<Expression> {
     parse_quote(datum).map(Expression::Quotation)
 }

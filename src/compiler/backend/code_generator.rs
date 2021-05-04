@@ -1,11 +1,12 @@
 use crate::compiler::frontend::parser::expression::body::BodyExpression;
 use crate::compiler::frontend::parser::expression::conditional::IfExpression;
+use crate::compiler::frontend::parser::expression::define::DefinitionExpression;
 use crate::compiler::frontend::parser::expression::identifier::Identifier;
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
+use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
 use crate::compiler::frontend::parser::expression::literal::LiteralExpression;
-use crate::compiler::frontend::parser::expression::{
-    BindingSpec, DefinitionExpression, Expression, LetExpression,
-};
+
+use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
@@ -184,7 +185,7 @@ impl CodeGenerator {
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(_if_expr) => todo!(),
-            Expression::Let(LetExpression::Let(bindings, body), _loc) => {
+            Expression::Let(LetExpression::Let(bindings, body, _loc)) => {
                 self.begin_scope();
                 self.emit_bindings(&bindings)?;
                 self.emit_body(&body)?;
@@ -270,7 +271,7 @@ impl CodeGenerator {
 
     fn emit_definition(&mut self, definition: &DefinitionExpression) -> Result<()> {
         match definition {
-            DefinitionExpression::DefineSimple(id, expr) => {
+            DefinitionExpression::DefineSimple(id, expr, _loc) => {
                 self.emit_instructions(expr)?;
                 let id_sym = self.sym(&id.string());
                 let const_addr = self.current_chunk().add_constant(id_sym);
@@ -285,7 +286,7 @@ impl CodeGenerator {
                     todo!()
                 }
             }
-            DefinitionExpression::Begin(_inner) => todo!(),
+            DefinitionExpression::Begin(_inner, _loc) => todo!(),
         }
     }
 

@@ -44,7 +44,13 @@ pub fn build(
 /// <consequent>  -> <expression>
 /// <alternate>   -> <expression> | <empty>
 /// ```
-pub fn parse(datum: &Datum) -> Result<IfExpression> {
+
+#[inline]
+pub fn parse(datum: &Datum) -> Result<Expression> {
+    parse_if(datum).map(Expression::If)
+}
+
+pub fn parse_if(datum: &Datum) -> Result<IfExpression> {
     match Expression::apply_special(datum) {
         Some(("if", [test, consequent, alternate])) => {
             let test_expr = Expression::parse_expression(&test)?;
