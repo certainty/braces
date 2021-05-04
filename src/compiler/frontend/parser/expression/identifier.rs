@@ -1,3 +1,7 @@
+use super::error::Error;
+use super::Expression;
+use super::Result;
+use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source::SourceType;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
@@ -40,10 +44,21 @@ impl HasSourceLocation for Identifier {
         &self.location
     }
 }
+
+/// Parses the datum as an identifier and fails if it's not a valid identifier
+pub fn parse(datum: &Datum) -> Result<Identifier> {
+    let id_expr = Expression::parse_expression(datum)?;
+    if let Expression::Identifier(id) = id_expr {
+        Ok(id)
+    } else {
+        Error::parse_error("Expected identifier", datum.location.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::source::SourceType;
+    use crate::compiler::frontend::parser::expression::tests::*;
 
     #[test]
     fn test_identifier_equals() {
@@ -53,11 +68,11 @@ mod tests {
         assert_eq!(x, y)
     }
 
-    fn location(line: usize, col: usize) -> SourceLocation {
-        SourceLocation::new(
-            SourceType::Buffer("datum-parser-test".to_string()),
-            line,
-            col,
+    #[test]
+    fn test_parse_identifier() {
+        assert_parse_as(
+            "foo",
+            Expression::identifier("foo".to_string(), location(0, 0)),
         )
     }
 }

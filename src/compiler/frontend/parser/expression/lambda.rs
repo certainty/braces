@@ -1,4 +1,5 @@
 use super::error::Error;
+use super::identifier;
 use super::identifier::Identifier;
 use super::Result;
 use super::{BodyExpression, DefinitionExpression, Expression};
@@ -83,18 +84,16 @@ pub fn parse(datum: &Datum) -> Result<LambdaExpression> {
 fn parse_formals(datum: &Datum) -> Result<Formals> {
     match datum.sexp() {
         Sexp::List(ls) => {
-            let identifiers: Result<Vec<Identifier>> =
-                ls.iter().map(Expression::parse_identifier).collect();
+            let identifiers: Result<Vec<Identifier>> = ls.iter().map(identifier::parse).collect();
             Ok(Formals::ArgList(identifiers?))
         }
         Sexp::ImproperList(head, tail) => {
-            let identifiers: Result<Vec<Identifier>> =
-                head.iter().map(Expression::parse_identifier).collect();
-            let rest = Expression::parse_identifier(tail);
+            let identifiers: Result<Vec<Identifier>> = head.iter().map(identifier::parse).collect();
+            let rest = identifier::parse(tail);
 
             Ok(Formals::VarArg(identifiers?, rest?))
         }
-        _ => Ok(Formals::RestArg(Expression::parse_identifier(datum)?)),
+        _ => Ok(Formals::RestArg(identifier::parse(datum)?)),
     }
 }
 

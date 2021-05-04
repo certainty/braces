@@ -33,4 +33,24 @@ mod tests {
             Expression::quoted_value(&make_datum(Sexp::Bool(true), 1, 8)),
         )
     }
+
+    #[test]
+    fn test_parse_literal_quoted_datum() {
+        assert_parse_as(
+            "'#t",
+            Expression::quoted_value(&make_datum(Sexp::Bool(true), 1, 2)),
+        );
+
+        assert_parse_as(
+            "'#\\a",
+            Expression::quoted_value(&make_datum(Sexp::character('a'), 1, 2)),
+        );
+
+        assert_parse_as(
+            "'foo",
+            Expression::quoted_value(&make_datum(Sexp::symbol("foo"), 1, 2)),
+        );
+
+        assert_parse_error("'");
+    }
 }

@@ -311,7 +311,7 @@ impl Expression {
     fn parse_assignment(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
         match &ls[..] {
             [_, identifier, expr] => Ok(Expression::assign(
-                Self::parse_identifier(identifier)?,
+                identifier::parse(identifier)?,
                 Self::parse_expression(expr)?,
                 loc.clone(),
             )),
@@ -366,7 +366,7 @@ impl Expression {
     fn parse_binding_spec(datum: &Datum) -> Result<BindingSpec> {
         match datum.sexp() {
             Sexp::List(ls) => match &ls[..] {
-                [identifier, expr] => Ok((Self::parse_identifier(identifier)?, Self::parse_expression(expr)?)),
+                [identifier, expr] => Ok((identifier::parse(identifier)?, Self::parse_expression(expr)?)),
                 _ => Error::parse_error(
                     "Expected list of exactly two elements for binding. (<identifier> <expression>)",
                     datum.location.clone(),
@@ -376,16 +376,6 @@ impl Expression {
                 "Expected list of exactly two elements for binding. (<identifier> <expression>)",
                 datum.location.clone()
             )
-        }
-    }
-
-    /// Parses the datum as an identifier and fails if it's not a valid identifier
-    fn parse_identifier(datum: &Datum) -> Result<Identifier> {
-        let id_expr = Self::parse_expression(datum)?;
-        if let Expression::Identifier(id) = id_expr {
-            Ok(id)
-        } else {
-            Error::parse_error("Expected identifier", datum.location.clone())
         }
     }
 
@@ -450,7 +440,7 @@ impl Expression {
             Sexp::List(ls) => match Self::head_symbol(&ls) {
                 Some("define") => match &ls[..] {
                     [_, identifier, expr] => Ok(DefinitionExpression::DefineSimple(
-                        Self::parse_identifier(&identifier)?,
+                        identifier::parse(&identifier)?,
                         Box::new(Self::parse_expression(&expr)?),
                     )),
                     _ => todo!(),
@@ -530,26 +520,6 @@ mod tests {
             "\"foo\"",
             Expression::constant(&make_datum(Sexp::string("foo"), 1, 1)),
         );
-    }
-
-    #[test]
-    fn test_parse_literal_quoted_datum() {
-        assert_parse_as(
-            "'#t",
-            Expression::quoted_value(&make_datum(Sexp::Bool(true), 1, 2)),
-        );
-
-        assert_parse_as(
-            "'#\\a",
-            Expression::quoted_value(&make_datum(Sexp::character('a'), 1, 2)),
-        );
-
-        assert_parse_as(
-            "'foo",
-            Expression::quoted_value(&make_datum(Sexp::symbol("foo"), 1, 2)),
-        );
-
-        assert_parse_error("'");
     }
 
     #[test]
