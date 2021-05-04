@@ -1,45 +1,19 @@
 pub mod error;
+pub mod identifier;
+mod quotation;
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
-use crate::compiler::{frontend::parser::Parser, source::SourceType};
 use crate::{
-    compiler::frontend::parser::sexp::datum::{Datum, Sexp},
+    compiler::frontend::parser::{
+        sexp::datum::{Datum, Sexp},
+        Parser,
+    },
     vm::scheme::value::lambda::Arity,
 };
 use error::Error;
+use identifier::Identifier;
 
 type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Clone, Debug)]
-pub struct Identifier(String, SourceLocation);
-
-impl PartialEq for Identifier {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Identifier {
-    pub fn synthetic(s: &str) -> Identifier {
-        Self(String::from(s), SourceType::Synthetic.location(0, 0))
-    }
-
-    pub fn string(&self) -> &String {
-        &self.0
-    }
-}
-
-impl From<Identifier> for String {
-    fn from(id: Identifier) -> String {
-        id.0
-    }
-}
-
-impl HasSourceLocation for Identifier {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation {
-        &self.1
-    }
-}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
@@ -213,7 +187,7 @@ impl Expression {
     }
 
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
-        Expression::Identifier(Identifier(str, loc))
+        Expression::Identifier(Identifier::new(str, loc))
     }
 
     pub fn body(sequence: Vec<Expression>) -> BodyExpression {
@@ -293,7 +267,7 @@ impl Expression {
             Sexp::Char(_) => Ok(Self::constant(datum)),
             Sexp::String(_) => Ok(Self::constant(datum)),
             Sexp::List(ls) => match Self::head_symbol(&ls) {
-                Some("quote") => Self::parse_quoted_datum(&ls, &datum.location),
+                Some("quote") => quotation::parse(datum),
                 Some("set!") => Self::parse_assignment(&ls, &datum.location),
                 Some("if") => Self::parse_conditional(&ls, &datum.location),
                 Some("let") => Self::parse_let(&ls, &datum.location),
@@ -602,6 +576,16 @@ impl Expression {
             _ => None,
         }
     }
+
+    pub fn apply_special<'a>(datum: &'a Datum) -> Option<(&'a str, &'a [Datum])> {
+        match datum.sexp() {
+            Sexp::List(ls) => match Self::head_symbol(ls) {
+                Some(s) => Some((&s, &ls[1..])),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -744,14 +728,14 @@ mod tests {
         )
     }
 
-    fn assert_parse_as(inp: &str, exp: Expression) {
+    pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut source = StringSource::new(inp, "datum-parser-test");
         let parsed_exp = Expression::parse_one(&mut source).unwrap();
 
         assert_eq!(parsed_exp, exp)
     }
 
-    fn assert_parse_error(inp: &str) {
+    pub fn assert_parse_error(inp: &str) {
         let mut source = StringSource::new(inp, "datum-parser-test");
 
         assert!(
@@ -760,7 +744,7 @@ mod tests {
         )
     }
 
-    fn location(line: usize, col: usize) -> SourceLocation {
+    pub fn location(line: usize, col: usize) -> SourceLocation {
         SourceLocation::new(
             SourceType::Buffer("datum-parser-test".to_string()),
             line,
@@ -768,7 +752,7 @@ mod tests {
         )
     }
 
-    fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
+    pub fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
         Datum::new(sexp, location(line, col))
     }
 }

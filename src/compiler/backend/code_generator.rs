@@ -1,6 +1,7 @@
+use crate::compiler::frontend::parser::expression::identifier::Identifier;
 use crate::compiler::frontend::parser::expression::{
-    BindingSpec, BodyExpression, DefinitionExpression, Expression, Formals, Identifier,
-    LambdaExpression, LetExpression, LiteralExpression,
+    BindingSpec, BodyExpression, DefinitionExpression, Expression, Formals, LambdaExpression,
+    LetExpression, LiteralExpression,
 };
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
