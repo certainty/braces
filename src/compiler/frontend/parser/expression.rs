@@ -1,8 +1,11 @@
 pub mod error;
-use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::frontend::parser::Parser;
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::{
+    compiler::frontend::parser::sexp::datum::{Datum, Sexp},
+    vm::scheme::value::lambda::Arity,
+};
 use error::Error;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -36,7 +39,7 @@ pub enum Expression {
     Identifier(Identifier, SourceLocation),
     Literal(LiteralExpression),
     Assign(Identifier, Box<Expression>, SourceLocation),
-    Define(DefinitionExpression, SourceLocation),
+    Define(DefinitionExpression),
     Let(LetExpression, SourceLocation),
     If(IfExpression, SourceLocation),
     Lambda(LambdaExpression, SourceLocation),
@@ -52,7 +55,7 @@ impl HasSourceLocation for Expression {
             Self::Literal(LiteralExpression::SelfEvaluating(datum)) => &datum.location,
             Self::Literal(LiteralExpression::Quotation(datum)) => &datum.location,
             Self::Assign(_, _expr, loc) => &loc,
-            Self::Define(_, loc) => &loc,
+            Self::Define(def) => def.source_location(),
             Self::Let(_, loc) => &loc,
             Self::If(_, loc) => &loc,
             Self::Lambda(_, loc) => &loc,
@@ -83,6 +86,16 @@ pub struct BodyExpression {
     pub sequence: Vec<Expression>,
 }
 
+impl HasSourceLocation for BodyExpression {
+    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+        match (self.definitions.first(), self.sequence.first()) {
+            (Some(def), _) => def.source_location(),
+            (_, Some(seq)) => seq.source_location(),
+            _ => panic!("Could not determine source location"),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct LambdaExpression {
     pub formals: Formals,
@@ -97,6 +110,18 @@ pub enum Formals {
 }
 
 impl Formals {
+    pub fn empty() -> Formals {
+        Formals::ArgList(vec![])
+    }
+
+    pub fn arity(&self) -> Arity {
+        match self {
+            Self::ArgList(v) => Arity::Exactly(v.len()),
+            Self::RestArg(_) => Arity::Many,
+            Self::VarArg(v, _) => Arity::AtLeast(v.len()),
+        }
+    }
+
     pub fn identifiers(&self) -> Vec<Identifier> {
         match self {
             Formals::ArgList(ids) => ids.to_vec(),
@@ -114,6 +139,15 @@ impl Formals {
 pub enum DefinitionExpression {
     DefineSimple(Identifier, Box<Expression>),
     Begin(Vec<Box<DefinitionExpression>>),
+}
+
+impl HasSourceLocation for DefinitionExpression {
+    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+        match self {
+            DefinitionExpression::DefineSimple(_, exp) => exp.source_location(),
+            DefinitionExpression::Begin(exprs) => exprs.first().unwrap().source_location(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -159,8 +193,8 @@ impl Expression {
         Expression::Lambda(LambdaExpression { formals, body }, loc)
     }
 
-    pub fn define(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
-        Expression::Define(DefinitionExpression::DefineSimple(id, Box::new(expr)), loc)
+    pub fn define(id: Identifier, expr: Expression, _loc: SourceLocation) -> Expression {
+        Expression::Define(DefinitionExpression::DefineSimple(id, Box::new(expr)))
     }
 
     pub fn begin(first: Expression, rest: Vec<Expression>, loc: SourceLocation) -> Expression {
@@ -261,10 +295,7 @@ impl Expression {
                     datum.location.clone(),
                 )),
                 Some("begin") => Self::parse_begin(&ls, datum.location.clone()),
-                Some("define") => Ok(Expression::Define(
-                    Self::parse_definition(&datum)?,
-                    datum.location.clone(),
-                )),
+                Some("define") => Ok(Expression::Define(Self::parse_definition(&datum)?)),
                 other => Self::parse_apply(&ls, &datum.location),
             },
             _ => todo!(),
@@ -411,7 +442,7 @@ impl Expression {
     fn parse_lambda(expr: &Vec<Datum>, loc: &SourceLocation) -> Result<LambdaExpression> {
         match &expr[..] {
             [_, formals, body @ ..] => {
-                let formals = Self::parse_formals(formals, loc)?;
+                let formals = Self::parse_formals(formals)?;
                 let body = Self::parse_body(body, loc)?;
                 Ok(LambdaExpression { formals, body })
             }
@@ -419,7 +450,7 @@ impl Expression {
         }
     }
 
-    fn parse_formals(datum: &Datum, loc: &SourceLocation) -> Result<Formals> {
+    fn parse_formals(datum: &Datum) -> Result<Formals> {
         match datum.sexp() {
             Sexp::List(ls) => {
                 let identifiers: Result<Vec<Identifier>> =
@@ -544,8 +575,7 @@ impl Expression {
     }
 
     fn parse_command_or_definition(datum: &Datum) -> Result<Expression> {
-        match Self::parse_definition(&datum).map(|e| Expression::Define(e, datum.location.clone()))
-        {
+        match Self::parse_definition(&datum).map(Expression::Define) {
             Ok(expr) => Ok(expr),
             Err(_) => Self::parse_expression(&datum),
         }

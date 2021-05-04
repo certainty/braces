@@ -43,10 +43,10 @@ impl Local {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Target {
     TopLevel,
-    Procedure,
+    Procedure(Option<String>),
 }
 
 pub struct CodeGenerator {
@@ -71,56 +71,37 @@ impl CodeGenerator {
         }
     }
 
-    pub fn generate_program(&mut self, ast: Vec<Expression>) -> Result<CompilationUnit> {
-        if let Some(location) = ast.first().map(|e| e.source_location().clone()) {
-            let proc = Self::generate_top_level(&Expression::body(ast), &location)?;
-            Ok(CompilationUnit::new(self.values.clone(), proc))
-        } else {
-            todo!()
-        }
-    }
-
-    pub fn generate(&mut self, ast: &Expression) -> Result<CompilationUnit> {
-        let proc = Self::generate_top_level(&ast.to_body_expression(), ast.source_location())?;
+    pub fn generate(&mut self, ast: Vec<Expression>) -> Result<CompilationUnit> {
+        let proc =
+            Self::generate_procedure(Target::TopLevel, &Expression::body(ast), &Formals::empty())?;
         Ok(CompilationUnit::new(self.values.clone(), proc))
     }
 
-    fn generate_procedure(
-        name: Option<String>,
-        arity: value::lambda::Arity,
-        formals: &Formals,
+    pub fn generate_procedure(
+        target: Target,
         ast: &BodyExpression,
-        loc: &SourceLocation,
+        formals: &Formals,
     ) -> Result<value::lambda::Procedure> {
-        let mut generator = CodeGenerator::new(Target::Procedure);
+        let mut generator = CodeGenerator::new(target.clone());
 
-        generator.begin_scope();
         for argument in formals.identifiers() {
             generator.declare_variable(&argument)?;
         }
-        generator.emit_body(ast, loc)?;
+        generator.emit_body(ast)?;
         generator.emit_return()?;
-        generator.end_scope();
 
-        match name {
-            Some(name) => Ok(value::lambda::Procedure::named(
+        match target {
+            Target::TopLevel => Ok(value::lambda::Procedure::thunk(generator.chunk)),
+            Target::Procedure(Some(name)) => Ok(value::lambda::Procedure::named(
                 name,
-                arity,
+                formals.arity(),
                 generator.chunk,
             )),
-            _ => Ok(value::lambda::Procedure::lambda(arity, generator.chunk)),
+            Target::Procedure(None) => Ok(value::lambda::Procedure::lambda(
+                formals.arity(),
+                generator.chunk,
+            )),
         }
-    }
-
-    fn generate_top_level(
-        ast: &BodyExpression,
-        loc: &SourceLocation,
-    ) -> Result<value::lambda::Procedure> {
-        let mut generator = CodeGenerator::new(Target::TopLevel);
-        generator.emit_body(ast, loc)?;
-        generator.emit_return()?;
-
-        Ok(value::lambda::Procedure::thunk(generator.chunk))
     }
 
     #[inline]
@@ -173,13 +154,13 @@ impl CodeGenerator {
             }
             Expression::Literal(LiteralExpression::Quotation(datum)) => self.emit_lit(datum)?,
             Expression::If(_if_expr, _loc) => todo!(),
-            Expression::Let(LetExpression::Let(bindings, body), loc) => {
+            Expression::Let(LetExpression::Let(bindings, body), _loc) => {
                 self.begin_scope();
                 self.emit_bindings(&bindings)?;
-                self.emit_body(&body, loc)?;
+                self.emit_body(&body)?;
                 self.end_scope();
             }
-            Expression::Define(definition, loc) => self.emit_definition(definition, &loc)?,
+            Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr, loc) => self.emit_lambda(expr, &loc)?,
             Expression::Begin(first, rest, _) => self.emit_begin(first, rest)?,
             Expression::Command(expr, _) => self.emit_instructions(expr)?,
@@ -215,13 +196,7 @@ impl CodeGenerator {
     }
 
     fn emit_lambda(&mut self, expr: &LambdaExpression, loc: &SourceLocation) -> Result<()> {
-        let arity = match &expr.formals {
-            Formals::RestArg(_) => value::lambda::Arity::Many,
-            Formals::VarArg(head, _) => value::lambda::Arity::AtLeast(head.len()),
-            Formals::ArgList(args) => value::lambda::Arity::Exactly(args.len()),
-        };
-
-        let lambda = Self::generate_procedure(None, arity, &expr.formals, &expr.body, &loc)?;
+        let lambda = Self::generate_procedure(Target::Procedure(None), &expr.body, &expr.formals)?;
         let proc = self.values.procedure(lambda);
         self.emit_constant(proc, &loc)
     }
@@ -256,9 +231,9 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_body(&mut self, body: &BodyExpression, loc: &SourceLocation) -> Result<()> {
+    fn emit_body(&mut self, body: &BodyExpression) -> Result<()> {
         for def in &body.definitions {
-            self.emit_definition(&def, loc)?;
+            self.emit_definition(&def)?;
         }
 
         for expr in &body.sequence {
@@ -272,17 +247,16 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_definition(
-        &mut self,
-        definition: &DefinitionExpression,
-        loc: &SourceLocation,
-    ) -> Result<()> {
+    fn emit_definition(&mut self, definition: &DefinitionExpression) -> Result<()> {
         match definition {
             DefinitionExpression::DefineSimple(id, expr) => {
                 self.emit_instructions(expr)?;
                 let id_sym = self.sym(&id.string());
                 let const_addr = self.current_chunk().add_constant(id_sym);
-                self.emit_instruction(Instruction::Define(const_addr), loc)
+                self.emit_instruction(
+                    Instruction::Define(const_addr),
+                    &definition.source_location(),
+                )
             }
             DefinitionExpression::Begin(_inner) => todo!(),
         }
