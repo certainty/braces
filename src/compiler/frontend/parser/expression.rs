@@ -1,15 +1,13 @@
 pub mod error;
 pub mod identifier;
+pub mod lambda;
 mod quotation;
+use crate::compiler::frontend::parser::{
+    sexp::datum::{Datum, Sexp},
+    Parser,
+};
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
-use crate::{
-    compiler::frontend::parser::{
-        sexp::datum::{Datum, Sexp},
-        Parser,
-    },
-    vm::scheme::value::lambda::Arity,
-};
 use error::Error;
 use identifier::Identifier;
 
@@ -23,7 +21,7 @@ pub enum Expression {
     Define(DefinitionExpression),
     Let(LetExpression, SourceLocation),
     If(IfExpression, SourceLocation),
-    Lambda(LambdaExpression, SourceLocation),
+    Lambda(lambda::LambdaExpression),
     Apply(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
     Command(Box<Expression>, SourceLocation),
     Begin(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
@@ -39,7 +37,7 @@ impl HasSourceLocation for Expression {
             Self::Define(def) => def.source_location(),
             Self::Let(_, loc) => &loc,
             Self::If(_, loc) => &loc,
-            Self::Lambda(_, loc) => &loc,
+            Self::Lambda(proc) => proc.source_location(),
             Self::Apply(_, _, loc) => &loc,
             Self::Command(_, loc) => &loc,
             Self::Begin(_, _, loc) => &loc,
@@ -60,7 +58,6 @@ pub type BindingSpec = (Identifier, Expression);
 pub enum LetExpression {
     Let(Vec<BindingSpec>, Box<BodyExpression>),
 }
-
 #[derive(Clone, PartialEq, Debug)]
 pub struct BodyExpression {
     pub definitions: Vec<DefinitionExpression>,
@@ -73,45 +70,6 @@ impl HasSourceLocation for BodyExpression {
             (Some(def), _) => def.source_location(),
             (_, Some(seq)) => seq.source_location(),
             _ => panic!("Could not determine source location"),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct LambdaExpression {
-    pub formals: Formals,
-    pub body: BodyExpression,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum Formals {
-    ArgList(Vec<Identifier>),
-    RestArg(Identifier),
-    VarArg(Vec<Identifier>, Identifier),
-}
-
-impl Formals {
-    pub fn empty() -> Formals {
-        Formals::ArgList(vec![])
-    }
-
-    pub fn arity(&self) -> Arity {
-        match self {
-            Self::ArgList(v) => Arity::Exactly(v.len()),
-            Self::RestArg(_) => Arity::Many,
-            Self::VarArg(v, _) => Arity::AtLeast(v.len()),
-        }
-    }
-
-    pub fn identifiers(&self) -> Vec<Identifier> {
-        match self {
-            Formals::ArgList(ids) => ids.to_vec(),
-            Formals::RestArg(id) => vec![id.clone()],
-            Formals::VarArg(ids, other) => {
-                let mut ret = ids.clone();
-                ret.push(other.clone());
-                ret
-            }
         }
     }
 }
@@ -170,8 +128,12 @@ impl Expression {
         Expression::Assign(id, Box::new(expr), loc)
     }
 
-    pub fn lambda(formals: Formals, body: BodyExpression, loc: SourceLocation) -> Expression {
-        Expression::Lambda(LambdaExpression { formals, body }, loc)
+    pub fn lambda(
+        formals: lambda::Formals,
+        body: BodyExpression,
+        loc: SourceLocation,
+    ) -> Expression {
+        Expression::Lambda(lambda::LambdaExpression::new(formals, body, loc))
     }
 
     pub fn define(id: Identifier, expr: Expression, _loc: SourceLocation) -> Expression {
@@ -271,10 +233,7 @@ impl Expression {
                 Some("set!") => Self::parse_assignment(&ls, &datum.location),
                 Some("if") => Self::parse_conditional(&ls, &datum.location),
                 Some("let") => Self::parse_let(&ls, &datum.location),
-                Some("lambda") => Ok(Expression::Lambda(
-                    Self::parse_lambda(&ls, &datum.location)?,
-                    datum.location.clone(),
-                )),
+                Some("lambda") => Ok(Expression::Lambda(lambda::parse(datum)?)),
                 Some("begin") => Self::parse_begin(&ls, datum.location.clone()),
                 Some("define") => Ok(Expression::Define(Self::parse_definition(&datum)?)),
                 other => Self::parse_apply(&ls, &datum.location),
@@ -420,35 +379,6 @@ impl Expression {
         }
     }
 
-    fn parse_lambda(expr: &Vec<Datum>, loc: &SourceLocation) -> Result<LambdaExpression> {
-        match &expr[..] {
-            [_, formals, body @ ..] => {
-                let formals = Self::parse_formals(formals)?;
-                let body = Self::parse_body(body, loc)?;
-                Ok(LambdaExpression { formals, body })
-            }
-            _ => Error::parse_error("Expected (lambda <formals> <body>)", loc.clone()),
-        }
-    }
-
-    fn parse_formals(datum: &Datum) -> Result<Formals> {
-        match datum.sexp() {
-            Sexp::List(ls) => {
-                let identifiers: Result<Vec<Identifier>> =
-                    ls.iter().map(Self::parse_identifier).collect();
-                Ok(Formals::ArgList(identifiers?))
-            }
-            Sexp::ImproperList(head, tail) => {
-                let identifiers: Result<Vec<Identifier>> =
-                    head.iter().map(Self::parse_identifier).collect();
-                let rest = Self::parse_identifier(tail);
-
-                Ok(Formals::VarArg(identifiers?, rest?))
-            }
-            _ => Ok(Formals::RestArg(Self::parse_identifier(datum)?)),
-        }
-    }
-
     /// Parses the datum as an identifier and fails if it's not a valid identifier
     fn parse_identifier(datum: &Datum) -> Result<Identifier> {
         let id_expr = Self::parse_expression(datum)?;
@@ -562,14 +492,6 @@ impl Expression {
         }
     }
 
-    #[inline]
-    fn parse_quoted_datum(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [_, value] => Ok(Self::quoted_value(value)),
-            _ => Error::parse_error("Too many arguments. Expected (quote <datum>).", loc.clone()),
-        }
-    }
-
     fn head_symbol<'a>(ls: &'a Vec<Datum>) -> Option<&'a str> {
         match ls.first().map(|e| e.sexp()) {
             Some(Sexp::Symbol(s)) => Some(s.as_str()),
@@ -669,51 +591,6 @@ mod tests {
                 location(1, 1),
             ),
         )
-    }
-
-    #[test]
-    fn test_parse_lambda() {
-        assert_parse_as(
-            "(lambda all #t)",
-            Expression::lambda(
-                Formals::RestArg(Identifier::synthetic("all")),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
-                location(1, 1),
-            ),
-        );
-
-        assert_parse_as(
-            "(lambda (x y) #t)",
-            Expression::lambda(
-                Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
-                location(1, 1),
-            ),
-        );
-
-        assert_parse_as(
-            "(lambda () #t)",
-            Expression::lambda(
-                Formals::ArgList(vec![]),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 12)).to_body_expression(),
-                location(1, 1),
-            ),
-        );
-
-        assert_parse_as(
-            "(lambda (x y . z) #t)",
-            Expression::lambda(
-                Formals::VarArg(
-                    vec![Identifier::synthetic("x"), Identifier::synthetic("y")],
-                    Identifier::synthetic("z"),
-                ),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
-                location(1, 1),
-            ),
-        );
-
-        assert_parse_error("(lambda #t)");
-        assert_parse_error("(lambda (foo . bar . baz) #t)");
     }
 
     #[test]

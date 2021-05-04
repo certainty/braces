@@ -1,7 +1,7 @@
 use crate::compiler::frontend::parser::expression::identifier::Identifier;
+use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::parser::expression::{
-    BindingSpec, BodyExpression, DefinitionExpression, Expression, Formals, LambdaExpression,
-    LetExpression, LiteralExpression,
+    BindingSpec, BodyExpression, DefinitionExpression, Expression, LetExpression, LiteralExpression,
 };
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -190,7 +190,7 @@ impl CodeGenerator {
                 self.end_scope();
             }
             Expression::Define(definition) => self.emit_definition(definition)?,
-            Expression::Lambda(expr, loc) => self.emit_lambda(expr, &loc)?,
+            Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(first, rest, _) => self.emit_begin(first, rest)?,
             Expression::Command(expr, _) => self.emit_instructions(expr)?,
             Expression::Apply(operator, operands, loc) => {
@@ -224,10 +224,10 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_lambda(&mut self, expr: &LambdaExpression, loc: &SourceLocation) -> Result<()> {
+    fn emit_lambda(&mut self, expr: &LambdaExpression) -> Result<()> {
         let lambda = Self::generate_procedure(Target::Procedure(None), &expr.body, &expr.formals)?;
         let proc = self.values.procedure(lambda);
-        self.emit_constant(proc, &loc)
+        self.emit_constant(proc, expr.source_location())
     }
 
     fn emit_read_variable(&mut self, id: &Identifier) -> Result<()> {
