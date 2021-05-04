@@ -1,13 +1,17 @@
+pub mod body;
+pub mod conditional;
 pub mod error;
 pub mod identifier;
 pub mod lambda;
-mod quotation;
+pub mod quotation;
+use self::conditional::IfExpression;
 use crate::compiler::frontend::parser::{
     sexp::datum::{Datum, Sexp},
     Parser,
 };
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use body::BodyExpression;
 use error::Error;
 use identifier::Identifier;
 
@@ -20,7 +24,7 @@ pub enum Expression {
     Assign(Identifier, Box<Expression>, SourceLocation),
     Define(DefinitionExpression),
     Let(LetExpression, SourceLocation),
-    If(IfExpression, SourceLocation),
+    If(IfExpression),
     Lambda(lambda::LambdaExpression),
     Apply(Box<Expression>, Vec<Box<Expression>>, SourceLocation),
     Command(Box<Expression>, SourceLocation),
@@ -36,7 +40,7 @@ impl HasSourceLocation for Expression {
             Self::Assign(_, _expr, loc) => &loc,
             Self::Define(def) => def.source_location(),
             Self::Let(_, loc) => &loc,
-            Self::If(_, loc) => &loc,
+            Self::If(expr) => expr.source_location(),
             Self::Lambda(proc) => proc.source_location(),
             Self::Apply(_, _, loc) => &loc,
             Self::Command(_, loc) => &loc,
@@ -45,35 +49,12 @@ impl HasSourceLocation for Expression {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct IfExpression {
-    pub test: Box<Expression>,
-    pub consequent: Box<Expression>,
-    pub alternate: Option<Box<Expression>>,
-}
-
 pub type BindingSpec = (Identifier, Expression);
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LetExpression {
     Let(Vec<BindingSpec>, Box<BodyExpression>),
 }
-#[derive(Clone, PartialEq, Debug)]
-pub struct BodyExpression {
-    pub definitions: Vec<DefinitionExpression>,
-    pub sequence: Vec<Expression>,
-}
-
-impl HasSourceLocation for BodyExpression {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation {
-        match (self.definitions.first(), self.sequence.first()) {
-            (Some(def), _) => def.source_location(),
-            (_, Some(seq)) => seq.source_location(),
-            _ => panic!("Could not determine source location"),
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum DefinitionExpression {
     DefineSimple(Identifier, Box<Expression>),
@@ -153,10 +134,7 @@ impl Expression {
     }
 
     pub fn body(sequence: Vec<Expression>) -> BodyExpression {
-        BodyExpression {
-            definitions: vec![],
-            sequence,
-        }
+        BodyExpression::from(sequence)
     }
 
     pub fn apply(
@@ -174,26 +152,7 @@ impl Expression {
     /// Create body expression, which is used in expressions introducing new
     /// scopes like <let>, <begin> and <lambda>
     pub fn to_body_expression(&self) -> BodyExpression {
-        BodyExpression {
-            definitions: vec![],
-            sequence: vec![self.clone()],
-        }
-    }
-
-    pub fn conditional(
-        test: Expression,
-        conseqent: Expression,
-        alternate: Option<Expression>,
-        location: SourceLocation,
-    ) -> Expression {
-        Expression::If(
-            IfExpression {
-                test: Box::new(test),
-                consequent: Box::new(conseqent),
-                alternate: alternate.map(Box::new),
-            },
-            location,
-        )
+        BodyExpression::from(self)
     }
 
     /// Create and expression for core-let
@@ -231,7 +190,7 @@ impl Expression {
             Sexp::List(ls) => match Self::head_symbol(&ls) {
                 Some("quote") => quotation::parse(datum),
                 Some("set!") => Self::parse_assignment(&ls, &datum.location),
-                Some("if") => Self::parse_conditional(&ls, &datum.location),
+                Some("if") => Ok(Expression::If(conditional::parse(datum)?)),
                 Some("let") => Self::parse_let(&ls, &datum.location),
                 Some("lambda") => Ok(Expression::Lambda(lambda::parse(datum)?)),
                 Some("begin") => Self::parse_begin(&ls, datum.location.clone()),
@@ -256,48 +215,6 @@ impl Expression {
                 ))
             }
             _ => Error::parse_error("expected (<operator> <operand>*)", loc.clone()),
-        }
-    }
-
-    /// Parse an if-expression
-    ///
-    /// Ref: r7rs 7.1.3
-    ///
-    /// ```grammar
-    /// <conditional> -> (if <test> <consequent> <alternate>)
-    /// <test>        -> <expression>
-    /// <consequent>  -> <expression>
-    /// <alternate>   -> <expression> | <empty>
-    /// ```
-    fn parse_conditional(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [test, consequent, alternate] => {
-                let test_expr = Self::parse_expression(&test)?;
-                let consequent_expr = Self::parse_expression(&consequent)?;
-                let alternate_expr = Self::parse_expression(&alternate)?;
-
-                Ok(Self::conditional(
-                    test_expr,
-                    consequent_expr,
-                    Some(alternate_expr),
-                    loc.clone(),
-                ))
-            }
-            [test, consequent] => {
-                let test_expr = Self::parse_expression(&test)?;
-                let consequent_expr = Self::parse_expression(&consequent)?;
-
-                Ok(Self::conditional(
-                    test_expr,
-                    consequent_expr,
-                    None,
-                    loc.clone(),
-                ))
-            }
-            _ => Error::parse_error(
-                "Expected (if <test> <consequent> <alternate>?)",
-                loc.clone(),
-            ),
         }
     }
 
