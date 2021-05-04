@@ -1,4 +1,4 @@
-use super::value::lambda;
+use super::value::{foreign, lambda};
 use super::value::{Factory, Value};
 use crate::compiler::frontend::parser::sexp;
 use std::collections::HashSet;
@@ -36,6 +36,7 @@ impl Writer {
             Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
             Value::Procedure(proc) => self.write_procedure(&proc),
+            Value::ForeignProcedure(proc) => self.write_foreign_procedure(&proc),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -133,6 +134,14 @@ impl Writer {
             }
             lambda::Arity::Many => " . args".to_string(),
         }
+    }
+
+    fn write_foreign_procedure(&self, proc: &foreign::Procedure) -> String {
+        format!(
+            "#<foreign-procedure ({} {})>",
+            proc.name,
+            self.write_formals(&proc.arity)
+        )
     }
 
     #[inline]

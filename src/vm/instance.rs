@@ -251,14 +251,18 @@ impl<'a> Instance<'a> {
     // specific VM instructions
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
-        if let value::Value::Procedure(proc) = &*self.peek(args) {
-            self.push_frame(proc.clone(), args)?;
-            #[cfg(feature = "debug_vm")]
-            self.disassemble_frame();
-        } else {
-            return self.runtime_error(&format!("Operator is not a callable object"));
+        match &*self.peek(args) {
+            value::Value::Procedure(proc) => {
+                self.push_frame(proc.clone(), args)?;
+                #[cfg(feature = "debug_vm")]
+                self.disassemble_frame();
+                Ok(())
+            }
+            value::Value::ForeignProcedure(proc) => {
+                todo!()
+            }
+            _ => self.runtime_error(&format!("Operator is not a callable object")),
         }
-        Ok(())
     }
 
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
