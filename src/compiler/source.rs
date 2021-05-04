@@ -6,6 +6,7 @@ use std::path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SourceType {
+    Synthetic,
     Buffer(String),
     File(path::PathBuf),
 }

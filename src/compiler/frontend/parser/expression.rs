@@ -1,7 +1,7 @@
 pub mod error;
-use crate::compiler::frontend::parser::Parser;
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::{frontend::parser::Parser, source::SourceType};
 use crate::{
     compiler::frontend::parser::sexp::datum::{Datum, Sexp},
     vm::scheme::value::lambda::Arity,
@@ -10,13 +10,20 @@ use error::Error;
 
 type Result<T> = std::result::Result<T, Error>;
 
-// Do we really need this type?
-// Don't we need source information?
-#[repr(transparent)]
-#[derive(Clone, PartialEq, Debug)]
-pub struct Identifier(String);
+#[derive(Clone, Debug)]
+pub struct Identifier(String, SourceLocation);
+
+impl PartialEq for Identifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
 
 impl Identifier {
+    pub fn synthetic(s: &str) -> Identifier {
+        Self(String::from(s), SourceType::Synthetic.location(0, 0))
+    }
+
     pub fn string(&self) -> &String {
         &self.0
     }
@@ -28,15 +35,15 @@ impl From<Identifier> for String {
     }
 }
 
-impl From<&str> for Identifier {
-    fn from(s: &str) -> Identifier {
-        Identifier(s.to_string())
+impl HasSourceLocation for Identifier {
+    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+        &self.1
     }
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
-    Identifier(Identifier, SourceLocation),
+    Identifier(Identifier),
     Literal(LiteralExpression),
     Assign(Identifier, Box<Expression>, SourceLocation),
     Define(DefinitionExpression),
@@ -51,7 +58,7 @@ pub enum Expression {
 impl HasSourceLocation for Expression {
     fn source_location<'a>(&'a self) -> &'a SourceLocation {
         match self {
-            Self::Identifier(_, loc) => &loc,
+            Self::Identifier(id) => id.source_location(),
             Self::Literal(LiteralExpression::SelfEvaluating(datum)) => &datum.location,
             Self::Literal(LiteralExpression::Quotation(datum)) => &datum.location,
             Self::Assign(_, _expr, loc) => &loc,
@@ -206,7 +213,7 @@ impl Expression {
     }
 
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
-        Expression::Identifier(Identifier(str), loc)
+        Expression::Identifier(Identifier(str, loc))
     }
 
     pub fn body(sequence: Vec<Expression>) -> BodyExpression {
@@ -471,7 +478,7 @@ impl Expression {
     /// Parses the datum as an identifier and fails if it's not a valid identifier
     fn parse_identifier(datum: &Datum) -> Result<Identifier> {
         let id_expr = Self::parse_expression(datum)?;
-        if let Expression::Identifier(id, _) = id_expr {
+        if let Expression::Identifier(id) = id_expr {
             Ok(id)
         } else {
             Error::parse_error("Expected identifier", datum.location.clone())
@@ -644,7 +651,7 @@ mod tests {
         assert_parse_as(
             "(set! foo #t)",
             Expression::assign(
-                Identifier("foo".to_string()),
+                Identifier::synthetic("foo"),
                 Expression::constant(&make_datum(Sexp::Bool(true), 1, 11)),
                 location(1, 1),
             ),
@@ -659,7 +666,7 @@ mod tests {
             "(let ((x #t)) #f)",
             Expression::let_bind(
                 vec![(
-                    Identifier::from("x"),
+                    Identifier::synthetic("x"),
                     Expression::constant(&make_datum(Sexp::Bool(true), 1, 10)),
                 )],
                 Expression::constant(&make_datum(Sexp::Bool(false), 1, 15)).to_body_expression(),
@@ -673,7 +680,7 @@ mod tests {
         assert_parse_as(
             "(define x #t)",
             Expression::define(
-                Identifier::from("x"),
+                Identifier::synthetic("x"),
                 Expression::constant(&make_datum(Sexp::Bool(true), 1, 11)),
                 location(1, 1),
             ),
@@ -685,7 +692,7 @@ mod tests {
         assert_parse_as(
             "(lambda all #t)",
             Expression::lambda(
-                Formals::RestArg(Identifier::from("all")),
+                Formals::RestArg(Identifier::synthetic("all")),
                 Expression::constant(&make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
                 location(1, 1),
             ),
@@ -694,7 +701,7 @@ mod tests {
         assert_parse_as(
             "(lambda (x y) #t)",
             Expression::lambda(
-                Formals::ArgList(vec![Identifier::from("x"), Identifier::from("y")]),
+                Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
                 Expression::constant(&make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
                 location(1, 1),
             ),
@@ -713,8 +720,8 @@ mod tests {
             "(lambda (x y . z) #t)",
             Expression::lambda(
                 Formals::VarArg(
-                    vec![Identifier::from("x"), Identifier::from("y")],
-                    Identifier::from("z"),
+                    vec![Identifier::synthetic("x"), Identifier::synthetic("y")],
+                    Identifier::synthetic("z"),
                 ),
                 Expression::constant(&make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
                 location(1, 1),

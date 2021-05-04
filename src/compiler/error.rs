@@ -57,6 +57,7 @@ impl UserMessage for super::Error {
 
 fn source_location_string(loc: &SourceLocation) -> String {
     match &loc.source_type {
+        SourceType::Synthetic => format!("{}:{}", loc.line, loc.column),
         SourceType::Buffer(name) => format!("[buffer] {}:{}:{}", name, loc.line, loc.column),
         SourceType::File(path) => format!(
             "[file] {}:{}:{}",

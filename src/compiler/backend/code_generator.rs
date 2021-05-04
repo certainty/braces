@@ -37,7 +37,7 @@ impl Local {
 
     pub fn for_vm() -> Self {
         Local {
-            name: Identifier::from(""),
+            name: Identifier::synthetic(""),
             depth: 0,
         }
     }
@@ -84,11 +84,13 @@ impl CodeGenerator {
     ) -> Result<value::lambda::Procedure> {
         let mut generator = CodeGenerator::new(target.clone());
 
+        generator.begin_scope();
         for argument in formals.identifiers() {
-            generator.declare_variable(&argument)?;
+            generator.declare_binding(&argument)?;
         }
         generator.emit_body(ast)?;
         generator.emit_return()?;
+        generator.end_scope();
 
         match target {
             Target::TopLevel => Ok(value::lambda::Procedure::thunk(generator.chunk)),
@@ -114,6 +116,18 @@ impl CodeGenerator {
         self.values.interned_string(s)
     }
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Locals and local tracking
+    //
+    // In order to make locals efficient and fast, they're represented as values on the stack.
+    // This way access to locals is an indexed access into the VM's stack.
+    // In order to make sure that the address calculation works correctly the code-generator
+    // tracks (emulates) the state of the stack. Each new scope is introduced by a binding construct
+    // which means there will be a new stack frame pushed.
+    // TODO: add better documentation on how this works
+    //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+
     fn begin_scope(&mut self) {
         self.scope_depth += 1;
     }
@@ -127,7 +141,7 @@ impl CodeGenerator {
         }
     }
 
-    fn add_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
+    fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
         if self.locals.len() >= MAX_LOCALS {
             Err(Error::TooManyLocals)
         } else {
@@ -136,18 +150,32 @@ impl CodeGenerator {
         }
     }
 
-    fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
-        for (addr, local) in self.locals.iter().enumerate().rev() {
-            if &local.name == name {
-                return Some(addr as ConstAddressType);
-            }
-        }
-        None
+    fn resolve_local(&self, name: &Identifier) -> Option<usize> {
+        self.locals.iter().rev().position(|l| l.name == *name)
     }
+
+    fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
+        // top level bindings aren't tracked on the stack
+        if self.scope_depth == 0 {
+            return Ok(());
+        }
+
+        // make sure the variable doesn't already exist in current scope
+
+        // register the local in current scope
+        self.register_local(id.clone())?;
+        Ok(())
+    }
+
+    /////////////////////////////////////////////////////////////////////////
+    //
+    // VM instructions
+    //
+    /////////////////////////////////////////////////////////////////////////
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
         match ast {
-            Expression::Identifier(id, loc) => self.emit_read_variable(id, loc)?,
+            Expression::Identifier(id) => self.emit_read_variable(id)?,
             Expression::Assign(id, expr, loc) => self.emit_assignment(id, expr, loc)?,
             Expression::Literal(LiteralExpression::SelfEvaluating(constant)) => {
                 self.emit_lit(constant)?
@@ -201,26 +229,17 @@ impl CodeGenerator {
         self.emit_constant(proc, &loc)
     }
 
-    fn emit_read_variable(&mut self, id: &Identifier, loc: &SourceLocation) -> Result<()> {
-        self.declare_variable(id)?;
-
+    fn emit_read_variable(&mut self, id: &Identifier) -> Result<()> {
         if let Some(addr) = self.resolve_local(id) {
-            self.emit_instruction(Instruction::GetLocal(addr), loc)
+            self.emit_instruction(
+                Instruction::GetLocal(addr as ConstAddressType),
+                id.source_location(),
+            )
         } else {
             let id_sym = self.sym(&id.string());
             let const_addr = self.current_chunk().add_constant(id_sym);
-            self.emit_instruction(Instruction::GetGlobal(const_addr), loc)
+            self.emit_instruction(Instruction::GetGlobal(const_addr), id.source_location())
         }
-    }
-
-    fn declare_variable(&mut self, id: &Identifier) -> Result<()> {
-        if self.scope_depth == 0 {
-            return Ok(());
-        }
-        // TODO make sure the variable isn't bound in this scope yet
-
-        self.add_local(id.clone())?;
-        Ok(())
     }
 
     fn emit_bindings(&mut self, bindings: &Vec<BindingSpec>) -> Result<()> {
@@ -253,10 +272,16 @@ impl CodeGenerator {
                 self.emit_instructions(expr)?;
                 let id_sym = self.sym(&id.string());
                 let const_addr = self.current_chunk().add_constant(id_sym);
-                self.emit_instruction(
-                    Instruction::Define(const_addr),
-                    &definition.source_location(),
-                )
+
+                if let Target::TopLevel = self.target {
+                    self.emit_instruction(
+                        Instruction::Define(const_addr),
+                        &definition.source_location(),
+                    )
+                } else {
+                    // internal define
+                    todo!()
+                }
             }
             DefinitionExpression::Begin(_inner) => todo!(),
         }
@@ -272,7 +297,7 @@ impl CodeGenerator {
 
         if self.scope_depth > 0 {
             // local variable
-            let const_addr = self.add_local(id.clone())?;
+            let const_addr = self.register_local(id.clone())?;
             self.emit_instruction(Instruction::SetLocal(const_addr), loc)
         } else {
             // top level variable

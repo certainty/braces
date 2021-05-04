@@ -149,7 +149,7 @@ impl<'a> Instance<'a> {
                     self.push(self.frame_get_slot(addr))?;
                 }
                 &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0)),
-                &Instruction::SetGlobal(addr) => self.set_value(addr)?,
+                &Instruction::SetGlobal(addr) => self.set_global(addr)?,
                 &Instruction::Define(addr) => self.define_value(addr)?,
                 &Instruction::Call(args) => self.apply(args)?,
             }
@@ -219,7 +219,7 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn push_frame(&mut self, proc: Rc<value::lambda::Procedure>, arg_count: usize) -> Result<()> {
-        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
+        let base = std::cmp::max(self.stack.len() - arg_count, 0);
         let frame = CallFrame::new(proc, base);
         self.call_stack.push(frame);
         self.active_frame = self.call_stack.top_mut_ptr();
@@ -238,18 +238,16 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn frame_get_slot(&self, slot_address: ConstAddressType) -> StackValue {
-        self.peek(self.stack_frame_address(slot_address))
+        let peek_distance =
+            self.stack.len() - (self.active_frame().stack_base + (slot_address as usize)) - 1;
+        self.peek(peek_distance)
     }
 
     #[inline]
     fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: StackValue) {
-        self.stack
-            .set(self.stack_frame_address(slot_address), value);
-    }
+        let slot_address = self.active_frame().stack_base + (slot_address as usize);
 
-    #[inline]
-    fn stack_frame_address(&self, slot_address: ConstAddressType) -> usize {
-        self.active_frame().stack_base + (slot_address as usize)
+        self.stack.set(slot_address, value);
     }
 
     // specific VM instructions
@@ -273,7 +271,7 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
-    fn set_value(&mut self, addr: ConstAddressType) -> Result<()> {
+    fn set_global(&mut self, addr: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
 
