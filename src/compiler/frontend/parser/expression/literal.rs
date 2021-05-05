@@ -1,7 +1,5 @@
-use super::error::Error;
 use super::Expression;
 use super::ParseResult;
-use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 

@@ -27,7 +27,6 @@ use identifier::Identifier;
 use lambda::LambdaExpression;
 use letexp::{BindingSpec, LetExpression};
 use literal::LiteralExpression;
-use rustc_hash::FxHashSet;
 use sequence::BeginExpression;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -163,26 +162,6 @@ impl<T> FromIterator<ParseResult<T>> for Vec<Result<T>> {
     }
 }
 
-lazy_static! {
-    pub static ref SPECIAL_OPERATORS: FxHashSet<&'static str> = {
-        let mut set = FxHashSet::default();
-        set.insert("set!");
-        set.insert("lambda");
-        set.insert("define");
-        set.insert("if");
-        set.insert("cond");
-        set.insert("let");
-        set.insert("let*");
-        set.insert("letrec");
-        set.insert("letrec");
-        set.insert("let-values");
-        set.insert("values");
-        set.insert("define-values");
-        set.insert("begin");
-        set
-    };
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(Identifier),
@@ -229,16 +208,6 @@ impl Expression {
     pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
         let ast = Parser.parse_datum(source)?;
         Self::parse(&ast)
-    }
-
-    #[inline]
-    pub fn is_special_operator(op: &Expression) -> bool {
-        if let Expression::Identifier(id) = &op {
-            let name: &str = &id.string();
-            SPECIAL_OPERATORS.contains(name)
-        } else {
-            false
-        }
     }
 
     pub fn constant(datum: Datum) -> Expression {

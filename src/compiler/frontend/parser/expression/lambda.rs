@@ -74,7 +74,7 @@ pub fn parse_lambda(datum: &Datum) -> ParseResult<LambdaExpression> {
 }
 
 pub fn do_parse_lambda(
-    op: &str,
+    _op: &str,
     operands: &[Datum],
     loc: &SourceLocation,
 ) -> Result<LambdaExpression> {

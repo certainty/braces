@@ -43,7 +43,7 @@ pub fn parse_set(datum: &Datum) -> ParseResult<SetExpression> {
     Expression::parse_apply_special(datum, "set!", do_parse_set)
 }
 
-pub fn do_parse_set(op: &str, operands: &[Datum], loc: &SourceLocation) -> Result<SetExpression> {
+pub fn do_parse_set(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Result<SetExpression> {
     match operands {
         [identifier, expr] => Ok(build(
             identifier::parse_identifier(identifier).res()?,

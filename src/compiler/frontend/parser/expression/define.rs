@@ -1,4 +1,3 @@
-use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
@@ -68,7 +67,6 @@ pub fn do_parse_definition(
 
             Ok(DefinitionExpression::Begin(exprs?, loc.clone()))
         }
-        _ => Error::parse_error("Invalid definition", loc.clone()),
     }
 }
 #[cfg(test)]
