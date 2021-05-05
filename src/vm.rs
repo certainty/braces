@@ -51,7 +51,6 @@ impl VM {
     }
 
     pub fn write(&self, value: &Value) -> String {
-        println!("{:?}", value);
         self.writer.write(value, &self.values).to_string()
     }
 
