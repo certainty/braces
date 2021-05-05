@@ -1,9 +1,8 @@
 # Braces
+
 ![Build Status](https://https://github.com/certainty/braces/blob/switch-to-actions/.github/workflows/rust.yml/badge.svg?branch=main)
 
 > Brace for impact
-
-
 
 ## TODO
 
@@ -14,15 +13,14 @@
   - [ ] number
   - [ ] vector
   - [ ] byte-vector
-  - [x] proper list 
-  - [ ] improper list 
+  - [x] proper list
+  - [ ] improper list
   - [x] string
   - [x] quoted constants
-  
 - [x] variables
-- [ ] conditionals
-- [ ] lambda expression
-- [ ] procedure call
+- [x] conditionals
+- [x] lambda expression
+- [x] procedure call
 - [x] assignment
 
 ## Bugs
