@@ -3,3 +3,8 @@
 
 (identity "foo")
 
+(define do-it (lambda (x) (if x 'heads 'tails)))
+
+(do-it #t)
+(do-it #f)
+

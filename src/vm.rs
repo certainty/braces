@@ -92,6 +92,11 @@ pub fn hello_world(_args: Vec<Value>) -> foreign::Result<Value> {
     Ok(Value::Unspecified)
 }
 
+pub fn scheme_inspect(args: Vec<Value>) -> foreign::Result<Value> {
+    println!("Debug: {:?}", args.first().unwrap());
+    Ok(Value::Unspecified)
+}
+
 impl Default for VM {
     fn default() -> Self {
         let mut vm = Self::new(64);
@@ -101,6 +106,14 @@ impl Default for VM {
             Arity::Exactly(0),
         ))
         .unwrap();
+
+        vm.register_foreign(foreign::Procedure::new(
+            "inspect",
+            scheme_inspect,
+            Arity::Exactly(1),
+        ))
+        .unwrap();
+
         vm
     }
 }
