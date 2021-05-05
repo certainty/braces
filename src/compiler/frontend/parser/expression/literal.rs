@@ -1,5 +1,6 @@
 use super::error::Error;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -19,16 +20,16 @@ pub fn build(datum: Datum) -> LiteralExpression {
 }
 
 #[inline]
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_literal(datum).map(Expression::Literal)
 }
 
-pub fn parse_literal(datum: &Datum) -> Result<LiteralExpression> {
+pub fn parse_literal(datum: &Datum) -> ParseResult<LiteralExpression> {
     match datum.sexp() {
-        Sexp::Bool(_) => Ok(build(datum.clone())),
-        Sexp::Char(_) => Ok(build(datum.clone())),
-        Sexp::String(_) => Ok(build(datum.clone())),
-        _ => Error::parse_error("Expected literal", datum.source_location().clone()),
+        Sexp::Bool(_) => ParseResult::accept(build(datum.clone())),
+        Sexp::Char(_) => ParseResult::accept(build(datum.clone())),
+        Sexp::String(_) => ParseResult::accept(build(datum.clone())),
+        _ => ParseResult::ignore("Expected literal", datum.source_location().clone()),
     }
 }
 

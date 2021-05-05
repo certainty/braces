@@ -1,5 +1,6 @@
 use super::error::Error;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -44,38 +45,37 @@ pub fn build(
 /// ```
 
 #[inline]
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_if(datum).map(Expression::If)
 }
 
-pub fn parse_if(datum: &Datum) -> Result<IfExpression> {
-    match Expression::apply_special(datum) {
-        Some(("if", [test, consequent, alternate])) => {
-            let test_expr = Expression::parse_expression(&test)?;
-            let consequent_expr = Expression::parse_expression(&consequent)?;
-            let alternate_expr = Expression::parse_expression(&alternate)?;
+pub fn parse_if(datum: &Datum) -> ParseResult<IfExpression> {
+    Expression::parse_apply_special(datum, "if", do_parse_if)
+}
+
+pub fn do_parse_if(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Result<IfExpression> {
+    match operands {
+        [test, consequent, alternate] => {
+            let test_expr = Expression::parse(&test)?;
+            let consequent_expr = Expression::parse(&consequent)?;
+            let alternate_expr = Expression::parse(&alternate)?;
 
             Ok(build(
                 test_expr,
                 consequent_expr,
                 Some(alternate_expr),
-                datum.source_location().clone(),
+                loc.clone(),
             ))
         }
-        Some(("if", [test, consequent])) => {
-            let test_expr = Expression::parse_expression(&test)?;
-            let consequent_expr = Expression::parse_expression(&consequent)?;
+        [test, consequent] => {
+            let test_expr = Expression::parse(&test)?;
+            let consequent_expr = Expression::parse(&consequent)?;
 
-            Ok(build(
-                test_expr,
-                consequent_expr,
-                None,
-                datum.source_location().clone(),
-            ))
+            Ok(build(test_expr, consequent_expr, None, loc.clone()))
         }
         _ => Error::parse_error(
             "Expected (if <test> <consequent> <alternate>?)",
-            datum.source_location().clone(),
+            loc.clone(),
         ),
     }
 }

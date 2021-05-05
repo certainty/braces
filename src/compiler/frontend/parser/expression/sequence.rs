@@ -1,6 +1,7 @@
 use super::define;
 use super::error::Error;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -26,32 +27,33 @@ pub fn build(first: Expression, rest: Vec<Expression>, loc: SourceLocation) -> B
     }
 }
 
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_begin(datum).map(Expression::Begin)
 }
 
-pub fn parse_begin(datum: &Datum) -> Result<BeginExpression> {
-    match Expression::apply_special(datum) {
-        Some(("begin", [first, rest @ ..])) => {
-            let parsed_first = parse_command_or_definition(first);
+pub fn parse_begin(datum: &Datum) -> ParseResult<BeginExpression> {
+    Expression::parse_apply_special(datum, "begin", do_parse_begin)
+}
+
+pub fn do_parse_begin(
+    _op: &str,
+    operands: &[Datum],
+    loc: &SourceLocation,
+) -> Result<BeginExpression> {
+    match operands {
+        [first, rest @ ..] => {
+            let parsed_first = parse_command_or_definition(first).res();
             let parsed_exprs: Result<Vec<Expression>> =
                 rest.iter().map(parse_command_or_definition).collect();
 
-            Ok(build(
-                parsed_first?,
-                parsed_exprs?,
-                datum.source_location().clone(),
-            ))
+            Ok(build(parsed_first?, parsed_exprs?, loc.clone()))
         }
-        _ => Error::parse_error(
-            "Expected (define <command-or-definition+>)",
-            datum.source_location().clone(),
-        ),
+        _ => Error::parse_error("Expected (define <command-or-definition+>)", loc.clone()),
     }
 }
 
-pub fn parse_command_or_definition(datum: &Datum) -> Result<Expression> {
-    define::parse(datum).or_else(|_| Expression::parse_expression(datum))
+pub fn parse_command_or_definition(datum: &Datum) -> ParseResult<Expression> {
+    define::parse(datum).or(|| Expression::parse(datum).into())
 }
 
 #[cfg(test)]

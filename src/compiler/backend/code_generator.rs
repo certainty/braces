@@ -4,7 +4,7 @@ use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpre
 use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
-    apply::ApplicationExpression, set::SetExpression,
+    apply::ApplicationExpression, assignment::SetExpression,
 };
 use crate::compiler::frontend::parser::expression::{
     body::BodyExpression, sequence::BeginExpression,

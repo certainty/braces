@@ -2,6 +2,7 @@ use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -39,30 +40,35 @@ pub fn build_simple(id: Identifier, expr: Expression, loc: SourceLocation) -> De
 ///   (begin <definition>*)
 /// ```
 
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_definition(datum).map(Expression::Define)
 }
 
-pub fn parse_definition(datum: &Datum) -> Result<DefinitionExpression> {
-    match Expression::apply_special(datum) {
-        Some(("define", [identifier, expr])) => Ok(DefinitionExpression::DefineSimple(
-            identifier::parse_identifier(&identifier)?,
-            Box::new(Expression::parse_expression(&expr)?),
-            datum.source_location().clone(),
+pub fn parse_definition(datum: &Datum) -> ParseResult<DefinitionExpression> {
+    Expression::parse_apply_special(datum, "define", do_parse_definition)
+}
+
+pub fn do_parse_definition(
+    _op: &str,
+    operands: &[Datum],
+    loc: &SourceLocation,
+) -> Result<DefinitionExpression> {
+    match operands {
+        [identifier, expr] => Ok(DefinitionExpression::DefineSimple(
+            identifier::parse_identifier(&identifier).res()?,
+            Box::new(Expression::parse(&expr)?),
+            loc.clone(),
         )),
-        Some(("begin", rest)) => {
+        rest => {
             let exprs: Result<Vec<Box<DefinitionExpression>>> = rest
                 .iter()
                 .map(parse_definition)
                 .map(|e| e.map(Box::new))
                 .collect();
 
-            Ok(DefinitionExpression::Begin(
-                exprs?,
-                datum.source_location().clone(),
-            ))
+            Ok(DefinitionExpression::Begin(exprs?, loc.clone()))
         }
-        _ => Error::parse_error("Invalid definition", datum.location.clone()),
+        _ => Error::parse_error("Invalid definition", loc.clone()),
     }
 }
 #[cfg(test)]

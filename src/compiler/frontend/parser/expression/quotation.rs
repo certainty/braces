@@ -1,5 +1,6 @@
 use super::error::Error;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -35,16 +36,24 @@ pub fn build_quote(datum: Datum) -> QuotationExpression {
 /// to the quote `Datum`. They're treated as unevaluated expressions.
 
 #[inline]
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_quote(datum).map(Expression::Quotation)
 }
 
-pub fn parse_quote(datum: &Datum) -> Result<QuotationExpression> {
-    match Expression::apply_special(datum) {
-        Some(("quote", [value])) => Ok(build_quote(value.clone())),
+pub fn parse_quote(datum: &Datum) -> ParseResult<QuotationExpression> {
+    Expression::parse_apply_special(datum, "quote", do_parse_quote)
+}
+
+pub fn do_parse_quote(
+    _op: &str,
+    operands: &[Datum],
+    loc: &SourceLocation,
+) -> Result<QuotationExpression> {
+    match operands {
+        [value] => Ok(build_quote(value.clone())),
         _ => Error::parse_error(
             "Expected (quote <datum>) or (quasiquite <datum>)",
-            datum.source_location().clone(),
+            loc.clone(),
         ),
     }
 }

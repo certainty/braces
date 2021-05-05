@@ -2,6 +2,7 @@ use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -34,22 +35,23 @@ pub fn build(id: Identifier, expr: Expression, loc: SourceLocation) -> SetExpres
 /// ```grammar
 /// <assignment> -> (set! <IDENTIFIER> <expression>)
 /// ```
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_set(datum).map(Expression::Assign)
 }
 
-pub fn parse_set(datum: &Datum) -> Result<SetExpression> {
-    match Expression::apply_special(datum) {
-        Some(("set!", [identifier, expr])) => Ok(build(
-            identifier::parse_identifier(identifier)?,
-            Expression::parse_expression(expr)?,
-            datum.source_location().clone(),
+pub fn parse_set(datum: &Datum) -> ParseResult<SetExpression> {
+    Expression::parse_apply_special(datum, "set!", do_parse_set)
+}
+
+pub fn do_parse_set(op: &str, operands: &[Datum], loc: &SourceLocation) -> Result<SetExpression> {
+    match operands {
+        [identifier, expr] => Ok(build(
+            identifier::parse_identifier(identifier).res()?,
+            Expression::parse(expr)?,
+            loc.clone(),
         )),
 
-        _other => Error::parse_error(
-            "Expected (set! <identifier> <expression>)",
-            datum.source_location().clone(),
-        ),
+        _other => Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone()),
     }
 }
 #[cfg(test)]

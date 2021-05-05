@@ -4,6 +4,7 @@ use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -64,25 +65,30 @@ pub fn build(formals: Formals, body: BodyExpression, location: SourceLocation) -
 }
 
 #[inline]
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_lambda(datum).map(Expression::Lambda)
 }
 
-pub fn parse_lambda(datum: &Datum) -> Result<LambdaExpression> {
-    match Expression::apply_special(datum) {
-        Some(("lambda", [formals, body @ ..])) => {
+pub fn parse_lambda(datum: &Datum) -> ParseResult<LambdaExpression> {
+    Expression::parse_apply_special(datum, "lambda", do_parse_lambda)
+}
+
+pub fn do_parse_lambda(
+    op: &str,
+    operands: &[Datum],
+    loc: &SourceLocation,
+) -> Result<LambdaExpression> {
+    match &operands {
+        [formals, body @ ..] => {
             let formals = parse_formals(formals)?;
-            let body = body::parse(body, &datum.source_location())?;
+            let body = body::parse(body, loc)?;
             Ok(LambdaExpression {
                 formals,
                 body,
-                location: datum.source_location().clone(),
+                location: loc.clone(),
             })
         }
-        _ => Error::parse_error(
-            "Expected (lambda <formals> <body>)",
-            datum.source_location().clone(),
-        ),
+        _ => Error::parse_error("Expected (lambda <formals> <body>)", loc.clone()),
     }
 }
 
@@ -96,11 +102,11 @@ fn parse_formals(datum: &Datum) -> Result<Formals> {
         Sexp::ImproperList(head, tail) => {
             let identifiers: Result<Vec<Identifier>> =
                 head.iter().map(identifier::parse_identifier).collect();
-            let rest = identifier::parse_identifier(tail);
+            let rest = identifier::parse_identifier(tail).res();
 
             Ok(Formals::VarArg(identifiers?, rest?))
         }
-        _ => Ok(Formals::RestArg(identifier::parse_identifier(datum)?)),
+        _ => Ok(Formals::RestArg(identifier::parse_identifier(datum).res()?)),
     }
 }
 

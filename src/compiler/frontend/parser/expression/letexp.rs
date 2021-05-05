@@ -4,6 +4,7 @@ use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -48,20 +49,24 @@ pub fn build_let(
 /// ```
 
 #[inline]
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_let(datum).map(Expression::Let)
 }
 
-pub fn parse_let(datum: &Datum) -> Result<LetExpression> {
-    match Expression::apply_special(datum) {
-        Some(("let", [binding_spec, body @ ..])) => Ok(build_let(
+pub fn parse_let(datum: &Datum) -> ParseResult<LetExpression> {
+    Expression::parse_apply_special(datum, "let", do_parse_let)
+}
+
+pub fn do_parse_let(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Result<LetExpression> {
+    match operands {
+        [binding_spec, body @ ..] => Ok(build_let(
             parse_binding_specs(binding_spec)?,
-            body::parse(body, datum.source_location())?,
-            datum.source_location().clone(),
+            body::parse(body, loc)?,
+            loc.clone(),
         )),
         _other => Error::parse_error(
             "Expected (let (<bindings>*) body) or (let name (<bindings*>) body)",
-            datum.source_location().clone(),
+            loc.clone(),
         ),
     }
 }
@@ -87,8 +92,8 @@ fn parse_binding_spec(datum: &Datum) -> Result<BindingSpec> {
     match datum.sexp() {
         Sexp::List(ls) => match &ls[..] {
             [identifier, expr] => Ok((
-                identifier::parse_identifier(identifier)?,
-                Expression::parse_expression(expr)?,
+                identifier::parse_identifier(identifier).res()?,
+                Expression::parse(expr)?,
             )),
             _ => Error::parse_error(
                 "Expected list of exactly two elements for binding. (<identifier> <expression>)",

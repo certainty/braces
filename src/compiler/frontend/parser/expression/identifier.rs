@@ -1,5 +1,6 @@
 use super::error::Error;
 use super::Expression;
+use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::SourceType;
@@ -45,14 +46,14 @@ impl HasSourceLocation for Identifier {
     }
 }
 
-pub fn parse(datum: &Datum) -> Result<Expression> {
+pub fn parse(datum: &Datum) -> ParseResult<Expression> {
     parse_identifier(datum).map(Expression::Identifier)
 }
 
-pub fn parse_identifier(datum: &Datum) -> Result<Identifier> {
+pub fn parse_identifier(datum: &Datum) -> ParseResult<Identifier> {
     match datum.sexp() {
-        Sexp::Symbol(s) => Ok(Identifier::new(s, datum.source_location().clone())),
-        _ => Error::parse_error("Expected identifier", datum.source_location().clone()),
+        Sexp::Symbol(s) => ParseResult::accept(Identifier::new(s, datum.source_location().clone())),
+        _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),
     }
 }
 

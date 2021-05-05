@@ -65,7 +65,7 @@ pub fn parse(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
 
     // parse definitions*
     while cur.is_some() {
-        match define::parse_definition(cur.unwrap()) {
+        match define::parse_definition(cur.unwrap()).res() {
             Ok(expr) => {
                 definitions.push(expr);
                 cur = iter.next();
@@ -83,8 +83,8 @@ pub fn parse(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
     }
 
     //parse the rest as sequence
-    let mut sequence = vec![Expression::parse_expression(cur.unwrap())?];
-    let rest: Result<Vec<Expression>> = iter.map(Expression::parse_expression).collect();
+    let mut sequence = vec![Expression::parse(cur.unwrap())?];
+    let rest: Result<Vec<Expression>> = iter.map(Expression::parse).collect();
     sequence.extend(rest?);
 
     Ok(BodyExpression {
