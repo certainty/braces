@@ -116,9 +116,13 @@ impl Factory {
         Value::Char(c)
     }
 
-    pub fn symbol<T: Into<std::string::String>>(&mut self, v: T) -> Value {
+    pub fn sym<T: Into<std::string::String>>(&mut self, v: T) -> Symbol {
         let k = self.symbols.get_or_intern(v.into());
-        Value::Symbol(Symbol(k))
+        Symbol(k)
+    }
+
+    pub fn symbol<T: Into<std::string::String>>(&mut self, v: T) -> Value {
+        Value::Symbol(self.sym(v))
     }
 
     pub fn interned_string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
@@ -141,6 +145,10 @@ impl Factory {
 
     pub fn procedure(&mut self, v: lambda::Procedure) -> Value {
         Value::Procedure(Rc::new(v))
+    }
+
+    pub fn foreign_procedure(&mut self, v: foreign::Procedure) -> Value {
+        Value::ForeignProcedure(Rc::new(v))
     }
 
     pub fn from_datum(&mut self, d: &Datum) -> Value {

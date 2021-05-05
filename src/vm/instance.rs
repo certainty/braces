@@ -195,6 +195,17 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
+    fn pop_n(&mut self, n: usize) -> Vec<StackValue> {
+        let mut result = vec![];
+
+        for _ in 0..n {
+            result.push(self.pop())
+        }
+
+        result
+    }
+
+    #[inline]
     fn peek(&self, distance: usize) -> StackValue {
         self.stack.peek(distance).clone()
     }
@@ -251,6 +262,7 @@ impl<'a> Instance<'a> {
     // specific VM instructions
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
+        //TODO: make sure that the arguments match the procedures expectations
         match &*self.peek(args) {
             value::Value::Procedure(proc) => {
                 self.push_frame(proc.clone(), args)?;
@@ -259,7 +271,16 @@ impl<'a> Instance<'a> {
                 Ok(())
             }
             value::Value::ForeignProcedure(proc) => {
-                todo!()
+                let arguments = self.pop_n(args);
+                match proc.call(arguments.iter().map(|v| (**v).clone()).collect()) {
+                    Ok(v) => {
+                        self.push(Rc::new(v))?;
+                        Ok(())
+                    }
+                    Err(e) => {
+                        self.runtime_error(&format!("Error calling native procedure: {:?}", e))
+                    }
+                }
             }
             _ => self.runtime_error(&format!("Operator is not a callable object")),
         }

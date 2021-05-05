@@ -14,7 +14,7 @@ pub struct Opts {
 }
 
 pub fn execute(opts: &Opts) {
-    let mut vm = VM::new();
+    let mut vm = VM::default();
 
     match vm.run_file(std::path::PathBuf::from(opts.input.clone())) {
         Ok(_) => (),

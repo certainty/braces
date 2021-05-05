@@ -15,7 +15,7 @@ pub fn execute(_opts: &Opts) {
         println!("No previous history.");
     }
 
-    let mut vm = VM::new();
+    let mut vm = VM::default();
 
     loop {
         let readline = rl.readline(">> ");

@@ -7,15 +7,32 @@ pub enum Error {
     ForeignError,
 }
 
-type Result<T> = std::result::Result<Error, T>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-pub type ProcedureImpl = std::rc::Rc<dyn Fn(Vec<Value>) -> Result<Value>>;
+pub type ProcedureImpl = dyn Fn(Vec<Value>) -> Result<Value>;
 
-#[derive(Clone)]
 pub struct Procedure {
     pub name: String,
     pub arity: lambda::Arity,
-    proc: ProcedureImpl,
+    proc: Box<ProcedureImpl>,
+}
+
+impl Procedure {
+    pub fn new<S, I>(name: S, op: I, arity: lambda::Arity) -> Self
+    where
+        S: Into<String>,
+        I: 'static + Fn(Vec<Value>) -> Result<Value>,
+    {
+        Self {
+            name: name.into(),
+            arity,
+            proc: Box::new(op),
+        }
+    }
+
+    pub fn call(&self, arguments: Vec<Value>) -> Result<Value> {
+        (self.proc)(arguments)
+    }
 }
 
 impl std::fmt::Debug for Procedure {

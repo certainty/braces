@@ -35,6 +35,9 @@ debug_run:
 debug_repl:
 	$(CARGO) run --features debug_vm --features debug_code --bin bracesi -- repl
 
+repl:
+	$(CARGO) run --bin bracesi -- repl
+
 
 test: build
 	$(CARGO) test -- --nocapture
