@@ -1,10 +1,13 @@
 #[cfg(test)]
 pub mod arbitrary;
+pub mod foreign;
+pub mod lambda;
 pub mod list;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table;
 use crate::compiler::utils::string_table::StringTable;
 use std::convert::Into;
+use std::rc::Rc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -22,6 +25,8 @@ pub enum Value {
     InternedString(string_table::Interned),
     UninternedString(std::string::String),
     ProperList(list::List),
+    Procedure(Rc<lambda::Procedure>),
+    ForeignProcedure(Rc<foreign::Procedure>),
     Unspecified,
 }
 
@@ -91,29 +96,33 @@ impl Default for Factory {
 }
 
 impl Factory {
-    pub fn bool_true<'a>(&'a self) -> &'a Value {
-        &self.true_value
+    pub fn bool_true(&self) -> Value {
+        self.true_value.clone()
     }
 
-    pub fn bool_false<'a>(&'a self) -> &'a Value {
-        &self.false_value
+    pub fn bool_false(&self) -> Value {
+        self.false_value.clone()
     }
 
-    pub fn nil<'a>(&'a self) -> &'a Value {
-        &self.nil_value
+    pub fn nil(&self) -> Value {
+        self.nil_value.clone()
     }
 
-    pub fn unspecified<'a>(&'a self) -> &'a Value {
-        &self.unspecified
+    pub fn unspecified(&self) -> Value {
+        self.unspecified.clone()
     }
 
     pub fn character(&self, c: char) -> Value {
         Value::Char(c)
     }
 
-    pub fn symbol<T: Into<std::string::String>>(&mut self, v: T) -> Value {
+    pub fn sym<T: Into<std::string::String>>(&mut self, v: T) -> Symbol {
         let k = self.symbols.get_or_intern(v.into());
-        Value::Symbol(Symbol(k))
+        Symbol(k)
+    }
+
+    pub fn symbol<T: Into<std::string::String>>(&mut self, v: T) -> Value {
+        Value::Symbol(self.sym(v))
     }
 
     pub fn interned_string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
@@ -132,6 +141,14 @@ impl Factory {
             let ls: list::List = vals.into();
             Value::ProperList(ls)
         }
+    }
+
+    pub fn procedure(&mut self, v: lambda::Procedure) -> Value {
+        Value::Procedure(Rc::new(v))
+    }
+
+    pub fn foreign_procedure(&mut self, v: foreign::Procedure) -> Value {
+        Value::ForeignProcedure(Rc::new(v))
     }
 
     pub fn from_datum(&mut self, d: &Datum) -> Value {

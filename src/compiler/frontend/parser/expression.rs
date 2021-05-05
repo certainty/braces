@@ -1,152 +1,263 @@
+pub mod apply;
+pub mod assignment;
+pub mod body;
+pub mod conditional;
+pub mod define;
 pub mod error;
-use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
-use crate::compiler::frontend::parser::Parser;
+pub mod identifier;
+pub mod lambda;
+pub mod letexp;
+pub mod literal;
+pub mod quotation;
+pub mod sequence;
+use std::iter::FromIterator;
+
+use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
+use crate::compiler::frontend::parser::{
+    sexp::datum::{Datum, Sexp},
+    Parser,
+};
 use crate::compiler::source::Source;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use apply::ApplicationExpression;
+use body::BodyExpression;
+use define::DefinitionExpression;
 use error::Error;
+use identifier::Identifier;
+use lambda::LambdaExpression;
+use letexp::{BindingSpec, LetExpression};
+use literal::LiteralExpression;
+use sequence::BeginExpression;
 
 type Result<T> = std::result::Result<T, Error>;
 
-// Do we really need this type?
-// Don't we need source information?
-#[repr(transparent)]
-#[derive(Clone, PartialEq, Debug)]
-pub struct Identifier(String);
+pub enum ParseResult<T> {
+    Applicable(Result<T>),
+    NonApplicable(String, SourceLocation),
+}
 
-impl Identifier {
-    pub fn string(&self) -> &String {
-        &self.0
+impl<T> ParseResult<T> {
+    pub fn collect_res(results: Vec<ParseResult<T>>) -> Vec<Result<T>> {
+        let mut total = vec![];
+
+        for res in results {
+            match res {
+                ParseResult::Applicable(res) => total.push(res),
+                _ => (),
+            }
+        }
+
+        total
+    }
+
+    pub fn accept(v: T) -> ParseResult<T> {
+        ParseResult::Applicable(Ok(v))
+    }
+
+    pub fn error(e: Error) -> ParseResult<T> {
+        ParseResult::Applicable(Err(e))
+    }
+
+    pub fn ignore<S: Into<String>>(message: S, location: SourceLocation) -> ParseResult<T> {
+        ParseResult::NonApplicable(message.into(), location)
+    }
+
+    pub fn or<F: FnOnce() -> ParseResult<T>>(self, op: F) -> ParseResult<T> {
+        match self {
+            Self::NonApplicable(_, _) => op(),
+            other => other,
+        }
+    }
+
+    pub fn and<F: FnOnce() -> ParseResult<T>>(self, op: F) -> ParseResult<T> {
+        match self {
+            Self::Applicable(_ignored) => op(),
+            other => other,
+        }
+    }
+
+    pub fn is_err(self) -> bool {
+        match self {
+            Self::NonApplicable(_, _) => false,
+            Self::Applicable(res) => res.is_err(),
+        }
+    }
+
+    pub fn is_ok(self) -> bool {
+        match self {
+            Self::NonApplicable(_, _) => false,
+            Self::Applicable(res) => res.is_ok(),
+        }
+    }
+
+    pub fn map<R, F: FnOnce(T) -> R>(self, op: F) -> ParseResult<R> {
+        match self {
+            Self::Applicable(v) => ParseResult::<R>::Applicable(v.map(op)),
+            Self::NonApplicable(m, l) => ParseResult::<R>::NonApplicable(m, l),
+        }
+    }
+
+    pub fn flat_map<F: FnOnce(T) -> ParseResult<T>>(self, op: F) -> ParseResult<T> {
+        match self {
+            Self::Applicable(Ok(v)) => op(v),
+            other => other,
+        }
+    }
+
+    pub fn res(self) -> Result<T> {
+        match self {
+            Self::NonApplicable(message, location) => Error::parse_error(&message, location),
+            Self::Applicable(res) => res,
+        }
+    }
+
+    #[inline]
+    pub fn is_applicable(self) -> bool {
+        match self {
+            Self::Applicable(_) => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_non_applicable(self) -> bool {
+        !self.is_applicable()
+    }
+
+    pub fn map_non_applicable(self, v: Result<T>) -> Result<T> {
+        match self {
+            Self::NonApplicable(_, _) => v,
+            Self::Applicable(other) => other,
+        }
     }
 }
 
-impl From<Identifier> for String {
-    fn from(id: Identifier) -> String {
-        id.0
+impl<T> From<Result<T>> for ParseResult<T> {
+    fn from(value: Result<T>) -> Self {
+        Self::Applicable(value)
     }
 }
 
-impl From<&str> for Identifier {
-    fn from(s: &str) -> Identifier {
-        Identifier(s.to_string())
+impl<T> From<T> for ParseResult<T> {
+    fn from(value: T) -> Self {
+        Self::Applicable(Ok(value))
+    }
+}
+
+impl<T> From<ParseResult<T>> for Result<T> {
+    fn from(res: ParseResult<T>) -> Self {
+        res.res()
+    }
+}
+
+impl<T> FromIterator<ParseResult<T>> for Result<Vec<T>> {
+    fn from_iter<I: IntoIterator<Item = ParseResult<T>>>(iter: I) -> Self {
+        iter.into_iter().map(|i| i.res()).collect()
+    }
+}
+
+impl<T> FromIterator<ParseResult<T>> for Vec<Result<T>> {
+    fn from_iter<I: IntoIterator<Item = ParseResult<T>>>(iter: I) -> Self {
+        iter.into_iter().map(|i| i.res()).collect()
     }
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
-    Identifier(Identifier, SourceLocation),
+    Identifier(Identifier),
+    Quotation(QuotationExpression),
     Literal(LiteralExpression),
-    Assign(Identifier, Box<Expression>, SourceLocation),
-    Define(DefinitionExpression, SourceLocation),
-    Let(LetExpression, SourceLocation),
-    If(IfExpression, SourceLocation),
+    Define(DefinitionExpression),
+    Lambda(LambdaExpression),
+    Assign(SetExpression),
+    Let(LetExpression),
+    If(IfExpression),
+    Apply(ApplicationExpression),
+    Command(Box<Expression>),
+    Begin(BeginExpression),
 }
 
 impl HasSourceLocation for Expression {
     fn source_location<'a>(&'a self) -> &'a SourceLocation {
         match self {
-            Self::Identifier(_, loc) => &loc,
-            Self::Literal(LiteralExpression::SelfEvaluating(datum)) => &datum.location,
-            Self::Literal(LiteralExpression::Quotation(datum)) => &datum.location,
-            Self::Assign(_, _expr, loc) => &loc,
-            Self::Define(_, loc) => &loc,
-            Self::Let(_, loc) => &loc,
-            Self::If(_, loc) => &loc,
+            Self::Identifier(id) => id.source_location(),
+            Self::Literal(exp) => exp.source_location(),
+            Self::Quotation(exp) => exp.source_location(),
+            Self::Assign(exp) => exp.source_location(),
+            Self::Define(def) => def.source_location(),
+            Self::Let(exp) => exp.source_location(),
+            Self::If(expr) => expr.source_location(),
+            Self::Lambda(proc) => proc.source_location(),
+            Self::Apply(exp) => exp.source_location(),
+            Self::Command(exp) => exp.source_location(),
+            Self::Begin(exp) => exp.source_location(),
         }
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct IfExpression {
-    pub test: Box<Expression>,
-    pub consequent: Box<Expression>,
-    pub alternate: Option<Box<Expression>>,
-}
-
-pub type BindingSpec = (Identifier, Expression);
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum LetExpression {
-    Let(Vec<BindingSpec>, Box<BodyExpression>),
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct BodyExpression {
-    pub definitions: Vec<DefinitionExpression>,
-    pub sequence: Vec<Expression>,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum DefinitionExpression {
-    DefineSimple(Identifier, Box<Expression>),
-    Begin(Vec<Box<DefinitionExpression>>),
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum LiteralExpression {
-    SelfEvaluating(Datum),
-    Quotation(Datum),
-}
-
 impl Expression {
+    pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
+        let ast = Parser.parse_datum_sequence(source)?;
+        ast.iter().map(Self::parse).collect()
+    }
+
     /// Parse a single datum into a an expression.
     ///
     /// It either succeeds or returns an error indicating
     /// what went wrong.
     pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
-        let parser = Parser;
-        let ast = parser.parse_datum(source)?;
-        Self::parse_expression(&ast)
+        let ast = Parser.parse_datum(source)?;
+        Self::parse(&ast)
     }
 
-    /// Create a constant expression
-    pub fn constant(datum: &Datum) -> Expression {
-        Expression::Literal(LiteralExpression::SelfEvaluating(datum.clone()))
+    pub fn constant(datum: Datum) -> Expression {
+        Expression::Literal(literal::build(datum))
     }
 
-    /// Create a quotation expression
-    ///
-    /// Quoted values are special in the sense that they maintain a reference
-    /// to the quote `Datum`. They're treated as unevaluated expressions.
-    pub fn quoted_value(datum: &Datum) -> Expression {
-        Expression::Literal(LiteralExpression::Quotation(datum.clone()))
+    pub fn quoted_value(datum: Datum) -> Expression {
+        Expression::Quotation(quotation::build_quote(datum))
     }
 
-    /// Create an assignment expression
     pub fn assign(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
-        Expression::Assign(id, Box::new(expr), loc)
+        Expression::Assign(assignment::build(id, expr, loc))
+    }
+
+    pub fn lambda(
+        formals: lambda::Formals,
+        body: BodyExpression,
+        loc: SourceLocation,
+    ) -> Expression {
+        Expression::Lambda(lambda::build(formals, body, loc))
     }
 
     pub fn define(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {
-        Expression::Define(DefinitionExpression::DefineSimple(id, Box::new(expr)), loc)
+        Expression::Define(define::build_simple(id, expr, loc))
+    }
+
+    pub fn begin(first: Expression, rest: Vec<Expression>, loc: SourceLocation) -> Expression {
+        Expression::Begin(sequence::build(first, rest, loc))
     }
 
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
-        Expression::Identifier(Identifier(str), loc)
+        Expression::Identifier(Identifier::new(str, loc))
+    }
+
+    pub fn body(sequence: Vec<Expression>) -> BodyExpression {
+        BodyExpression::from(sequence)
+    }
+
+    pub fn apply(
+        operator: Expression,
+        operands: Vec<Expression>,
+        loc: SourceLocation,
+    ) -> Expression {
+        Expression::Apply(apply::build(operator, operands, loc))
     }
 
     /// Create body expression, which is used in expressions introducing new
     /// scopes like <let>, <begin> and <lambda>
     pub fn to_body_expression(&self) -> BodyExpression {
-        BodyExpression {
-            definitions: vec![],
-            sequence: vec![self.clone()],
-        }
-    }
-
-    pub fn conditional(
-        test: Expression,
-        conseqent: Expression,
-        alternate: Option<Expression>,
-        location: SourceLocation,
-    ) -> Expression {
-        Expression::If(
-            IfExpression {
-                test: Box::new(test),
-                consequent: Box::new(conseqent),
-                alternate: alternate.map(Box::new),
-            },
-            location,
-        )
+        BodyExpression::from(self)
     }
 
     /// Create and expression for core-let
@@ -155,7 +266,7 @@ impl Expression {
         body: BodyExpression,
         loc: SourceLocation,
     ) -> Expression {
-        Expression::Let(LetExpression::Let(bindings, Box::new(body)), loc)
+        Expression::Let(letexp::build_let(bindings, body, loc))
     }
 
     /// Parse a single datum into an expression
@@ -175,247 +286,48 @@ impl Expression {
     ///   <macro block>        |
     ///   <includer>           |
     /// ```
-    fn parse_expression(datum: &Datum) -> Result<Expression> {
+
+    fn parse(datum: &Datum) -> Result<Expression> {
+        identifier::parse(datum)
+            .or(|| literal::parse(datum))
+            .or(|| lambda::parse(datum))
+            .or(|| assignment::parse(datum))
+            .or(|| quotation::parse(datum))
+            .or(|| conditional::parse(datum))
+            .or(|| Self::parse_derived(datum))
+            .or(|| apply::parse(datum))
+            .map_non_applicable(Error::parse_error(
+                "Invalid expression",
+                datum.source_location().clone(),
+            ))
+    }
+
+    fn parse_derived(datum: &Datum) -> ParseResult<Expression> {
+        letexp::parse(datum)
+            .or(|| sequence::parse(datum))
+            .or(|| define::parse(datum))
+    }
+
+    pub fn parse_apply_special<'a, T, F>(
+        datum: &'a Datum,
+        operator: &'a str,
+        parse: F,
+    ) -> ParseResult<T>
+    where
+        F: FnOnce(&'a str, &'a [Datum], &'a SourceLocation) -> Result<T>,
+    {
         match datum.sexp() {
-            Sexp::Symbol(s) => Ok(Self::identifier(s.to_string(), datum.location.clone())),
-            Sexp::Bool(_) => Ok(Self::constant(datum)),
-            Sexp::Char(_) => Ok(Self::constant(datum)),
-            Sexp::String(_) => Ok(Self::constant(datum)),
-            Sexp::List(ls) => match Self::head_symbol(&ls) {
-                Some("quote") => Self::parse_quoted_datum(&ls, &datum.location),
-                Some("set!") => Self::parse_assignment(&ls, &datum.location),
-                Some("if") => Self::parse_conditional(&ls, &datum.location),
-                Some("let") => Self::parse_let(&ls, &datum.location),
-                Some("define") => Ok(Expression::Define(
-                    Self::parse_definition(&datum)?,
-                    datum.location.clone(),
-                )),
-                other => {
-                    println!("{:?}", other);
-                    todo!()
-                }
-            },
-
-            _ => todo!(),
-        }
-    }
-
-    /// Parse an if-expression
-    ///
-    /// Ref: r7rs 7.1.3
-    ///
-    /// ```grammar
-    /// <conditional> -> (if <test> <consequent> <alternate>)
-    /// <test>        -> <expression>
-    /// <consequent>  -> <expression>
-    /// <alternate>   -> <expression> | <empty>
-    /// ```
-    fn parse_conditional(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [test, consequent, alternate] => {
-                let test_expr = Self::parse_expression(&test)?;
-                let consequent_expr = Self::parse_expression(&consequent)?;
-                let alternate_expr = Self::parse_expression(&alternate)?;
-
-                Ok(Self::conditional(
-                    test_expr,
-                    consequent_expr,
-                    Some(alternate_expr),
-                    loc.clone(),
-                ))
-            }
-            [test, consequent] => {
-                let test_expr = Self::parse_expression(&test)?;
-                let consequent_expr = Self::parse_expression(&consequent)?;
-
-                Ok(Self::conditional(
-                    test_expr,
-                    consequent_expr,
-                    None,
-                    loc.clone(),
-                ))
-            }
-            _ => Error::parse_error(
-                "Expected (if <test> <consequent> <alternate>?)",
-                loc.clone(),
-            ),
-        }
-    }
-
-    /// Parse a set! expression
-    ///
-    /// Ref: r7rs 7.1.3
-    ///
-    /// ```grammar
-    /// <assignment> -> (set! <IDENTIFIER> <expression>)
-    /// ```
-    fn parse_assignment(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [_, identifier, expr] => Ok(Expression::assign(
-                Self::parse_identifier(identifier)?,
-                Self::parse_expression(expr)?,
-                loc.clone(),
-            )),
-            _other => Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone()),
-        }
-    }
-
-    /// Parse a let expression
-    ///
-    /// Ref: r7rs 7.1.3 (derived expression)
-    ///
-    /// ```grammar
-    /// <derived expression> ->
-    ///   (let <IDENTIFIER> (<binding spec>*) <body>)
-    ///
-    /// <binding spec> -> (<IDENTIFIER> <expression>)
-    /// <body>         -> <definition>* <sequence>
-    /// <sequence>     -> <command>* <expression>
-    /// <command>      -> <expression>
-    ///
-    /// ```
-    fn parse_let(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [_, binding_spec, body @ ..] => Ok(Expression::let_bind(
-                Self::parse_binding_specs(binding_spec)?,
-                Self::parse_body(body, loc)?,
-                loc.clone(),
-            )),
-            [_, _name, _binding_spec, _body @ ..] => {
-                Error::parse_error("Named let not yet supported", loc.clone())
-            }
-            _other => Error::parse_error(
-                "Expected (let (<bindings>*) body) or (let name (<bindings*>) body)",
-                loc.clone(),
-            ),
-        }
-    }
-    /// Parse a let expression
-    ///
-    /// Ref: r7rs 7.1.3 (derived expression)
-    ///
-    /// ```grammar
-    /// <binding spec> -> (<IDENTIFIER> <expression>)
-    /// ```
-    fn parse_binding_specs(datum: &Datum) -> Result<Vec<BindingSpec>> {
-        match datum.sexp() {
-            Sexp::List(ls) => ls.iter().map(Self::parse_binding_spec).collect(),
-            _ => Error::parse_error("Expected list of binding specs", datum.location.clone()),
-        }
-    }
-
-    fn parse_binding_spec(datum: &Datum) -> Result<BindingSpec> {
-        match datum.sexp() {
-            Sexp::List(ls) => match &ls[..] {
-                [identifier, expr] => Ok((Self::parse_identifier(identifier)?, Self::parse_expression(expr)?)),
-                _ => Error::parse_error(
-                    "Expected list of exactly two elements for binding. (<identifier> <expression>)",
-                    datum.location.clone(),
+            Sexp::List(ls) => match Self::head_symbol(ls) {
+                Some(s) if s == operator => parse(s, &ls[1..], datum.source_location()).into(),
+                _ => ParseResult::ignore(
+                    "Expected (<special> <operands>*)",
+                    datum.source_location().clone(),
                 ),
             },
-            _ => Error::parse_error(
-                "Expected list of exactly two elements for binding. (<identifier> <expression>)",
-                datum.location.clone()
-            )
-        }
-    }
-
-    /// Parses the datum as an identifier and fails if it's not a valid identifier
-    fn parse_identifier(datum: &Datum) -> Result<Identifier> {
-        let id_expr = Self::parse_expression(datum)?;
-        if let Expression::Identifier(id, _) = id_expr {
-            Ok(id)
-        } else {
-            Error::parse_error("Expected identifier", datum.location.clone())
-        }
-    }
-
-    /// Parse a body
-    ///
-    /// Ref: r7rs 7.1.3
-    ///
-    /// ```grammar
-    /// <body>         -> <definition>* <sequence>
-    /// <sequence>     -> <command>* <expression>
-    /// <command>      -> <expression>
-    /// ```
-    fn parse_body(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
-        let mut definitions: Vec<DefinitionExpression> = vec![];
-        let mut iter = datum.iter();
-        let mut cur = iter.next();
-
-        // parse definitions*
-        while cur.is_some() {
-            match Self::parse_definition(cur.unwrap()) {
-                Ok(expr) => {
-                    definitions.push(expr);
-                    cur = iter.next();
-                }
-                Err(_) => break,
-            }
-        }
-
-        // nothing left to parse
-        if cur.is_none() {
-            return Error::parse_error(
-                "Invalid body definition. Expected (<definition>* sequence)",
-                loc.clone(),
-            );
-        }
-
-        //parse the rest as sequence
-        let mut sequence = vec![Self::parse_expression(cur.unwrap())?];
-        let rest: Result<Vec<Expression>> = iter.map(Self::parse_expression).collect();
-        sequence.extend(rest?);
-
-        Ok(BodyExpression {
-            definitions,
-            sequence,
-        })
-    }
-    /// Parse a define expression
-    ///
-    /// Ref: r7rs 7.1.6
-    ///
-    /// ```grammar
-    /// <definition> ->
-    ///   (define <IDENTIFIER> <expression>)                                         |
-    ///   (define (<IDENTIFIER> <def formals>) <body>)                               |
-    ///   <syntax definition>                                                        |
-    ///   (define-values <formals> <body>)                                           |
-    ///   (define-record-type <IDENTIFIER> <constructor> <IDENTIFIER> <field spec>*) |
-    ///   (begin <definition>*)
-    /// ```
-    fn parse_definition(datum: &Datum) -> Result<DefinitionExpression> {
-        match datum.sexp() {
-            Sexp::List(ls) => match Self::head_symbol(&ls) {
-                Some("define") => match &ls[..] {
-                    [_, identifier, expr] => Ok(DefinitionExpression::DefineSimple(
-                        Self::parse_identifier(&identifier)?,
-                        Box::new(Self::parse_expression(&expr)?),
-                    )),
-                    _ => todo!(),
-                },
-                Some("begin") => {
-                    let exprs: Result<Vec<Box<DefinitionExpression>>> = ls[1..]
-                        .iter()
-                        .map(Self::parse_definition)
-                        .map(|e| e.map(Box::new))
-                        .collect();
-
-                    Ok(DefinitionExpression::Begin(exprs?))
-                }
-                _ => Error::parse_error("Invalid definition", datum.location.clone()),
-            },
-            _ => Error::parse_error("Expected definition", datum.location.clone()),
-        }
-    }
-
-    #[inline]
-    fn parse_quoted_datum(ls: &Vec<Datum>, loc: &SourceLocation) -> Result<Expression> {
-        match &ls[..] {
-            [_, value] => Ok(Self::quoted_value(value)),
-            _ => Error::parse_error("Too many arguments. Expected (quote <datum>).", loc.clone()),
+            _ => ParseResult::ignore(
+                "Expected (<special> <operands>*)",
+                datum.source_location().clone(),
+            ),
         }
     }
 
@@ -432,101 +344,99 @@ mod tests {
     use super::*;
     use crate::compiler::source::{SourceType, StringSource};
 
-    // Literals
-    // See: r7rs page 12 for all examples of literals we need to support
-    // TODO: add support for the other literals once we support them
-
     #[test]
-    fn test_parse_literal_constant() {
-        assert_parse_as(
-            "#t",
-            Expression::constant(&make_datum(Sexp::Bool(true), 1, 1)),
-        );
+    fn test_parse_result_collect_err() {
+        let res1: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        let res2: ParseResult<u32> = ParseResult::Applicable(Ok(12));
+        let res3: ParseResult<u32> =
+            ParseResult::Applicable(Error::parse_error("couldn't parse", location(0, 1)));
+        let res4: ParseResult<u32> = ParseResult::Applicable(Ok(20));
+        let total: Result<Vec<u32>> = vec![res1, res2, res3, res4].into_iter().collect();
 
-        assert_parse_as(
-            "\"foo\"",
-            Expression::constant(&make_datum(Sexp::string("foo"), 1, 1)),
-        );
+        assert!(total.is_err(), "expected error")
     }
 
     #[test]
-    fn test_parse_literal_quoted_datum() {
-        assert_parse_as(
-            "'#t",
-            Expression::quoted_value(&make_datum(Sexp::Bool(true), 1, 2)),
-        );
+    fn test_parse_result_collect_ok() {
+        let res1: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        let res2: ParseResult<u32> = ParseResult::Applicable(Ok(12));
+        let res4: ParseResult<u32> = ParseResult::Applicable(Ok(20));
+        let total: Result<Vec<u32>> = vec![res1, res2, res4].into_iter().collect();
 
-        assert_parse_as(
-            "'#\\a",
-            Expression::quoted_value(&make_datum(Sexp::character('a'), 1, 2)),
-        );
-
-        assert_parse_as(
-            "'foo",
-            Expression::quoted_value(&make_datum(Sexp::symbol("foo"), 1, 2)),
-        );
-
-        assert_parse_error("'");
+        assert_eq!(total.unwrap(), vec![10, 12, 20])
     }
 
     #[test]
-    fn test_parse_assignment() {
-        assert_parse_as(
-            "(set! foo #t)",
-            Expression::assign(
-                Identifier("foo".to_string()),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 11)),
-                location(1, 1),
-            ),
-        );
+    fn test_parse_result_predicates() {
+        let res: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+        assert!(res.is_non_applicable(), "Expected non-applicable");
 
-        assert_parse_error("(set! foo)");
+        let res: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+        assert!(!res.is_applicable(), "Expected non-applicable");
+
+        let res: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        assert!(res.is_applicable(), "Expected applicable");
+
+        let res: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        assert!(!res.is_non_applicable(), "Expected applicable");
     }
 
     #[test]
-    fn test_parse_let_simple() {
-        assert_parse_as(
-            "(let ((x #t)) #f)",
-            Expression::let_bind(
-                vec![(
-                    Identifier::from("x"),
-                    Expression::constant(&make_datum(Sexp::Bool(true), 1, 10)),
-                )],
-                Expression::constant(&make_datum(Sexp::Bool(false), 1, 15)).to_body_expression(),
-                location(1, 1),
-            ),
+    fn test_parse_result_and() {
+        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+        let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        assert!(
+            res1.and(|| res2).is_non_applicable(),
+            "Expected non-applicable"
+        );
+
+        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+        let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        assert!(
+            res2.and(|| res1).is_non_applicable(),
+            "Expected non-applicable"
+        );
+
+        let res1: ParseResult<u32> = ParseResult::Applicable(Ok(5));
+        let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        assert_eq!(res1.and(|| res2).res().unwrap(), 10)
+    }
+
+    #[test]
+    fn test_parse_result_or() {
+        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+        let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        assert_eq!(res1.or(|| res2).res().unwrap(), 10);
+
+        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+        let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
+        assert_eq!(res1.or(|| res2).res().unwrap(), 10);
+
+        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+        let res2: ParseResult<u32> = ParseResult::ignore("test", location(0, 1));
+
+        assert!(
+            res1.or(|| res2).is_non_applicable(),
+            "Expected non-applicable parse result"
         )
     }
 
-    #[test]
-    fn test_parse_define() {
-        assert_parse_as(
-            "(define x #t)",
-            Expression::define(
-                Identifier::from("x"),
-                Expression::constant(&make_datum(Sexp::Bool(true), 1, 11)),
-                location(1, 1),
-            ),
-        )
-    }
-
-    fn assert_parse_as(inp: &str, exp: Expression) {
+    pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut source = StringSource::new(inp, "datum-parser-test");
         let parsed_exp = Expression::parse_one(&mut source).unwrap();
 
         assert_eq!(parsed_exp, exp)
     }
 
-    fn assert_parse_error(inp: &str) {
+    pub fn assert_parse_error(inp: &str) {
         let mut source = StringSource::new(inp, "datum-parser-test");
+        let result = Expression::parse_one(&mut source);
+        let message = format!("expected parse error but got {:?}", result);
 
-        assert!(
-            Expression::parse_one(&mut source).is_err(),
-            "expected parse error"
-        )
+        assert!(result.is_err(), message)
     }
 
-    fn location(line: usize, col: usize) -> SourceLocation {
+    pub fn location(line: usize, col: usize) -> SourceLocation {
         SourceLocation::new(
             SourceType::Buffer("datum-parser-test".to_string()),
             line,
@@ -534,7 +444,7 @@ mod tests {
         )
     }
 
-    fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
+    pub fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
         Datum::new(sexp, location(line, col))
     }
 }

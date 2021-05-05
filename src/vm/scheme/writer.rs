@@ -1,3 +1,4 @@
+use super::value::{foreign, lambda};
 use super::value::{Factory, Value};
 use crate::compiler::frontend::parser::sexp;
 use std::collections::HashSet;
@@ -34,6 +35,8 @@ impl Writer {
             Value::Char(c) => self.write_char(*c),
             Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
+            Value::Procedure(proc) => self.write_procedure(&proc),
+            Value::ForeignProcedure(proc) => self.write_foreign_procedure(&proc),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -106,6 +109,41 @@ impl Writer {
         external
     }
 
+    fn write_procedure(&self, proc: &lambda::Procedure) -> String {
+        match proc {
+            lambda::Procedure::Named(named_lambda) => format!(
+                "#<procedure ({} {})>",
+                named_lambda.name,
+                self.write_formals(&named_lambda.lambda.arity)
+            ),
+            lambda::Procedure::Lambda(lambda) => {
+                format!("#<procedure ({})>", self.write_formals(&lambda.arity))
+            }
+        }
+    }
+
+    fn write_formals(&self, arity: &lambda::Arity) -> String {
+        match arity {
+            lambda::Arity::Exactly(count) => (0..*count)
+                .map(|i| format!("x{}", i))
+                .collect::<Vec<String>>()
+                .join(" "),
+            lambda::Arity::AtLeast(count) => {
+                let fixed_args: Vec<String> = (0..*count).map(|i| format!("x{}", i)).collect();
+                format!("{} . rest", fixed_args.join(" "))
+            }
+            lambda::Arity::Many => " . args".to_string(),
+        }
+    }
+
+    fn write_foreign_procedure(&self, proc: &foreign::Procedure) -> String {
+        format!(
+            "#<foreign-procedure ({} {})>",
+            proc.name,
+            self.write_formals(&proc.arity)
+        )
+    }
+
     #[inline]
     fn add_quote(&self, s: String, quote: bool) -> String {
         if quote {
@@ -157,10 +195,10 @@ mod tests {
         let writer = Writer::new();
 
         let v = values.bool_true();
-        assert_eq!(writer.write(v, &values), "#t");
+        assert_eq!(writer.write(&v, &values), "#t");
 
         let v = values.bool_false();
-        assert_eq!(writer.write(v, &values), "#f");
+        assert_eq!(writer.write(&v, &values), "#f");
     }
 
     #[test]

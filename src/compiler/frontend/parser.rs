@@ -14,8 +14,15 @@ impl Parser {
         sexp::parse(source)
     }
 
-    pub fn parse_program<T: Source>(&self, _source: &mut T) -> Result<Vec<expression::Expression>> {
-        todo!()
+    pub fn parse_datum_sequence<T: Source>(
+        &self,
+        source: &mut T,
+    ) -> std::result::Result<Vec<Datum>, ReadError> {
+        sexp::parse_sequence(source)
+    }
+
+    pub fn parse_program<T: Source>(&self, source: &mut T) -> Result<Vec<expression::Expression>> {
+        expression::Expression::parse_program(source)
     }
 
     pub fn parse_expression<T: Source>(&self, source: &mut T) -> Result<expression::Expression> {

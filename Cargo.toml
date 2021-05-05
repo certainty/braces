@@ -33,18 +33,18 @@ env_logger = "0.8"
 pretty_env_logger = "0.4"
 thiserror = "1.0"
 anyhow = "1.0"
+lazy_static = "1.4"
 
 # values
 im = "15.0"
 
 # compiler / interpreter
-clap-v3 = "3.0.0-beta.1"
+clap = "3.0.0-beta.2"
 rustyline = "8.0.0"
 hashbrown = "0.11"
 fasthash = "0.4.0"
 rustc-hash = "1.1.0"
-lazy_static = "1.4"
-lasso = "0.5"
+arrayvec = "0.7.0"
 
 #parser
 nom_locate = "3.0"

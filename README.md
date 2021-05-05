@@ -24,3 +24,7 @@
 - [ ] lambda expression
 - [ ] procedure call
 - [x] assignment
+
+## Bugs
+
+- [ ] set! unbound variables should create an error

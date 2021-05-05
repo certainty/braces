@@ -30,7 +30,13 @@ run:
 	$(CARGO) run --bin bracesi
 
 debug_run: 
-	$(CARGO) run --features debug_vm --features debug_code --bin bracesi 
+	$(CARGO) run --features debug_vm --features debug_code --bin bracesi -- run $(RUN_FILE)
+
+debug_repl:
+	$(CARGO) run --features debug_vm --features debug_code --bin bracesi -- repl
+
+repl:
+	$(CARGO) run --bin bracesi -- repl
 
 
 test: build
