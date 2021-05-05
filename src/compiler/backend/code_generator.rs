@@ -194,11 +194,8 @@ impl CodeGenerator {
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr)?,
-            Expression::Let(LetExpression::Let(bindings, body, _loc)) => {
-                self.begin_scope();
-                self.emit_bindings(&bindings)?;
-                self.emit_body(&body)?;
-                self.end_scope();
+            Expression::Let(let_exp) => {
+                self.emit_instructions(&let_exp.to_lambda())?;
             }
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,

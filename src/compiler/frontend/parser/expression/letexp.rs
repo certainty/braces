@@ -1,11 +1,11 @@
-use super::body;
-use super::body::BodyExpression;
 use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
+use super::{body, lambda::LambdaExpression};
+use super::{body::BodyExpression, lambda::Formals};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
@@ -14,6 +14,20 @@ pub type BindingSpec = (Identifier, Expression);
 #[derive(Clone, PartialEq, Debug)]
 pub enum LetExpression {
     Let(Vec<BindingSpec>, Box<BodyExpression>, SourceLocation),
+}
+
+impl LetExpression {
+    // re-write to equivalent lambda expression
+    pub fn to_lambda(&self) -> Expression {
+        match self {
+            Self::Let(bindings, body, source) => {
+                let formals = Formals::ArgList(bindings.iter().cloned().map(|e| e.0).collect());
+                let lambda = Expression::lambda(formals, (**body).clone(), source.clone());
+                let operands = bindings.iter().cloned().map(|e| e.1).collect();
+                Expression::apply(lambda, operands, source.clone())
+            }
+        }
+    }
 }
 
 impl HasSourceLocation for LetExpression {
