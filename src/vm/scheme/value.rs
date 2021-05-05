@@ -30,6 +30,15 @@ pub enum Value {
     Unspecified,
 }
 
+impl Value {
+    pub fn is_false(&self) -> bool {
+        match self {
+            Self::Bool(false) => true,
+            _ => false,
+        }
+    }
+}
+
 #[repr(transparent)]
 #[derive(Clone, PartialEq, Hash, Eq)]
 pub struct Symbol(string_table::Interned);

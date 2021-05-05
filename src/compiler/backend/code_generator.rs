@@ -1,5 +1,3 @@
-use crate::compiler::frontend::parser::expression::define::DefinitionExpression;
-use crate::compiler::frontend::parser::expression::identifier::Identifier;
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
 use crate::compiler::frontend::parser::expression::Expression;
@@ -8,6 +6,9 @@ use crate::compiler::frontend::parser::expression::{
 };
 use crate::compiler::frontend::parser::expression::{
     body::BodyExpression, sequence::BeginExpression,
+};
+use crate::compiler::frontend::parser::expression::{
+    conditional::IfExpression, define::DefinitionExpression,
 };
 use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -19,6 +20,10 @@ use crate::vm::byte_code::Instruction;
 use crate::vm::disassembler::Disassembler;
 use crate::vm::scheme::value;
 use crate::vm::scheme::value::Value;
+use crate::{
+    compiler::frontend::parser::expression::identifier::Identifier,
+    vm::byte_code::chunk::AddressType,
+};
 use thiserror::Error;
 
 const MAX_LOCALS: usize = 256;
@@ -27,6 +32,8 @@ const MAX_LOCALS: usize = 256;
 pub enum Error {
     #[error("Too many locals defined")]
     TooManyLocals,
+    #[error("CompilerBug: {0}")]
+    CompilerBug(String),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -186,7 +193,7 @@ impl CodeGenerator {
             Expression::Assign(expr) => self.emit_assignment(expr)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
-            Expression::If(_if_expr) => todo!(),
+            Expression::If(if_expr) => self.emit_if(if_expr)?,
             Expression::Let(LetExpression::Let(bindings, body, _loc)) => {
                 self.begin_scope();
                 self.emit_bindings(&bindings)?;
@@ -199,6 +206,50 @@ impl CodeGenerator {
             Expression::Command(expr) => self.emit_instructions(expr)?,
             Expression::Apply(expr) => self.emit_apply(expr)?,
         }
+        Ok(())
+    }
+
+    fn emit_if(&mut self, expr: &IfExpression) -> Result<()> {
+        self.emit_instructions(&expr.test)?;
+        let then_jump = self.emit_jump(Instruction::JumpIfFalse(0), expr.source_location())?;
+        self.emit_pop()?;
+        self.emit_instructions(&expr.consequent)?;
+
+        match &expr.alternate {
+            Some(else_expr) => {
+                let else_jump =
+                    self.emit_jump(Instruction::Jump(0), else_expr.source_location())?;
+                self.patch_jump(then_jump)?;
+                self.emit_pop()?;
+                self.emit_instructions(else_expr)?;
+                self.patch_jump(else_jump)?;
+            }
+            _ => {
+                let else_jump = self.emit_jump(Instruction::Jump(0), expr.source_location())?;
+                self.patch_jump(then_jump)?;
+                self.emit_pop()?;
+                self.emit_constant(Value::Unspecified, expr.source_location())?;
+                self.patch_jump(else_jump)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn emit_jump(&mut self, instr: Instruction, loc: &SourceLocation) -> Result<AddressType> {
+        self.emit_instruction(instr, loc)?;
+        Ok(self.current_chunk().size() - 1)
+    }
+
+    fn patch_jump(&mut self, jump_addr: AddressType) -> Result<()> {
+        let to_addr = self.current_chunk().size();
+        let new_instruction = match self.current_chunk().at(jump_addr) {
+            &Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(to_addr),
+            &Instruction::Jump(_) => Instruction::Jump(to_addr),
+            _ => return Err(Error::CompilerBug("Can't patch non-jump".to_string())),
+        };
+
+        self.current_chunk().patch(jump_addr, new_instruction);
         Ok(())
     }
 
@@ -334,6 +385,11 @@ impl CodeGenerator {
             }
         }
 
+        Ok(())
+    }
+
+    fn emit_pop(&mut self) -> Result<()> {
+        self.current_chunk().write_instruction(Instruction::Pop);
         Ok(())
     }
 

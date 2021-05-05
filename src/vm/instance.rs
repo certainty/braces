@@ -36,6 +36,11 @@ impl CallFrame {
     }
 
     #[inline]
+    pub fn set_ip(&mut self, address: usize) {
+        self.ip = address
+    }
+
+    #[inline]
     pub fn code(&self) -> &Chunk {
         self.proc.code()
     }
@@ -125,6 +130,12 @@ impl<'a> Instance<'a> {
                 &Instruction::True => self.push_value(self.values.bool_true())?,
                 &Instruction::False => self.push_value(self.values.bool_false())?,
                 &Instruction::Nil => self.push_value(self.values.nil())?,
+                &Instruction::JumpIfFalse(addr) => {
+                    if self.peek(0).is_false() {
+                        self.active_mut_frame().set_ip(addr)
+                    }
+                }
+                &Instruction::Jump(addr) => self.active_mut_frame().set_ip(addr),
                 &Instruction::Const(addr) => self.push_value(self.read_constant(addr).clone())?,
                 &Instruction::Return => {
                     let value = self.pop();

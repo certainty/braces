@@ -29,4 +29,19 @@ fn test_vm_full_cycle() {
             .unwrap(),
         Value::Bool(false)
     );
+
+    assert_eq!(
+        vm.run_string("(if #f #t #f)", "test").unwrap(),
+        Value::Bool(false)
+    );
+
+    assert_eq!(
+        vm.run_string("(if #t #t #f)", "test").unwrap(),
+        Value::Bool(true)
+    );
+
+    assert_eq!(
+        vm.run_string("(if #f #t)", "test").unwrap(),
+        Value::Unspecified
+    );
 }
