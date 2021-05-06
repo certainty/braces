@@ -1,10 +1,10 @@
+use super::body;
 use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
-use super::{body, lambda::LambdaExpression};
 use super::{body::BodyExpression, lambda::Formals};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};

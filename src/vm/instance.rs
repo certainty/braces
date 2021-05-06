@@ -1,15 +1,18 @@
-use super::byte_code::chunk::{Chunk, LineNumber};
-use super::byte_code::Instruction;
-use super::debug;
 #[cfg(feature = "debug_vm")]
 use super::disassembler::Disassembler;
 use super::global::*;
 use super::scheme::value;
 use super::scheme::value::error;
-use super::scheme::value::lambda::Procedure;
+use super::scheme::value::procedure::Procedure;
 use super::scheme::value::{Symbol, Value};
 use super::stack::Stack;
 use super::Error;
+use super::{
+    byte_code::chunk::{Chunk, LineNumber},
+    scheme::value::procedure::HasArity,
+};
+use super::{byte_code::Instruction, scheme::value::procedure::Arity};
+use super::{debug, scheme::value::foreign};
 use crate::vm::byte_code::chunk::ConstAddressType;
 use std::rc::Rc;
 
@@ -54,8 +57,7 @@ impl CallFrame {
 
 //////////////////////////////////////////////////////////////////////////////
 
-type StackValue = Rc<Value>;
-type ValueStack = Stack<StackValue>;
+type ValueStack = Stack<Value>;
 type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
@@ -78,7 +80,7 @@ type Result<T> = std::result::Result<T, Error>;
 // Most notably access to the stack and the callstack (including ip increments)
 impl<'a> Instance<'a> {
     pub fn new(
-        proc: value::lambda::Procedure,
+        proc: Procedure,
         call_stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
@@ -88,7 +90,7 @@ impl<'a> Instance<'a> {
         let initial_procedure = Rc::new(proc);
 
         // the first value on the stack is the initial procedure
-        stack.push(Rc::new(Value::Procedure(initial_procedure.clone())));
+        stack.push(Value::Procedure(initial_procedure.clone()));
 
         // the first active stack frame is that of the current procedure
         call_stack.push(CallFrame::new(initial_procedure.clone(), 0));
@@ -105,7 +107,7 @@ impl<'a> Instance<'a> {
     }
 
     pub fn interprete(
-        proc: value::lambda::Procedure,
+        proc: Procedure,
         stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
@@ -128,38 +130,38 @@ impl<'a> Instance<'a> {
                 &Instruction::Pop => {
                     self.pop();
                 }
-                &Instruction::True => self.push_value(self.values.bool_true())?,
-                &Instruction::False => self.push_value(self.values.bool_false())?,
-                &Instruction::Nil => self.push_value(self.values.nil())?,
+                &Instruction::True => self.push(self.values.bool_true())?,
+                &Instruction::False => self.push(self.values.bool_false())?,
+                &Instruction::Nil => self.push(self.values.nil())?,
                 &Instruction::JumpIfFalse(addr) => {
                     if self.peek(0).is_false() {
                         self.active_mut_frame().set_ip(addr)
                     }
                 }
                 &Instruction::Jump(addr) => self.active_mut_frame().set_ip(addr),
-                &Instruction::Const(addr) => self.push_value(self.read_constant(addr).clone())?,
+                &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
                 &Instruction::Return => {
                     let value = self.pop();
 
                     if self.pop_frame() <= 0 {
-                        return Ok((*value).clone());
+                        return Ok(value.clone());
                     } else {
-                        self.push(value)?
+                        self.push(value.clone())?
                     }
                 }
                 &Instruction::GetGlobal(addr) => {
                     let id = self.read_identifier(addr)?;
 
                     if let Some(value) = self.toplevel.get_owned(&id) {
-                        self.push_value(value)?;
+                        self.push(value)?;
                     } else {
                         return self.runtime_error(error::undefined_variable(id));
                     }
                 }
                 &Instruction::GetLocal(addr) => {
-                    self.push(self.frame_get_slot(addr))?;
+                    self.push(self.frame_get_slot(addr).clone())?;
                 }
-                &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0)),
+                &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0).clone()),
                 &Instruction::SetGlobal(addr) => self.set_global(addr)?,
                 &Instruction::Define(addr) => self.define_value(addr)?,
                 &Instruction::Call(args) => self.apply(args)?,
@@ -190,24 +192,18 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn push_value(&mut self, v: Value) -> Result<()> {
-        self.stack.push(Rc::new(v));
-        Ok(())
-    }
-
-    #[inline]
-    fn push(&mut self, v: StackValue) -> Result<()> {
+    fn push(&mut self, v: Value) -> Result<()> {
         self.stack.push(v);
         Ok(())
     }
 
     #[inline]
-    fn pop(&mut self) -> StackValue {
+    fn pop(&mut self) -> Value {
         self.stack.pop()
     }
 
     #[inline]
-    fn pop_n(&mut self, n: usize) -> Vec<StackValue> {
+    fn pop_n(&mut self, n: usize) -> Vec<Value> {
         let mut result = vec![];
 
         for _ in 0..n {
@@ -218,8 +214,8 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn peek(&self, distance: usize) -> StackValue {
-        self.stack.peek(distance).clone()
+    fn peek(&self, distance: usize) -> &Value {
+        self.stack.peek(distance)
     }
     //
     // <- Stack operations
@@ -240,7 +236,11 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn push_frame(&mut self, proc: Rc<value::lambda::Procedure>, arg_count: usize) -> Result<()> {
+    fn push_frame(
+        &mut self,
+        proc: Rc<value::procedure::Procedure>,
+        arg_count: usize,
+    ) -> Result<()> {
         let base = std::cmp::max(self.stack.len() - arg_count, 0);
         let frame = CallFrame::new(proc, base);
         self.call_stack.push(frame);
@@ -259,52 +259,96 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn frame_get_slot(&self, slot_address: ConstAddressType) -> StackValue {
+    fn frame_get_slot(&self, slot_address: ConstAddressType) -> &Value {
         let peek_distance =
             self.stack.len() - (self.active_frame().stack_base + (slot_address as usize)) - 1;
         self.peek(peek_distance)
     }
 
     #[inline]
-    fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: StackValue) {
+    fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: Value) {
         let slot_address = self.active_frame().stack_base + (slot_address as usize);
         self.stack.set(slot_address, value);
     }
 
     // specific VM instructions
+
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
-        //TODO: make sure that the arguments match the procedures expectations
-        match &*self.peek(args) {
-            value::Value::Procedure(proc) => {
-                self.push_frame(proc.clone(), args)?;
-                #[cfg(feature = "debug_vm")]
-                self.disassemble_frame();
+        match self.peek(args) {
+            value::Value::Procedure(p) => self.apply_native(p.clone(), args),
+            value::Value::ForeignProcedure(p) => self.apply_foreign(p.clone(), args),
+            other => return self.runtime_error(error::non_callable(other.clone())),
+        }
+    }
+
+    #[inline]
+    fn apply_native(&mut self, proc: std::rc::Rc<Procedure>, arg_count: usize) -> Result<()> {
+        self.check_arity(&proc, arg_count)?;
+        let arg_count = self.bind_arguments(&proc, arg_count)?;
+        self.push_frame(proc, arg_count)?;
+        #[cfg(feature = "debug_vm")]
+        self.disassemble_frame();
+        Ok(())
+    }
+
+    #[inline]
+    fn apply_foreign(
+        &mut self,
+        proc: std::rc::Rc<foreign::Procedure>,
+        arg_count: usize,
+    ) -> Result<()> {
+        self.check_arity(&proc, arg_count)?;
+        let arguments = self.pop_n(arg_count).iter().cloned().collect();
+        match proc.call(arguments) {
+            Ok(v) => {
+                self.push(v)?;
                 Ok(())
             }
-            value::Value::ForeignProcedure(proc) => {
-                let arguments = self.pop_n(args);
-                match proc.call(arguments.iter().map(|v| (**v).clone()).collect()) {
-                    Ok(v) => {
-                        self.push(Rc::new(v))?;
-                        Ok(())
-                    }
-                    Err(e) => self.runtime_error(error::foreign_error(
-                        "Error during foreign function",
-                        proc.clone(),
-                        e,
-                    )),
-                }
+            Err(e) => self.runtime_error(error::foreign_error(
+                "Error during foreign function",
+                proc,
+                e,
+            )),
+        }
+    }
+
+    fn bind_arguments<T: HasArity>(&mut self, proc: &T, arg_count: usize) -> Result<usize> {
+        match proc.arity() {
+            Arity::Exactly(_) => Ok(arg_count), // nothing to do as the variables are layed out as expected already on the stack
+            Arity::AtLeast(n) => {
+                // stuff the last values into a new local
+                let rest_count = arg_count - n;
+                let mut rest_values = self.pop_n(rest_count);
+                rest_values.reverse();
+                let rest_list = self.values.proper_list(rest_values);
+                self.push(rest_list)?;
+                Ok(n + 1)
             }
-            other => self.runtime_error(error::non_callable(other.clone())),
+            Arity::Many => {
+                let mut rest_values = self.pop_n(arg_count);
+                rest_values.reverse();
+                let rest_list = self.values.proper_list(rest_values);
+                self.push(rest_list)?;
+                Ok(1)
+            }
+        }
+    }
+
+    fn check_arity<T: HasArity>(&self, proc: &T, arg_count: usize) -> Result<()> {
+        match proc.arity() {
+            Arity::Exactly(n) if arg_count == *n => Ok(()),
+            Arity::AtLeast(n) if arg_count >= *n => Ok(()),
+            Arity::Many => Ok(()),
+            other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count)),
         }
     }
 
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
-        self.toplevel.set(id.clone(), (*v).clone());
-        self.push_value(self.values.unspecified())?;
+        self.toplevel.set(id.clone(), v.clone());
+        self.push(self.values.unspecified())?;
         Ok(())
     }
 
@@ -315,8 +359,8 @@ impl<'a> Instance<'a> {
         if !self.toplevel.get(&id).is_some() {
             return self.runtime_error(error::undefined_variable(id.clone()));
         } else {
-            self.toplevel.set(id.clone(), (*v).clone());
-            self.push_value(self.values.unspecified())?;
+            self.toplevel.set(id.clone(), v.clone());
+            self.push(self.values.unspecified())?;
         }
 
         Ok(())
@@ -355,13 +399,8 @@ impl<'a> Instance<'a> {
         let mut disassembler = Disassembler::new(std::io::stdout());
         let chunk = self.active_frame().code();
 
-        self.print_stack();
-        disassembler.disassemble_instruction(chunk, self.active_frame().ip);
-    }
-
-    // print the stack better
-    fn print_stack(&self) {
         println!("{}", debug::stack::pretty_print(&self.stack));
+        disassembler.disassemble_instruction(chunk, self.active_frame().ip);
     }
 
     #[cfg(feature = "debug_vm")]

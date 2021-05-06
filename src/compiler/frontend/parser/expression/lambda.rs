@@ -8,7 +8,7 @@ use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
-use crate::vm::scheme::value::lambda::Arity;
+use crate::vm::scheme::value::procedure::Arity;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LambdaExpression {
@@ -159,5 +159,22 @@ mod tests {
 
         assert_parse_error("(lambda #t)");
         assert_parse_error("(lambda (foo . bar . baz) #t)");
+    }
+
+    #[test]
+    fn test_formals_identifiers() {
+        let formals = Formals::VarArg(
+            vec![Identifier::synthetic("x"), Identifier::synthetic("y")],
+            Identifier::synthetic("z"),
+        );
+
+        assert_eq!(
+            formals.identifiers(),
+            vec![
+                Identifier::synthetic("x"),
+                Identifier::synthetic("y"),
+                Identifier::synthetic("z")
+            ]
+        )
     }
 }

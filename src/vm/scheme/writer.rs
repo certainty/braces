@@ -1,4 +1,4 @@
-use super::value::{foreign, lambda};
+use super::value::{foreign, procedure};
 use super::value::{Factory, Value};
 use crate::compiler::frontend::parser::sexp;
 use std::collections::HashSet;
@@ -109,30 +109,30 @@ impl Writer {
         external
     }
 
-    fn write_procedure(&self, proc: &lambda::Procedure) -> String {
+    fn write_procedure(&self, proc: &procedure::Procedure) -> String {
         match proc {
-            lambda::Procedure::Named(named_lambda) => format!(
+            procedure::Procedure::Named(named_lambda) => format!(
                 "#<procedure ({} {})>",
                 named_lambda.name,
                 self.write_formals(&named_lambda.lambda.arity)
             ),
-            lambda::Procedure::Lambda(lambda) => {
+            procedure::Procedure::Lambda(lambda) => {
                 format!("#<procedure ({})>", self.write_formals(&lambda.arity))
             }
         }
     }
 
-    fn write_formals(&self, arity: &lambda::Arity) -> String {
+    fn write_formals(&self, arity: &procedure::Arity) -> String {
         match arity {
-            lambda::Arity::Exactly(count) => (0..*count)
+            procedure::Arity::Exactly(count) => (0..*count)
                 .map(|i| format!("x{}", i))
                 .collect::<Vec<String>>()
                 .join(" "),
-            lambda::Arity::AtLeast(count) => {
+            procedure::Arity::AtLeast(count) => {
                 let fixed_args: Vec<String> = (0..*count).map(|i| format!("x{}", i)).collect();
                 format!("{} . rest", fixed_args.join(" "))
             }
-            lambda::Arity::Many => " . args".to_string(),
+            procedure::Arity::Many => " . args".to_string(),
         }
     }
 

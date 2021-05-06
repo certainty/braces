@@ -1,5 +1,5 @@
-use braces::vm::scheme::value::error;
 use braces::vm::scheme::value::Value;
+use braces::vm::scheme::value::{error, procedure::Arity};
 use braces::vm::Error;
 use braces::vm::VM;
 use matches::assert_matches;
@@ -80,17 +80,100 @@ fn test_vm_set() {
 fn test_vm_lambda() {
     let mut vm = VM::default();
 
-    let mut result = vm.run_string("((lambda (x) x) #f)", "").unwrap();
+    let result = vm.run_string("((lambda (x) x) #f)", "").unwrap();
     assert_eq!(result, vm.values.bool_false());
 
-    result = vm.run_string("((lambda () #t))", "").unwrap();
+    let result = vm.run_string("((lambda () #t))", "").unwrap();
     assert_eq!(result, vm.values.bool_true());
 
-    result = vm
+    let result = vm
         .run_string("(begin (define id (lambda (x) x)) (id #t))", "")
         .unwrap();
     assert_eq!(result, vm.values.bool_true());
+
+    let result = vm.run_string("((lambda (x) #t))", "");
+    assert_matches!(
+        result,
+        Err(Error::RuntimeError(
+            error::RuntimeError::ArityError(Arity::Exactly(1), _),
+            _
+        ))
+    );
 }
+
+#[test]
+fn test_vm_lambda_formals() {
+    let mut vm = VM::default();
+
+    let result = vm
+        .run_string("(begin (define test (lambda (x) x)) (test #f))", "")
+        .unwrap();
+    assert_eq!(result, vm.values.bool_false());
+
+    let result = vm
+        .run_string("(begin (define test (lambda x x)) (test))", "")
+        .unwrap();
+    assert_eq!(result, vm.values.proper_list(vec![]));
+
+    let result = vm
+        .run_string("(begin (define test (lambda x x)) (test #f))", "")
+        .unwrap();
+    assert_eq!(result, vm.values.proper_list(vec![vm.values.bool_false()]));
+
+    let result = vm
+        .run_string("(begin (define test (lambda x x)) (test #f #t))", "")
+        .unwrap();
+    assert_eq!(
+        result,
+        vm.values
+            .proper_list(vec![vm.values.bool_false(), vm.values.bool_true()])
+    );
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) x)) (test #t #f #f))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) y)) (test #f #t #f))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) z)) (test #f #f #t))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) rest)) (test #f #t #t))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.proper_list(vec![]));
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) rest)) (test #f #f #f #t #t))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(
+        result,
+        vm.values
+            .proper_list(vec![vm.values.bool_true(), vm.values.bool_true()])
+    );
+}
+
 #[test]
 fn test_vm_conditional() {
     let mut vm = VM::default();

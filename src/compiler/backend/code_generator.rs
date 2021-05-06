@@ -1,5 +1,4 @@
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
-use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
     apply::ApplicationExpression, assignment::SetExpression,
@@ -57,6 +56,57 @@ impl Local {
     }
 }
 
+pub struct Locals {
+    max: usize,
+    locals: Vec<Local>,
+}
+
+impl Locals {
+    pub fn new(limit: usize) -> Self {
+        let mut i = Self {
+            max: limit,
+            locals: Vec::with_capacity(limit),
+        };
+
+        // first slot is reserved for the vm
+        i.locals.push(Local::for_vm());
+        i
+    }
+
+    pub fn at<'a>(&'a self, idx: usize) -> &'a Local {
+        &self.locals[idx]
+    }
+
+    pub fn add(&mut self, name: Identifier, scope_depth: usize) -> Result<()> {
+        if self.locals.len() >= self.max {
+            Err(Error::TooManyLocals)
+        } else {
+            self.locals.push(Local::new(name, scope_depth));
+            Ok(())
+        }
+    }
+
+    pub fn pop(&mut self) -> Result<()> {
+        self.locals.pop();
+        Ok(())
+    }
+
+    pub fn last_address(&self) -> ConstAddressType {
+        (self.locals.len() - 1) as ConstAddressType
+    }
+
+    pub fn len(&self) -> usize {
+        self.locals.len()
+    }
+
+    pub fn resolve(&self, id: &Identifier) -> Option<usize> {
+        self.locals
+            .iter()
+            .rposition(|l| l.name == *id)
+            .map(|e| e - 1)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Target {
     TopLevel,
@@ -65,7 +115,7 @@ pub enum Target {
 
 pub struct CodeGenerator {
     scope_depth: usize,
-    locals: Vec<Local>,
+    locals: Locals,
     values: value::Factory,
     target: Target,
     chunk: Chunk,
@@ -73,8 +123,7 @@ pub struct CodeGenerator {
 
 impl CodeGenerator {
     pub fn new(target: Target) -> Self {
-        let mut locals = Vec::with_capacity(MAX_LOCALS);
-        locals.push(Local::for_vm()); // first slot is reserved for VM use
+        let mut locals = Locals::new(MAX_LOCALS);
 
         CodeGenerator {
             scope_depth: 0,
@@ -95,7 +144,7 @@ impl CodeGenerator {
         target: Target,
         ast: &BodyExpression,
         formals: &Formals,
-    ) -> Result<value::lambda::Procedure> {
+    ) -> Result<value::procedure::Procedure> {
         let mut generator = CodeGenerator::new(target.clone());
 
         generator.begin_scope();
@@ -104,19 +153,18 @@ impl CodeGenerator {
         }
         generator.emit_body(ast)?;
         generator.emit_return()?;
-        generator.end_scope();
+        generator.end_scope()?;
 
         match target {
-            Target::TopLevel => Ok(value::lambda::Procedure::thunk(generator.chunk)),
-            Target::Procedure(Some(name)) => Ok(value::lambda::Procedure::named(
+            Target::TopLevel => Ok(value::procedure::thunk(generator.chunk)),
+            Target::Procedure(Some(name)) => Ok(value::procedure::named(
                 name,
                 formals.arity(),
                 generator.chunk,
             )),
-            Target::Procedure(None) => Ok(value::lambda::Procedure::lambda(
-                formals.arity(),
-                generator.chunk,
-            )),
+            Target::Procedure(None) => {
+                Ok(value::procedure::lambda(formals.arity(), generator.chunk))
+            }
         }
     }
 
@@ -146,26 +194,26 @@ impl CodeGenerator {
         self.scope_depth += 1;
     }
 
-    fn end_scope(&mut self) {
+    fn end_scope(&mut self) -> Result<()> {
         self.scope_depth -= 1;
 
-        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth > self.scope_depth {
+        while self.locals.len() > 0
+            && self.locals.at(self.locals.len() - 1).depth > self.scope_depth
+        {
             self.current_chunk().write_instruction(Instruction::Pop);
-            self.locals.pop();
+            self.locals.pop()?;
         }
+
+        Ok(())
     }
 
     fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
-        if self.locals.len() >= MAX_LOCALS {
-            Err(Error::TooManyLocals)
-        } else {
-            self.locals.push(Local::new(name, self.scope_depth));
-            Ok((self.locals.len() - 1) as ConstAddressType)
-        }
+        self.locals.add(name, self.scope_depth)?;
+        Ok(self.locals.last_address())
     }
 
     fn resolve_local(&self, name: &Identifier) -> Option<usize> {
-        self.locals.iter().rev().position(|l| l.name == *name)
+        self.locals.resolve(name)
     }
 
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
@@ -268,7 +316,7 @@ impl CodeGenerator {
         for exp in &expr.rest {
             self.emit_instructions(&*exp)?;
         }
-        self.end_scope();
+        self.end_scope()?;
         Ok(())
     }
 
@@ -399,5 +447,21 @@ impl CodeGenerator {
     #[inline]
     fn current_chunk(&mut self) -> &mut Chunk {
         &mut self.chunk
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_local() {
+        let mut locals = Locals::new(10);
+
+        locals.add(Identifier::synthetic("foo"), 1).unwrap();
+        locals.add(Identifier::synthetic("bar"), 1).unwrap();
+        locals.add(Identifier::synthetic("barz"), 1).unwrap();
+
+        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0))
     }
 }

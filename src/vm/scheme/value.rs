@@ -4,6 +4,7 @@ pub mod error;
 pub mod foreign;
 pub mod lambda;
 pub mod list;
+pub mod procedure;
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table;
 use crate::compiler::utils::string_table::StringTable;
@@ -26,7 +27,7 @@ pub enum Value {
     InternedString(string_table::Interned),
     UninternedString(std::string::String),
     ProperList(list::List),
-    Procedure(Rc<lambda::Procedure>),
+    Procedure(Rc<procedure::Procedure>),
     ForeignProcedure(Rc<foreign::Procedure>),
     Unspecified,
 }
@@ -153,7 +154,7 @@ impl Factory {
         }
     }
 
-    pub fn procedure(&mut self, v: lambda::Procedure) -> Value {
+    pub fn procedure(&mut self, v: procedure::Procedure) -> Value {
         Value::Procedure(Rc::new(v))
     }
 

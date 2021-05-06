@@ -7,7 +7,7 @@ pub mod scheme;
 pub mod stack;
 
 use self::scheme::value::error;
-use self::scheme::value::{foreign, lambda::Arity};
+use self::scheme::value::{foreign, procedure::Arity};
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
@@ -24,7 +24,7 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
-    #[error("RuntimeError at {1}")]
+    #[error("RuntimeError at {1}: {0}")]
     RuntimeError(error::RuntimeError, usize),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
