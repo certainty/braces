@@ -5,6 +5,7 @@ use super::debug;
 use super::disassembler::Disassembler;
 use super::global::*;
 use super::scheme::value;
+use super::scheme::value::error;
 use super::scheme::value::lambda::Procedure;
 use super::scheme::value::{Symbol, Value};
 use super::stack::Stack;
@@ -33,6 +34,11 @@ impl CallFrame {
             stack_base,
             proc,
         }
+    }
+
+    #[inline]
+    pub fn set_ip(&mut self, address: usize) {
+        self.ip = address
     }
 
     #[inline]
@@ -125,6 +131,12 @@ impl<'a> Instance<'a> {
                 &Instruction::True => self.push_value(self.values.bool_true())?,
                 &Instruction::False => self.push_value(self.values.bool_false())?,
                 &Instruction::Nil => self.push_value(self.values.nil())?,
+                &Instruction::JumpIfFalse(addr) => {
+                    if self.peek(0).is_false() {
+                        self.active_mut_frame().set_ip(addr)
+                    }
+                }
+                &Instruction::Jump(addr) => self.active_mut_frame().set_ip(addr),
                 &Instruction::Const(addr) => self.push_value(self.read_constant(addr).clone())?,
                 &Instruction::Return => {
                     let value = self.pop();
@@ -141,7 +153,7 @@ impl<'a> Instance<'a> {
                     if let Some(value) = self.toplevel.get_owned(&id) {
                         self.push_value(value)?;
                     } else {
-                        return self.runtime_error(&format!("Variable {} is unbound", id.as_str()));
+                        return self.runtime_error(error::undefined_variable(id));
                     }
                 }
                 &Instruction::GetLocal(addr) => {
@@ -277,12 +289,14 @@ impl<'a> Instance<'a> {
                         self.push(Rc::new(v))?;
                         Ok(())
                     }
-                    Err(e) => {
-                        self.runtime_error(&format!("Error calling native procedure: {:?}", e))
-                    }
+                    Err(e) => self.runtime_error(error::foreign_error(
+                        "Error during foreign function",
+                        proc.clone(),
+                        e,
+                    )),
                 }
             }
-            _ => self.runtime_error(&format!("Operator is not a callable object")),
+            other => self.runtime_error(error::non_callable(other.clone())),
         }
     }
 
@@ -299,10 +313,7 @@ impl<'a> Instance<'a> {
         let id = self.read_identifier(addr)?;
 
         if !self.toplevel.get(&id).is_some() {
-            return self.runtime_error(&format!(
-                "Can't set! {} because it's undefined",
-                id.as_str()
-            ));
+            return self.runtime_error(error::undefined_variable(id.clone()));
         } else {
             self.toplevel.set(id.clone(), (*v).clone());
             self.push_value(self.values.unspecified())?;
@@ -327,9 +338,9 @@ impl<'a> Instance<'a> {
     }
 
     // TODO: add a representation for stack trace and add it to the error
-    fn runtime_error<T>(&self, message: &str) -> Result<T> {
+    fn runtime_error<T>(&self, e: error::RuntimeError) -> Result<T> {
         let result = Err(Error::RuntimeError(
-            message.to_string(),
+            e,
             self.active_frame()
                 .line_number_for_current_instruction()
                 .unwrap_or(0),

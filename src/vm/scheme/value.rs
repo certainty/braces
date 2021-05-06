@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub mod arbitrary;
+pub mod error;
 pub mod foreign;
 pub mod lambda;
 pub mod list;
@@ -28,6 +29,15 @@ pub enum Value {
     Procedure(Rc<lambda::Procedure>),
     ForeignProcedure(Rc<foreign::Procedure>),
     Unspecified,
+}
+
+impl Value {
+    pub fn is_false(&self) -> bool {
+        match self {
+            Self::Bool(false) => true,
+            _ => false,
+        }
+    }
 }
 
 #[repr(transparent)]

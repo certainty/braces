@@ -56,6 +56,10 @@ impl<T: Write> Disassembler<T> {
             &Instruction::True => self.disassemble_simple("OP_TRUE", address),
             &Instruction::False => self.disassemble_simple("OP_FALSE", address),
             &Instruction::Nil => self.disassemble_simple("OP_NIL", address),
+            &Instruction::JumpIfFalse(addr) => {
+                self.disassemble_jump("OP_JUMP_IF_FALSE", addr, address)
+            }
+            &Instruction::Jump(addr) => self.disassemble_jump("OP_JUMP", addr, address),
             &Instruction::GetGlobal(const_address) => {
                 self.disassemble_constant(chunk, "OP_GET_GLOBAL", address, const_address)
             }
@@ -88,6 +92,17 @@ impl<T: Write> Disassembler<T> {
         self.writer
             .write_fmt(format_args!("{:<16} {:?} \n", name, code))
             .unwrap();
+        address + 1
+    }
+
+    fn disassemble_jump(&mut self, name: &str, offset: usize, address: usize) -> usize {
+        self.writer
+            .write_fmt(format_args!(
+                "{:<16} {:04} -> {:04}\n",
+                name, address, offset
+            ))
+            .unwrap();
+
         address + 1
     }
 

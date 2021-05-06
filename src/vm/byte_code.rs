@@ -1,5 +1,5 @@
 pub mod chunk;
-use chunk::ConstAddressType;
+use chunk::{AddressType, ConstAddressType};
 
 #[repr(u8)]
 #[derive(Debug, Clone)]
@@ -10,6 +10,8 @@ pub enum Instruction {
     GetGlobal(ConstAddressType),
     GetLocal(ConstAddressType),
     Const(ConstAddressType),
+    JumpIfFalse(AddressType),
+    Jump(AddressType),
     Call(usize), // number of arguments
     Break,       // Reserved for future use
     Return,

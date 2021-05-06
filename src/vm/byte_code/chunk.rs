@@ -31,6 +31,10 @@ impl Chunk {
         &self.code[index]
     }
 
+    pub fn patch(&mut self, index: usize, inst: Instruction) {
+        self.code[index] = inst;
+    }
+
     pub fn size(&self) -> usize {
         self.code.len()
     }

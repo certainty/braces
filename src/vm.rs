@@ -6,6 +6,8 @@ pub mod instance;
 pub mod scheme;
 pub mod stack;
 
+use self::scheme::value::error;
+use self::scheme::value::{foreign, lambda::Arity};
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
@@ -18,14 +20,12 @@ use scheme::writer::Writer;
 use std::path::PathBuf;
 use thiserror::Error;
 
-use self::scheme::value::{foreign, lambda::Arity};
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
-    #[error("RuntimeError: {0} at line {1}")]
-    RuntimeError(String, usize),
+    #[error("RuntimeError at {1}")]
+    RuntimeError(error::RuntimeError, usize),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
 }
@@ -35,7 +35,7 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 pub struct VM {
     stack_size: usize,
-    values: value::Factory,
+    pub values: value::Factory,
     toplevel: TopLevel,
     writer: Writer,
 }
@@ -92,6 +92,11 @@ pub fn hello_world(_args: Vec<Value>) -> foreign::Result<Value> {
     Ok(Value::Unspecified)
 }
 
+pub fn scheme_inspect(args: Vec<Value>) -> foreign::Result<Value> {
+    println!("Debug: {:?}", args.first().unwrap());
+    Ok(Value::Unspecified)
+}
+
 impl Default for VM {
     fn default() -> Self {
         let mut vm = Self::new(64);
@@ -101,6 +106,14 @@ impl Default for VM {
             Arity::Exactly(0),
         ))
         .unwrap();
+
+        vm.register_foreign(foreign::Procedure::new(
+            "inspect",
+            scheme_inspect,
+            Arity::Exactly(1),
+        ))
+        .unwrap();
+
         vm
     }
 }
