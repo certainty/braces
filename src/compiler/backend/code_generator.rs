@@ -123,7 +123,7 @@ pub struct CodeGenerator {
 
 impl CodeGenerator {
     pub fn new(target: Target) -> Self {
-        let mut locals = Locals::new(MAX_LOCALS);
+        let locals = Locals::new(MAX_LOCALS);
 
         CodeGenerator {
             scope_depth: 0,

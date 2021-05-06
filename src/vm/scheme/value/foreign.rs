@@ -1,16 +1,10 @@
 use super::procedure;
 use super::procedure::HasArity;
 use super::Value;
-use thiserror::Error;
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Error in foreign function call")]
-    ForeignError,
-}
+use crate::vm::scheme::equality::SchemeEqual;
+use crate::vm::scheme::ffi::FunctionResult;
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-pub type ProcedureImpl = dyn Fn(Vec<Value>) -> Result<Value>;
+pub type ProcedureImpl = dyn Fn(Vec<Value>) -> FunctionResult<Value>;
 
 pub struct Procedure {
     pub name: String,
@@ -22,7 +16,7 @@ impl Procedure {
     pub fn new<S, I>(name: S, op: I, arity: procedure::Arity) -> Self
     where
         S: Into<String>,
-        I: 'static + Fn(Vec<Value>) -> Result<Value>,
+        I: 'static + Fn(Vec<Value>) -> FunctionResult<Value>,
     {
         Self {
             name: name.into(),
@@ -31,7 +25,7 @@ impl Procedure {
         }
     }
 
-    pub fn call(&self, arguments: Vec<Value>) -> Result<Value> {
+    pub fn call(&self, arguments: Vec<Value>) -> FunctionResult<Value> {
         (self.proc)(arguments)
     }
 }
@@ -57,5 +51,19 @@ impl std::fmt::Debug for Procedure {
 impl PartialEq for Procedure {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
+    }
+}
+
+impl SchemeEqual<Procedure> for Procedure {
+    fn is_eq(&self, other: &Procedure) -> bool {
+        (&*self.proc as *const _) == (&*other.proc as *const _)
+    }
+
+    fn is_eqv(&self, other: &Procedure) -> bool {
+        (&*self.proc as *const _) == (&*other.proc as *const _)
+    }
+
+    fn is_equal(&self, other: &Procedure) -> bool {
+        (&*self.proc as *const _) == (&*other.proc as *const _)
     }
 }

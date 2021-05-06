@@ -1,4 +1,5 @@
 use super::Value;
+use crate::vm::scheme::equality::SchemeEqual;
 use im::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
@@ -145,6 +146,32 @@ impl From<Vec<Value>> for List {
             List::Nil
         } else {
             List::Cons(ls)
+        }
+    }
+}
+
+impl SchemeEqual<List> for List {
+    fn is_eq(&self, other: &List) -> bool {
+        if self.len() != other.len() {
+            return false;
+        } else {
+            self.iter().zip(other.iter()).all(|(a, b)| a.is_eq(b))
+        }
+    }
+
+    fn is_eqv(&self, other: &List) -> bool {
+        if self.len() != other.len() {
+            return false;
+        } else {
+            self.iter().zip(other.iter()).all(|(a, b)| a.is_eqv(b))
+        }
+    }
+
+    fn is_equal(&self, other: &List) -> bool {
+        if self.len() != other.len() {
+            return false;
+        } else {
+            self.iter().zip(other.iter()).all(|(a, b)| a.is_equal(b))
         }
     }
 }

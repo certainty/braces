@@ -7,6 +7,10 @@ use std::rc::Rc;
 pub struct Interned(Rc<String>);
 
 impl Interned {
+    pub fn is_identifical(&self, other: &Interned) -> bool {
+        (&*self.0 as *const _) == (&*other.0 as *const _)
+    }
+
     pub fn as_str<'a>(&'a self) -> &'a str {
         &(*self.0)
     }

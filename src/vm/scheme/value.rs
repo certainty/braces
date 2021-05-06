@@ -5,12 +5,16 @@ pub mod foreign;
 pub mod lambda;
 pub mod list;
 pub mod procedure;
+pub mod string;
+pub mod symbol;
+use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
-use crate::compiler::utils::string_table;
 use crate::compiler::utils::string_table::StringTable;
 use std::convert::Into;
 use std::rc::Rc;
 use thiserror::Error;
+
+use super::equality::SchemeEqual;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -24,7 +28,7 @@ pub enum Value {
     Bool(bool),
     Symbol(Symbol),
     Char(char),
-    InternedString(string_table::Interned),
+    InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
     Procedure(Rc<procedure::Procedure>),
@@ -41,45 +45,53 @@ impl Value {
     }
 }
 
-#[repr(transparent)]
-#[derive(Clone, PartialEq, Hash, Eq)]
-pub struct Symbol(string_table::Interned);
-
-impl Symbol {
-    pub fn as_str<'a>(&'a self) -> &'a str {
-        self.0.as_str()
+impl SchemeEqual<Value> for Value {
+    fn is_eqv(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
+            (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
+            (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eqv(rhs),
+            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eqv(rhs),
+            (Value::UninternedString(_), Value::InternedString(_)) => false,
+            (Value::UninternedString(_), Value::UninternedString(_)) => false,
+            (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
+            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
+            (Value::Unspecified, Value::Unspecified) => false,
+            _ => false,
+        }
     }
-}
 
-impl std::fmt::Debug for Symbol {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter<'_>,
-    ) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_fmt(format_args!("sym#({})", self.as_str()))
+    fn is_eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
+            (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
+            (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
+            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
+            (Value::UninternedString(_), Value::InternedString(_)) => false,
+            (Value::UninternedString(_), Value::UninternedString(_)) => false,
+            (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
+            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
+            (Value::ForeignProcedure(lhs), Value::ForeignProcedure(rhs)) => lhs.is_eq(rhs),
+            (Value::Unspecified, Value::Unspecified) => false,
+            _ => false,
+        }
     }
-}
 
-#[repr(transparent)]
-#[derive(Clone, PartialEq)]
-pub struct InternedString(string_table::Interned);
-
-impl InternedString {
-    pub fn as_str<'a>(&'a self) -> &'a str {
-        self.0.as_str()
-    }
-}
-
-impl std::fmt::Debug for InternedString {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter<'_>,
-    ) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_fmt(format_args!(
-            "Interned({} @ {:p})",
-            self.as_str(),
-            self.as_str()
-        ))
+    fn is_equal(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
+            (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
+            (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_equal(rhs),
+            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_equal(rhs),
+            (Value::UninternedString(lhs), Value::InternedString(rhs)) => {
+                lhs.as_str() == rhs.as_str()
+            }
+            (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
+            (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
+            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
+            (Value::Unspecified, Value::Unspecified) => true,
+            _ => false,
+        }
     }
 }
 
@@ -138,7 +150,7 @@ impl Factory {
 
     pub fn interned_string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
         let k = self.strings.get_or_intern(v.into());
-        Value::InternedString(k)
+        Value::InternedString(InternedString(k))
     }
 
     pub fn string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
@@ -186,7 +198,8 @@ impl Factory {
         self.symbols
             .interned_vec()
             .iter()
-            .map(|e| Symbol(e.clone()))
+            .cloned()
+            .map(Symbol)
             .collect()
     }
 
@@ -194,7 +207,8 @@ impl Factory {
         self.strings
             .interned_vec()
             .iter()
-            .map(|e| InternedString(e.clone()))
+            .cloned()
+            .map(InternedString)
             .collect()
     }
 }

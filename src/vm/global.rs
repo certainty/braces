@@ -1,4 +1,5 @@
-use super::value::{Symbol, Value};
+use super::value::symbol::Symbol;
+use super::value::Value;
 use rustc_hash::FxHashMap;
 
 #[derive(Debug)]
