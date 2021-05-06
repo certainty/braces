@@ -6,6 +6,8 @@ pub mod instance;
 pub mod scheme;
 pub mod stack;
 
+use self::scheme::value::error;
+use self::scheme::value::{foreign, lambda::Arity};
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
@@ -18,14 +20,12 @@ use scheme::writer::Writer;
 use std::path::PathBuf;
 use thiserror::Error;
 
-use self::scheme::value::{foreign, lambda::Arity};
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
-    #[error("RuntimeError: {0} at line {1}")]
-    RuntimeError(String, usize),
+    #[error("RuntimeError at {1}")]
+    RuntimeError(error::RuntimeError, usize),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
 }

@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub mod arbitrary;
+pub mod error;
 pub mod foreign;
 pub mod lambda;
 pub mod list;

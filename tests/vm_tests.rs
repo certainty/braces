@@ -1,5 +1,8 @@
+use braces::vm::scheme::value::error;
 use braces::vm::scheme::value::Value;
+use braces::vm::Error;
 use braces::vm::VM;
+use matches::assert_matches;
 
 #[test]
 fn test_vm_literal() {
@@ -58,13 +61,18 @@ fn test_vm_lexical_scope() {
 fn test_vm_set() {
     let mut vm = VM::default();
 
-    let mut result = vm.run_string("(begin (set! x #t) x)", "").unwrap();
-    assert_eq!(result, vm.values.bool_true());
+    let result = vm.run_string("(begin (set! x #t) x)", "");
+    assert_matches!(
+        result,
+        Err(Error::RuntimeError(
+            error::RuntimeError::UndefinedVariable(_),
+            _
+        ))
+    );
 
-    result = vm
+    let result = vm
         .run_string(r#"(let ((foo #t)) (set! foo 'bar) foo) "#, "")
         .unwrap();
-
     assert_eq!(result, vm.values.symbol("bar"));
 }
 

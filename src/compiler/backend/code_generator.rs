@@ -189,8 +189,8 @@ impl CodeGenerator {
 
     fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
         match ast {
-            Expression::Identifier(id) => self.emit_read_variable(id)?,
-            Expression::Assign(expr) => self.emit_assignment(expr)?,
+            Expression::Identifier(id) => self.emit_get_variable(id)?,
+            Expression::Assign(expr) => self.emit_set_variable(expr)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr)?,
@@ -278,7 +278,7 @@ impl CodeGenerator {
         self.emit_constant(proc, expr.source_location())
     }
 
-    fn emit_read_variable(&mut self, id: &Identifier) -> Result<()> {
+    fn emit_get_variable(&mut self, id: &Identifier) -> Result<()> {
         if let Some(addr) = self.resolve_local(id) {
             self.emit_instruction(
                 Instruction::GetLocal(addr as ConstAddressType),
@@ -291,13 +291,22 @@ impl CodeGenerator {
         }
     }
 
-    fn emit_bindings(&mut self, _bindings: &Vec<BindingSpec>) -> Result<()> {
-        //TODO: turn this into proper local scope
-        // for binding in bindings {
-        //     self.emit_assignment(&binding.0, &binding.1, &binding.1.source_location())?;
-        // }
+    fn emit_set_variable(&mut self, expr: &SetExpression) -> Result<()> {
+        // push the value of the expression
+        self.emit_instructions(&expr.value)?;
 
-        Ok(())
+        // is it local
+        if let Some(addr) = self.resolve_local(&expr.name) {
+            self.emit_instruction(
+                Instruction::SetLocal(addr as ConstAddressType),
+                expr.source_location(),
+            )
+        } else {
+            // top level variable
+            let id_sym = self.sym(&expr.name.string());
+            let const_addr = self.current_chunk().add_constant(id_sym);
+            self.emit_instruction(Instruction::SetGlobal(const_addr), expr.source_location())
+        }
     }
 
     fn emit_body(&mut self, body: &BodyExpression) -> Result<()> {
@@ -334,21 +343,6 @@ impl CodeGenerator {
                 }
             }
             DefinitionExpression::Begin(_inner, _loc) => todo!(),
-        }
-    }
-
-    fn emit_assignment(&mut self, expr: &SetExpression) -> Result<()> {
-        self.emit_instructions(&expr.value)?;
-
-        if self.scope_depth > 0 {
-            // local variable
-            let const_addr = self.register_local(expr.name.clone())?;
-            self.emit_instruction(Instruction::SetLocal(const_addr), expr.source_location())
-        } else {
-            // top level variable
-            let id_sym = self.sym(&expr.name.string());
-            let const_addr = self.current_chunk().add_constant(id_sym);
-            self.emit_instruction(Instruction::SetGlobal(const_addr), expr.source_location())
         }
     }
 

@@ -68,10 +68,6 @@ impl<V> Stack<V> {
         self.repr.as_mut_ptr()
     }
 
-    pub fn frame_from(&mut self, base: usize) -> Frame<V> {
-        Frame::from(self.as_mut_ptr(), base)
-    }
-
     pub fn len(&self) -> usize {
         self.repr.len()
     }
@@ -89,29 +85,6 @@ impl<V> Stack<V> {
 impl<V> Default for Stack<V> {
     fn default() -> Stack<V> {
         Stack::new(DEFAULT_STACK_MAX)
-    }
-}
-
-// A stack frame is a windowed view into a stack
-// You can get and set values in that frame
-// Note that the Frame owns the stack for the time it lives and it may give it back
-#[derive(Debug)]
-pub struct Frame<V> {
-    base: usize,
-    slots: *mut V,
-}
-
-impl<V> Frame<V> {
-    pub fn from(slots: *mut V, base: usize) -> Frame<V> {
-        Self { base, slots }
-    }
-
-    pub fn get<'a>(&'a self, index: usize) -> &'a V {
-        unsafe { &*self.slots.add(self.base + index) }
-    }
-
-    pub fn set(&mut self, index: usize, v: V) {
-        unsafe { (*self.slots.add(self.base + index)) = v }
     }
 }
 
@@ -153,44 +126,5 @@ mod tests {
 
         assert_eq!(stack.peek(0), &Value::Char('d'));
         assert_eq!(stack.peek(3), &Value::Bool(true));
-    }
-
-    #[test]
-    fn test_frame_get() {
-        let mut stack: Stack<Value> = Stack::default();
-
-        stack.push(Value::Bool(true));
-        stack.push(Value::Bool(false));
-        stack.push(Value::Char('c'));
-        stack.push(Value::Char('d'));
-
-        let frame = stack.frame_from(1);
-
-        assert_eq!(frame.get(0), &Value::Bool(false));
-        assert_eq!(frame.get(1), &Value::Char('c'));
-    }
-
-    #[test]
-    fn test_frame_set() {
-        let mut stack: Stack<Value> = Stack::default();
-
-        stack.push(Value::Bool(true));
-        stack.push(Value::Bool(false));
-        stack.push(Value::Char('c'));
-        stack.push(Value::Char('d'));
-
-        let mut frame = stack.frame_from(1);
-        frame.set(0, Value::Bool(true));
-        frame.set(2, Value::Char('y'));
-
-        assert_eq!(
-            stack.as_vec(),
-            &vec![
-                Value::Bool(true),
-                Value::Bool(true),
-                Value::Char('c'),
-                Value::Char('y')
-            ]
-        );
     }
 }
