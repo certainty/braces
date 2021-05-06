@@ -160,4 +160,21 @@ mod tests {
         assert_parse_error("(lambda #t)");
         assert_parse_error("(lambda (foo . bar . baz) #t)");
     }
+
+    #[test]
+    fn test_formals_identifiers() {
+        let formals = Formals::VarArg(
+            vec![Identifier::synthetic("x"), Identifier::synthetic("y")],
+            Identifier::synthetic("z"),
+        );
+
+        assert_eq!(
+            formals.identifiers(),
+            vec![
+                Identifier::synthetic("x"),
+                Identifier::synthetic("y"),
+                Identifier::synthetic("z")
+            ]
+        )
+    }
 }

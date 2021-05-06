@@ -100,6 +100,68 @@ fn test_vm_lambda() {
         ))
     );
 }
+
+#[test]
+fn test_vm_lambda_formals() {
+    let mut vm = VM::default();
+
+    let result = vm
+        .run_string("(begin (define test (lambda (x) x)) (test #f))", "")
+        .unwrap();
+    assert_eq!(result, vm.values.bool_false());
+
+    let result = vm
+        .run_string("(begin (define test (lambda x x)) (test))", "")
+        .unwrap();
+    assert_eq!(result, vm.values.proper_list(vec![]));
+
+    let result = vm
+        .run_string("(begin (define test (lambda x x)) (test #f))", "")
+        .unwrap();
+    assert_eq!(result, vm.values.proper_list(vec![vm.values.bool_false()]));
+
+    let result = vm
+        .run_string("(begin (define test (lambda x x)) (test #f #t))", "")
+        .unwrap();
+    assert_eq!(
+        result,
+        vm.values
+            .proper_list(vec![vm.values.bool_false(), vm.values.bool_true()])
+    );
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) x)) (test #t #f #f))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) y)) (test #f #t #f))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) z)) (test #f #f #t))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) rest)) (test #f #t #t))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.proper_list(vec![]));
+}
+
 #[test]
 fn test_vm_conditional() {
     let mut vm = VM::default();

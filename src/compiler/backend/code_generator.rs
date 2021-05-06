@@ -56,6 +56,54 @@ impl Local {
     }
 }
 
+pub struct Locals {
+    max: usize,
+    locals: Vec<Local>,
+}
+
+impl Locals {
+    pub fn new(limit: usize) -> Self {
+        let mut i = Self {
+            max: limit,
+            locals: Vec::with_capacity(limit),
+        };
+
+        // first slot is reserved for the vm
+        i.locals.push(Local::for_vm());
+        i
+    }
+
+    pub fn at<'a>(&'a self, idx: usize) -> &'a Local {
+        &self.locals[idx]
+    }
+
+    pub fn add(&mut self, name: Identifier, scope_depth: usize) -> Result<()> {
+        if self.locals.len() >= self.max {
+            Err(Error::TooManyLocals)
+        } else {
+            self.locals.push(Local::new(name, scope_depth));
+            Ok(())
+        }
+    }
+
+    pub fn pop(&mut self) -> Result<()> {
+        self.locals.pop();
+        Ok(())
+    }
+
+    pub fn last_address(&self) -> ConstAddressType {
+        (self.locals.len() - 1) as ConstAddressType
+    }
+
+    pub fn len(&self) -> usize {
+        self.locals.len()
+    }
+
+    pub fn resolve(&self, id: &Identifier) -> Option<usize> {
+        self.locals.iter().rev().position(|l| l.name == *id)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Target {
     TopLevel,
@@ -64,7 +112,7 @@ pub enum Target {
 
 pub struct CodeGenerator {
     scope_depth: usize,
-    locals: Vec<Local>,
+    locals: Locals,
     values: value::Factory,
     target: Target,
     chunk: Chunk,
@@ -72,8 +120,7 @@ pub struct CodeGenerator {
 
 impl CodeGenerator {
     pub fn new(target: Target) -> Self {
-        let mut locals = Vec::with_capacity(MAX_LOCALS);
-        locals.push(Local::for_vm()); // first slot is reserved for VM use
+        let mut locals = Locals::new(MAX_LOCALS);
 
         CodeGenerator {
             scope_depth: 0,
@@ -103,7 +150,7 @@ impl CodeGenerator {
         }
         generator.emit_body(ast)?;
         generator.emit_return()?;
-        generator.end_scope();
+        generator.end_scope()?;
 
         match target {
             Target::TopLevel => Ok(value::procedure::thunk(generator.chunk)),
@@ -144,26 +191,26 @@ impl CodeGenerator {
         self.scope_depth += 1;
     }
 
-    fn end_scope(&mut self) {
+    fn end_scope(&mut self) -> Result<()> {
         self.scope_depth -= 1;
 
-        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth > self.scope_depth {
+        while self.locals.len() > 0
+            && self.locals.at(self.locals.len() - 1).depth > self.scope_depth
+        {
             self.current_chunk().write_instruction(Instruction::Pop);
-            self.locals.pop();
+            self.locals.pop()?;
         }
+
+        Ok(())
     }
 
     fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
-        if self.locals.len() >= MAX_LOCALS {
-            Err(Error::TooManyLocals)
-        } else {
-            self.locals.push(Local::new(name, self.scope_depth));
-            Ok((self.locals.len() - 1) as ConstAddressType)
-        }
+        self.locals.add(name, self.scope_depth)?;
+        Ok(self.locals.last_address())
     }
 
     fn resolve_local(&self, name: &Identifier) -> Option<usize> {
-        self.locals.iter().rev().position(|l| l.name == *name)
+        self.locals.resolve(name)
     }
 
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
@@ -266,7 +313,7 @@ impl CodeGenerator {
         for exp in &expr.rest {
             self.emit_instructions(&*exp)?;
         }
-        self.end_scope();
+        self.end_scope()?;
         Ok(())
     }
 

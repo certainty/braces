@@ -57,7 +57,6 @@ impl CallFrame {
 
 //////////////////////////////////////////////////////////////////////////////
 
-type StackValue = Rc<Value>;
 type ValueStack = Stack<Value>;
 type CallStack = Stack<CallFrame>;
 
@@ -273,6 +272,7 @@ impl<'a> Instance<'a> {
     }
 
     // specific VM instructions
+
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
         match self.peek(args) {
@@ -285,8 +285,8 @@ impl<'a> Instance<'a> {
     #[inline]
     fn apply_native(&mut self, proc: std::rc::Rc<Procedure>, arg_count: usize) -> Result<()> {
         self.check_arity(&proc, arg_count)?;
-        self.bind_arguments(&proc, arg_count)?;
-        self.push_frame(proc, arg_count);
+        let arg_count = self.bind_arguments(&proc, arg_count)?;
+        self.push_frame(proc, arg_count)?;
         #[cfg(feature = "debug_vm")]
         self.disassemble_frame();
         Ok(())
@@ -313,20 +313,24 @@ impl<'a> Instance<'a> {
         }
     }
 
-    fn bind_arguments<T: HasArity>(&mut self, proc: &T, arg_count: usize) -> Result<()> {
+    fn bind_arguments<T: HasArity>(&mut self, proc: &T, arg_count: usize) -> Result<usize> {
         match proc.arity() {
-            Arity::Exactly(_) => Ok(()), // nothing to do as the variables are layed out as expected already on the stack
-            Arity::AtLeast(n) if *n == arg_count => Ok(()), // same as above
+            Arity::Exactly(_) => Ok(arg_count), // nothing to do as the variables are layed out as expected already on the stack
             Arity::AtLeast(n) => {
                 // stuff the last values into a new local
-                let rest_values = self.pop_n(n - arg_count);
+                let rest_count = arg_count - n;
+                let mut rest_values = self.pop_n(rest_count);
+                rest_values.reverse();
                 let rest_list = self.values.proper_list(rest_values);
-                self.push(rest_list)
+                self.push(rest_list)?;
+                Ok(n + 1)
             }
             Arity::Many => {
-                let rest_values = self.pop_n(arg_count);
+                let mut rest_values = self.pop_n(arg_count);
+                rest_values.reverse();
                 let rest_list = self.values.proper_list(rest_values);
-                self.push(rest_list)
+                self.push(rest_list)?;
+                Ok(1)
             }
         }
     }
