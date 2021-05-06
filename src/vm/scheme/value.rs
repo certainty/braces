@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub mod arbitrary;
+pub mod closure;
 pub mod error;
 pub mod foreign;
 pub mod lambda;
@@ -7,7 +8,7 @@ pub mod list;
 pub mod procedure;
 pub mod string;
 pub mod symbol;
-use self::{string::InternedString, symbol::Symbol};
+use self::{closure::Closure, string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
 use std::convert::Into;
@@ -31,6 +32,7 @@ pub enum Value {
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
+    Closure(Closure),
     Procedure(Rc<procedure::Procedure>),
     ForeignProcedure(Rc<foreign::Procedure>),
     Unspecified,

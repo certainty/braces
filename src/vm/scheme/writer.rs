@@ -35,6 +35,7 @@ impl Writer {
             Value::Char(c) => self.write_char(*c),
             Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
+            Value::Closure(closure) => self.write_procedure(&closure.proc),
             Value::Procedure(proc) => self.write_procedure(&proc),
             Value::ForeignProcedure(proc) => self.write_foreign_procedure(&proc),
             Value::ProperList(elts) => {
