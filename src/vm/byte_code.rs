@@ -10,6 +10,7 @@ pub enum Instruction {
     GetGlobal(ConstAddressType),
     GetLocal(ConstAddressType),
     Const(ConstAddressType),
+    Closure(ConstAddressType),
     JumpIfFalse(AddressType),
     Jump(AddressType),
     Call(usize), // number of arguments

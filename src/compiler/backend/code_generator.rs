@@ -323,7 +323,8 @@ impl CodeGenerator {
     fn emit_lambda(&mut self, expr: &LambdaExpression) -> Result<()> {
         let lambda = Self::generate_procedure(Target::Procedure(None), &expr.body, &expr.formals)?;
         let proc = self.values.procedure(lambda);
-        self.emit_constant(proc, expr.source_location())
+
+        self.emit_closure(proc, expr.source_location())
     }
 
     fn emit_get_variable(&mut self, id: &Identifier) -> Result<()> {
@@ -399,6 +400,17 @@ impl CodeGenerator {
         let inst_addr = self
             .current_chunk()
             .write_instruction(Instruction::Const(const_addr));
+
+        self.current_chunk()
+            .write_line(inst_addr, inst_addr, loc.line);
+        Ok(())
+    }
+
+    fn emit_closure(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
+        let const_addr = self.current_chunk().add_constant(value);
+        let inst_addr = self
+            .current_chunk()
+            .write_instruction(Instruction::Closure(const_addr));
 
         self.current_chunk()
             .write_line(inst_addr, inst_addr, loc.line);

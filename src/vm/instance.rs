@@ -141,6 +141,10 @@ impl<'a> Instance<'a> {
                 }
                 &Instruction::Jump(addr) => self.active_mut_frame().set_ip(addr),
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
+                &Instruction::Closure(addr) => match self.read_constant(addr).clone() {
+                    Value::Procedure(proc) => self.push(Value::Closure(proc.into()))?,
+                    _ => return self.compiler_bug("Expected closure function"),
+                },
                 &Instruction::Return => {
                     let value = self.pop();
 
@@ -276,10 +280,11 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
-        match self.peek(args) {
+        match &self.peek(args) {
+            &value::Value::Closure(cl) => self.apply_native(cl.proc.clone(), args),
             value::Value::Procedure(p) => self.apply_native(p.clone(), args),
             value::Value::ForeignProcedure(p) => self.apply_foreign(p.clone(), args),
-            other => return self.runtime_error(error::non_callable(other.clone())),
+            &other => return self.runtime_error(error::non_callable(other.clone())),
         }
     }
 

@@ -45,10 +45,9 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Return => self.disassemble_simple("OP_RET", address),
-            &Instruction::Call(_args) => {
-                self.disassemble_simple("OP_CALL", address)
-                // This creates an endless loop
-                //self.disassemble_code_at(chunk, "OP_CALL", address - (args as usize) - 1)
+            &Instruction::Call(_args) => self.disassemble_simple("OP_CALL", address),
+            &Instruction::Closure(addr) => {
+                self.disassemble_closure(chunk, "OP_CLOSURE", address, addr)
             }
             &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
             &Instruction::Break => self.disassemble_simple("OP_BREAK", address),
@@ -103,6 +102,25 @@ impl<T: Write> Disassembler<T> {
             ))
             .unwrap();
 
+        address + 1
+    }
+
+    fn disassemble_closure(
+        &mut self,
+        chunk: &Chunk,
+        name: &str,
+        address: AddressType,
+        constant_address: ConstAddressType,
+    ) -> usize {
+        let v = &chunk.constants[constant_address as usize];
+        self.writer
+            .write_fmt(format_args!(
+                "{:<16} {:04} {}\n",
+                name,
+                constant_address,
+                &self.disassemble_value(v)
+            ))
+            .unwrap();
         address + 1
     }
 
