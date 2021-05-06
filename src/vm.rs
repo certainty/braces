@@ -35,7 +35,7 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 pub struct VM {
     stack_size: usize,
-    values: value::Factory,
+    pub values: value::Factory,
     toplevel: TopLevel,
     writer: Writer,
 }
