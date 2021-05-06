@@ -1,6 +1,5 @@
 #[cfg(feature = "debug_vm")]
 use super::disassembler::Disassembler;
-use super::global::*;
 use super::scheme::value;
 use super::scheme::value::error;
 use super::scheme::value::procedure::Procedure;
@@ -14,6 +13,7 @@ use super::{
 };
 use super::{byte_code::Instruction, scheme::value::procedure::Arity};
 use super::{debug, scheme::value::foreign};
+use super::{global::*, scheme::value::closure::Closure};
 use crate::vm::byte_code::chunk::ConstAddressType;
 use std::rc::Rc;
 
@@ -26,17 +26,17 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct CallFrame {
-    pub proc: Rc<Procedure>,
+    pub closure: Closure,
     pub ip: usize,
     pub stack_base: usize,
 }
 
 impl CallFrame {
-    pub fn new(proc: Rc<Procedure>, stack_base: usize) -> Self {
+    pub fn new(closure: Closure, stack_base: usize) -> Self {
         Self {
             ip: 0,
             stack_base,
-            proc,
+            closure,
         }
     }
 
@@ -47,12 +47,12 @@ impl CallFrame {
 
     #[inline]
     pub fn code(&self) -> &Chunk {
-        self.proc.code()
+        self.closure.proc.code()
     }
 
     #[inline]
     pub fn line_number_for_current_instruction(&self) -> Option<LineNumber> {
-        self.proc.code().find_line(self.ip).map(|e| e.2)
+        self.closure.proc.code().find_line(self.ip).map(|e| e.2)
     }
 }
 
@@ -88,13 +88,13 @@ impl<'a> Instance<'a> {
     ) -> Self {
         let mut stack = ValueStack::new(call_stack_size * 255);
         let mut call_stack = CallStack::new(call_stack_size);
-        let initial_procedure = Rc::new(proc);
+        let initial_closure: Closure = proc.into();
 
         // the first value on the stack is the initial procedure
-        stack.push(Value::Procedure(initial_procedure.clone()));
+        stack.push(Value::Closure(initial_closure.clone()));
 
         // the first active stack frame is that of the current procedure
-        call_stack.push(CallFrame::new(initial_procedure.clone(), 0));
+        call_stack.push(CallFrame::new(initial_closure.into(), 0));
 
         let active_frame = call_stack.top_mut_ptr();
 
@@ -241,13 +241,9 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn push_frame(
-        &mut self,
-        proc: Rc<value::procedure::Procedure>,
-        arg_count: usize,
-    ) -> Result<()> {
+    fn push_frame(&mut self, closure: value::closure::Closure, arg_count: usize) -> Result<()> {
         let base = std::cmp::max(self.stack.len() - arg_count, 0);
-        let frame = CallFrame::new(proc, base);
+        let frame = CallFrame::new(closure, base);
         self.call_stack.push(frame);
         self.active_frame = self.call_stack.top_mut_ptr();
         Ok(())
@@ -292,7 +288,7 @@ impl<'a> Instance<'a> {
     fn apply_native(&mut self, proc: std::rc::Rc<Procedure>, arg_count: usize) -> Result<()> {
         self.check_arity(&proc, arg_count)?;
         let arg_count = self.bind_arguments(&proc, arg_count)?;
-        self.push_frame(proc, arg_count)?;
+        self.push_frame(proc.into(), arg_count)?;
         #[cfg(feature = "debug_vm")]
         self.disassemble_frame();
         Ok(())
