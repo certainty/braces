@@ -7,7 +7,7 @@ pub mod scheme;
 pub mod stack;
 
 use self::scheme::value::error;
-use self::scheme::value::{foreign, lambda::Arity};
+use self::scheme::value::{foreign, procedure::Arity};
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;

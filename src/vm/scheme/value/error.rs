@@ -1,3 +1,4 @@
+use super::procedure::Arity;
 use super::{foreign, Symbol, Value};
 use std::rc::Rc;
 use thiserror::Error;
@@ -6,12 +7,18 @@ use thiserror::Error;
 pub enum RuntimeError {
     #[error("UndefinedVariableError: Variable `{0:?}` is undefined")]
     UndefinedVariable(Symbol),
+    #[error("ArityError: Function expected `{0:?}` arguments")]
+    ArityError(Arity, usize),
     #[error("ArgumentError: `{0}` is undefined")]
     ArgumentError(String),
     #[error("AppplicationError: `{0:?}` is not callable")]
     NoncallableError(Value),
     #[error("ForeignError:  {0} ")]
     ForeignError(String, Rc<foreign::Procedure>, foreign::Error),
+}
+
+pub fn arity_mismatch(arity: Arity, arg_count: usize) -> RuntimeError {
+    RuntimeError::ArityError(arity, arg_count)
 }
 
 pub fn non_callable(v: Value) -> RuntimeError {

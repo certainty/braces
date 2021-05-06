@@ -1,4 +1,5 @@
-use super::lambda;
+use super::procedure;
+use super::procedure::HasArity;
 use super::Value;
 use thiserror::Error;
 #[derive(Error, Debug)]
@@ -13,12 +14,12 @@ pub type ProcedureImpl = dyn Fn(Vec<Value>) -> Result<Value>;
 
 pub struct Procedure {
     pub name: String,
-    pub arity: lambda::Arity,
+    pub arity: procedure::Arity,
     proc: Box<ProcedureImpl>,
 }
 
 impl Procedure {
-    pub fn new<S, I>(name: S, op: I, arity: lambda::Arity) -> Self
+    pub fn new<S, I>(name: S, op: I, arity: procedure::Arity) -> Self
     where
         S: Into<String>,
         I: 'static + Fn(Vec<Value>) -> Result<Value>,
@@ -32,6 +33,18 @@ impl Procedure {
 
     pub fn call(&self, arguments: Vec<Value>) -> Result<Value> {
         (self.proc)(arguments)
+    }
+}
+
+impl HasArity for Procedure {
+    fn arity<'a>(&'a self) -> &'a procedure::Arity {
+        &self.arity
+    }
+}
+
+impl HasArity for std::rc::Rc<Procedure> {
+    fn arity<'a>(&'a self) -> &'a procedure::Arity {
+        &self.arity
     }
 }
 

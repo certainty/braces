@@ -1,15 +1,18 @@
-use super::byte_code::chunk::{Chunk, LineNumber};
-use super::byte_code::Instruction;
 use super::debug;
 #[cfg(feature = "debug_vm")]
 use super::disassembler::Disassembler;
 use super::global::*;
 use super::scheme::value;
 use super::scheme::value::error;
-use super::scheme::value::lambda::Procedure;
+use super::scheme::value::procedure::Procedure;
 use super::scheme::value::{Symbol, Value};
 use super::stack::Stack;
 use super::Error;
+use super::{
+    byte_code::chunk::{Chunk, LineNumber},
+    scheme::value::procedure::HasArity,
+};
+use super::{byte_code::Instruction, scheme::value::procedure::Arity};
 use crate::vm::byte_code::chunk::ConstAddressType;
 use std::rc::Rc;
 
@@ -78,7 +81,7 @@ type Result<T> = std::result::Result<T, Error>;
 // Most notably access to the stack and the callstack (including ip increments)
 impl<'a> Instance<'a> {
     pub fn new(
-        proc: value::lambda::Procedure,
+        proc: Procedure,
         call_stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
@@ -105,7 +108,7 @@ impl<'a> Instance<'a> {
     }
 
     pub fn interprete(
-        proc: value::lambda::Procedure,
+        proc: Procedure,
         stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
@@ -240,7 +243,11 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn push_frame(&mut self, proc: Rc<value::lambda::Procedure>, arg_count: usize) -> Result<()> {
+    fn push_frame(
+        &mut self,
+        proc: Rc<value::procedure::Procedure>,
+        arg_count: usize,
+    ) -> Result<()> {
         let base = std::cmp::max(self.stack.len() - arg_count, 0);
         let frame = CallFrame::new(proc, base);
         self.call_stack.push(frame);
@@ -277,12 +284,14 @@ impl<'a> Instance<'a> {
         //TODO: make sure that the arguments match the procedures expectations
         match &*self.peek(args) {
             value::Value::Procedure(proc) => {
+                self.check_arity(proc, args)?;
                 self.push_frame(proc.clone(), args)?;
                 #[cfg(feature = "debug_vm")]
                 self.disassemble_frame();
                 Ok(())
             }
             value::Value::ForeignProcedure(proc) => {
+                self.check_arity(proc, args)?;
                 let arguments = self.pop_n(args);
                 match proc.call(arguments.iter().map(|v| (**v).clone()).collect()) {
                     Ok(v) => {
@@ -297,6 +306,15 @@ impl<'a> Instance<'a> {
                 }
             }
             other => self.runtime_error(error::non_callable(other.clone())),
+        }
+    }
+
+    fn check_arity<T: HasArity>(&self, proc: &T, arg_count: usize) -> Result<()> {
+        match proc.arity() {
+            Arity::Exactly(n) if arg_count == *n => Ok(()),
+            Arity::AtLeast(n) if arg_count <= *n => Ok(()),
+            Arity::Many => Ok(()),
+            other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count)),
         }
     }
 

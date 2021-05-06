@@ -1,5 +1,4 @@
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
-use crate::compiler::frontend::parser::expression::letexp::{BindingSpec, LetExpression};
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
     apply::ApplicationExpression, assignment::SetExpression,
@@ -95,7 +94,7 @@ impl CodeGenerator {
         target: Target,
         ast: &BodyExpression,
         formals: &Formals,
-    ) -> Result<value::lambda::Procedure> {
+    ) -> Result<value::procedure::Procedure> {
         let mut generator = CodeGenerator::new(target.clone());
 
         generator.begin_scope();
@@ -107,16 +106,15 @@ impl CodeGenerator {
         generator.end_scope();
 
         match target {
-            Target::TopLevel => Ok(value::lambda::Procedure::thunk(generator.chunk)),
-            Target::Procedure(Some(name)) => Ok(value::lambda::Procedure::named(
+            Target::TopLevel => Ok(value::procedure::thunk(generator.chunk)),
+            Target::Procedure(Some(name)) => Ok(value::procedure::named(
                 name,
                 formals.arity(),
                 generator.chunk,
             )),
-            Target::Procedure(None) => Ok(value::lambda::Procedure::lambda(
-                formals.arity(),
-                generator.chunk,
-            )),
+            Target::Procedure(None) => {
+                Ok(value::procedure::lambda(formals.arity(), generator.chunk))
+            }
         }
     }
 

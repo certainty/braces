@@ -29,11 +29,11 @@ pub struct Compiler {
 #[derive(Clone, Debug)]
 pub struct CompilationUnit {
     pub values: value::Factory,
-    pub proc: value::lambda::Procedure,
+    pub proc: value::procedure::Procedure,
 }
 
 impl CompilationUnit {
-    pub fn new(values: value::Factory, proc: value::lambda::Procedure) -> Self {
+    pub fn new(values: value::Factory, proc: value::procedure::Procedure) -> Self {
         CompilationUnit { values, proc }
     }
 }
