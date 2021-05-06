@@ -160,6 +160,18 @@ fn test_vm_lambda_formals() {
         )
         .unwrap();
     assert_eq!(result, vm.values.proper_list(vec![]));
+
+    let result = vm
+        .run_string(
+            "(begin (define test (lambda (x y z . rest) rest)) (test #f #f #f #t #t))",
+            "",
+        )
+        .unwrap();
+    assert_eq!(
+        result,
+        vm.values
+            .proper_list(vec![vm.values.bool_true(), vm.values.bool_true()])
+    );
 }
 
 #[test]

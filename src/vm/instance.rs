@@ -338,7 +338,7 @@ impl<'a> Instance<'a> {
     fn check_arity<T: HasArity>(&self, proc: &T, arg_count: usize) -> Result<()> {
         match proc.arity() {
             Arity::Exactly(n) if arg_count == *n => Ok(()),
-            Arity::AtLeast(n) if arg_count <= *n => Ok(()),
+            Arity::AtLeast(n) if arg_count >= *n => Ok(()),
             Arity::Many => Ok(()),
             other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count)),
         }

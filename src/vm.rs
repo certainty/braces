@@ -24,7 +24,7 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
-    #[error("RuntimeError at {1}")]
+    #[error("RuntimeError at {1}: {0}")]
     RuntimeError(error::RuntimeError, usize),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),

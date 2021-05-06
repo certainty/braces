@@ -100,7 +100,10 @@ impl Locals {
     }
 
     pub fn resolve(&self, id: &Identifier) -> Option<usize> {
-        self.locals.iter().rev().position(|l| l.name == *id)
+        self.locals
+            .iter()
+            .rposition(|l| l.name == *id)
+            .map(|e| e - 1)
     }
 }
 
@@ -444,5 +447,21 @@ impl CodeGenerator {
     #[inline]
     fn current_chunk(&mut self) -> &mut Chunk {
         &mut self.chunk
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_local() {
+        let mut locals = Locals::new(10);
+
+        locals.add(Identifier::synthetic("foo"), 1).unwrap();
+        locals.add(Identifier::synthetic("bar"), 1).unwrap();
+        locals.add(Identifier::synthetic("barz"), 1).unwrap();
+
+        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0))
     }
 }
