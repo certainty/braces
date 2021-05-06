@@ -14,6 +14,7 @@ use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use global::TopLevel;
 use instance::Instance;
+use scheme::core;
 use scheme::value;
 use scheme::value::Value;
 use scheme::writer::Writer;
@@ -87,33 +88,10 @@ impl VM {
     }
 }
 
-pub fn hello_world(_args: Vec<Value>) -> foreign::Result<Value> {
-    println!("Hello world from native!");
-    Ok(Value::Unspecified)
-}
-
-pub fn scheme_inspect(args: Vec<Value>) -> foreign::Result<Value> {
-    println!("Debug: {:?}", args.first().unwrap());
-    Ok(Value::Unspecified)
-}
-
 impl Default for VM {
     fn default() -> Self {
         let mut vm = Self::new(64);
-        vm.register_foreign(foreign::Procedure::new(
-            "hello-world",
-            hello_world,
-            Arity::Exactly(0),
-        ))
-        .unwrap();
-
-        vm.register_foreign(foreign::Procedure::new(
-            "inspect",
-            scheme_inspect,
-            Arity::Exactly(1),
-        ))
-        .unwrap();
-
+        core::register(&mut vm);
         vm
     }
 }

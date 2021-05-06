@@ -1,5 +1,6 @@
 use super::lambda;
 use crate::vm::byte_code::chunk::Chunk;
+use crate::vm::scheme::equality::SchemeEqual;
 #[derive(Debug, Clone)]
 pub enum Arity {
     Exactly(usize),
@@ -30,6 +31,32 @@ impl Procedure {
             named.name.clone()
         } else {
             String::from("lambda")
+        }
+    }
+}
+
+impl SchemeEqual<Procedure> for Procedure {
+    fn is_eq(&self, other: &Procedure) -> bool {
+        match (self, other) {
+            (Self::Named(lhs), Self::Named(rhs)) => lhs.is_eq(rhs),
+            (Self::Lambda(lhs), Self::Lambda(rhs)) => lhs.is_eq(rhs),
+            _ => false,
+        }
+    }
+
+    fn is_eqv(&self, other: &Procedure) -> bool {
+        match (self, other) {
+            (Self::Named(lhs), Self::Named(rhs)) => lhs.is_eqv(rhs),
+            (Self::Lambda(lhs), Self::Lambda(rhs)) => lhs.is_eqv(rhs),
+            _ => false,
+        }
+    }
+
+    fn is_equal(&self, other: &Procedure) -> bool {
+        match (self, other) {
+            (Self::Named(lhs), Self::Named(rhs)) => lhs.is_equal(rhs),
+            (Self::Lambda(lhs), Self::Lambda(rhs)) => lhs.is_equal(rhs),
+            _ => false,
         }
     }
 }

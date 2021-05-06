@@ -4,7 +4,8 @@ use super::global::*;
 use super::scheme::value;
 use super::scheme::value::error;
 use super::scheme::value::procedure::Procedure;
-use super::scheme::value::{Symbol, Value};
+use super::scheme::value::symbol::Symbol;
+use super::scheme::value::Value;
 use super::stack::Stack;
 use super::Error;
 use super::{
@@ -305,11 +306,7 @@ impl<'a> Instance<'a> {
                 self.push(v)?;
                 Ok(())
             }
-            Err(e) => self.runtime_error(error::foreign_error(
-                "Error during foreign function",
-                proc,
-                e,
-            )),
+            Err(e) => self.runtime_error(e),
         }
     }
 
