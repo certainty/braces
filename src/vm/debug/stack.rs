@@ -30,6 +30,8 @@ pub fn pretty_print(stack: &Stack<Value>) -> String {
 fn stack_print(v: &Value) -> String {
     match v {
         Value::Procedure(_) => String::from("#<proc>"),
+        Value::Closure(_) => String::from("#<closure>"),
+        Value::UpValue(inner) => stack_print(inner),
         v => format!("{:?}", v),
     }
 }

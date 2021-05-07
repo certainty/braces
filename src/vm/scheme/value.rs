@@ -8,7 +8,7 @@ pub mod list;
 pub mod procedure;
 pub mod string;
 pub mod symbol;
-use self::{closure::Closure, string::InternedString, symbol::Symbol};
+use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
 use std::convert::Into;
@@ -32,10 +32,12 @@ pub enum Value {
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
-    Closure(Closure),
     Procedure(Rc<procedure::Procedure>),
     ForeignProcedure(Rc<foreign::Procedure>),
     Unspecified,
+    // these are not actually scheme values but rather runtime values that exist during execution
+    Closure(closure::Closure),
+    UpValue(Rc<Value>),
 }
 
 impl Value {

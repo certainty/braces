@@ -33,6 +33,13 @@ impl Procedure {
             String::from("lambda")
         }
     }
+
+    pub fn up_value_count(&self) -> usize {
+        match self {
+            Procedure::Named(proc) => proc.lambda.up_value_count,
+            Procedure::Lambda(proc) => proc.up_value_count,
+        }
+    }
 }
 
 impl SchemeEqual<Procedure> for Procedure {
@@ -79,15 +86,23 @@ impl HasArity for std::rc::Rc<Procedure> {
     }
 }
 
-pub fn thunk(chunk: Chunk) -> Procedure {
-    lambda(Arity::Exactly(0), chunk)
+pub fn thunk(chunk: Chunk, up_value_count: usize) -> Procedure {
+    lambda(Arity::Exactly(0), chunk, up_value_count)
 }
 
-pub fn lambda(arity: Arity, chunk: Chunk) -> Procedure {
-    Procedure::Lambda(lambda::Lambda { arity, chunk })
+pub fn lambda(arity: Arity, chunk: Chunk, up_value_count: usize) -> Procedure {
+    Procedure::Lambda(lambda::Lambda {
+        arity,
+        chunk,
+        up_value_count,
+    })
 }
 
-pub fn named(name: String, arity: Arity, chunk: Chunk) -> Procedure {
-    let lambda = lambda::Lambda { arity, chunk };
+pub fn named(name: String, arity: Arity, chunk: Chunk, up_value_count: usize) -> Procedure {
+    let lambda = lambda::Lambda {
+        arity,
+        chunk,
+        up_value_count,
+    };
     Procedure::Named(lambda::NamedLambda { name, lambda })
 }

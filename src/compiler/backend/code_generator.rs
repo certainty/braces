@@ -306,16 +306,21 @@ impl CodeGenerator {
         generator.emit_return()?;
         generator.end_scope()?;
 
+        let up_value_count = generator.variables.borrow().up_values.len();
+
         match target {
-            Target::TopLevel => Ok(value::procedure::thunk(generator.chunk)),
+            Target::TopLevel => Ok(value::procedure::thunk(generator.chunk, up_value_count)),
             Target::Procedure(Some(name)) => Ok(value::procedure::named(
                 name,
                 formals.arity(),
                 generator.chunk,
+                up_value_count,
             )),
-            Target::Procedure(None) => {
-                Ok(value::procedure::lambda(formals.arity(), generator.chunk))
-            }
+            Target::Procedure(None) => Ok(value::procedure::lambda(
+                formals.arity(),
+                generator.chunk,
+                up_value_count,
+            )),
         }
     }
 
@@ -571,23 +576,24 @@ impl CodeGenerator {
         Ok(())
     }
 
+    // a closure is compiled to a sequence of up-value markers followed by the closure
     fn emit_closure(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
+        // add up-values
+        let up_values = self.variables.borrow().up_values.to_vec();
+        for up_value in up_values {
+            self.current_chunk().write_instruction(Instruction::UpValue(
+                up_value.address as ConstAddressType,
+                up_value.is_local,
+            ));
+        }
+
+        // now add the closure
         let const_addr = self.current_chunk().add_constant(value);
         let inst_addr = self
             .current_chunk()
             .write_instruction(Instruction::Closure(const_addr));
         self.current_chunk()
             .write_line(inst_addr, inst_addr, loc.line);
-
-        // add up-values
-        let up_values = self.variables.borrow().up_values.to_vec();
-        for up_value in up_values {
-            self.current_chunk()
-                .write_instruction(Instruction::ClosureVariable(
-                    up_value.address as ConstAddressType,
-                    up_value.is_local,
-                ));
-        }
 
         Ok(())
     }

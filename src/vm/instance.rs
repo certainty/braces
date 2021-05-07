@@ -15,7 +15,10 @@ use super::{byte_code::Instruction, scheme::value::procedure::Arity};
 use super::{debug, scheme::value::foreign};
 use super::{global::*, scheme::value::closure::Closure};
 use crate::vm::byte_code::chunk::ConstAddressType;
-use std::rc::Rc;
+use std::{
+    borrow::Borrow,
+    rc::{self, Rc},
+};
 
 //////////////////////////////////////////////////
 // Welcome the call stack
@@ -67,6 +70,7 @@ pub struct Instance<'a> {
     stack: ValueStack,
     call_stack: CallStack,
     active_frame: *mut CallFrame,
+    up_values_for_next_closure: Vec<Rc<Value>>,
 }
 
 ////////////////////////////////////////////////////////
@@ -104,6 +108,7 @@ impl<'a> Instance<'a> {
             call_stack,
             toplevel,
             active_frame,
+            up_values_for_next_closure: vec![],
         }
     }
 
@@ -141,11 +146,8 @@ impl<'a> Instance<'a> {
                 }
                 &Instruction::Jump(addr) => self.active_mut_frame().set_ip(addr),
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
-                &Instruction::Closure(addr) => match self.read_constant(addr).clone() {
-                    Value::Procedure(proc) => self.push(Value::Closure(proc.into()))?,
-                    _ => return self.compiler_bug("Expected closure function"),
-                },
-                &Instruction::ClosureVariable(addr, is_local) => todo!(),
+                &Instruction::Closure(addr) => self.create_closure(addr)?,
+                &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
                 &Instruction::Return => {
                     let value = self.pop();
 
@@ -165,13 +167,17 @@ impl<'a> Instance<'a> {
                     }
                 }
                 &Instruction::GetUpValue(addr) => {
-                    todo!()
+                    let value = self.active_frame().closure.get_up_value(addr);
+                    self.push((*value).clone())?
                 }
                 &Instruction::GetLocal(addr) => {
                     self.push(self.frame_get_slot(addr).clone())?;
                 }
                 &Instruction::SetGlobal(addr) => self.set_global(addr)?,
-                &Instruction::SetUpValue(addr) => todo!(),
+                &Instruction::SetUpValue(addr) => {
+                    let value = self.peek(0).clone();
+                    self.active_mut_frame().closure.set_up_value(addr, value);
+                }
                 &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0).clone()),
                 &Instruction::Define(addr) => self.define_value(addr)?,
                 &Instruction::Call(args) => self.apply(args)?,
@@ -209,7 +215,7 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn pop(&mut self) -> Value {
-        self.stack.pop()
+        self.stack.pop().into()
     }
 
     #[inline]
@@ -278,6 +284,33 @@ impl<'a> Instance<'a> {
     }
 
     // specific VM instructions
+    fn setup_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
+        if is_local {
+            let value = self.capture_up_value(addr);
+            self.up_values_for_next_closure.push(value);
+        } else {
+            self.up_values_for_next_closure
+                .push(self.active_frame().closure.get_up_value(addr));
+        }
+        Ok(())
+    }
+
+    fn capture_up_value(&mut self, addr: ConstAddressType) -> Rc<Value> {
+        let value = self.frame_get_slot(addr);
+        Rc::new(Value::UpValue(Rc::new(value.clone())))
+    }
+
+    fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
+        match self.read_constant(addr).clone() {
+            Value::Procedure(proc) => {
+                let up_values = self.up_values_for_next_closure.to_owned();
+                let closure = Closure::new(proc, up_values);
+                self.up_values_for_next_closure.truncate(0);
+                self.push(Value::Closure(closure))
+            }
+            _ => return self.compiler_bug("Expected closure function"),
+        }
+    }
 
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
@@ -411,7 +444,7 @@ impl<'a> Instance<'a> {
         let mut disassembler = Disassembler::new(std::io::stdout());
         let base_addr = self.active_frame().stack_base;
         let chunk = self.active_frame().code();
-        let proc_name = self.active_frame().proc.name();
+        let proc_name = self.active_frame().closure.proc.name();
         println!("\n");
         disassembler.disassemble(
             chunk,

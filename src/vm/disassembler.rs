@@ -49,8 +49,8 @@ impl<T: Write> Disassembler<T> {
             &Instruction::Closure(addr) => {
                 self.disassemble_closure(chunk, "OP_CLOSURE", address, addr)
             }
-            &Instruction::ClosureVariable(addr, is_local) => {
-                self.disassemble_closure_variable(chunk, "OP_CLOSURE_VAR", address, addr, is_local)
+            &Instruction::UpValue(addr, is_local) => {
+                self.disassemble_closure_variable(chunk, "OP_UP_VALUE", address, addr, is_local)
             }
             &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
             &Instruction::Break => self.disassemble_simple("OP_BREAK", address),

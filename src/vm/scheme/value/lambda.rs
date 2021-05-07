@@ -10,6 +10,7 @@ pub struct NamedLambda {
 
 #[derive(Debug, Clone)]
 pub struct Lambda {
+    pub up_value_count: usize,
     pub arity: Arity,
     pub chunk: Chunk,
 }
