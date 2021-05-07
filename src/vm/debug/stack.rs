@@ -31,15 +31,18 @@ fn stack_print(v: &Value) -> String {
     match v {
         Value::Procedure(proc) => format!("#<procedure {}>", proc.name()),
         Value::Closure(closure) => {
-            let up_values: Vec<String> =
-                closure.up_values.iter().map(|e| stack_print(&e)).collect();
+            let up_values: Vec<String> = closure
+                .up_values
+                .iter()
+                .map(|e| format!("{} @ {:p}", stack_print(&e.borrow()), e))
+                .collect();
             format!(
                 "#<closure {}  up-values: [{}]>",
                 closure.proc.name(),
                 up_values.join(", ")
             )
         }
-        Value::UpValue(inner) => stack_print(inner),
+        Value::UpValue(inner) => stack_print(&inner.borrow()),
         v => format!("{:?}", v),
     }
 }

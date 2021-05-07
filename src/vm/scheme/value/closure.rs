@@ -2,11 +2,11 @@ use super::procedure;
 use crate::vm::{byte_code::chunk::ConstAddressType, scheme::value::Value};
 use std::{cell::RefCell, rc::Rc};
 
-//pub type RuntimeUpValue = Rc<RefCell<Value>>;
-pub type RuntimeUpValue = Rc<Value>;
+pub type RuntimeUpValue = Rc<RefCell<Value>>;
+//pub type RuntimeUpValue = Rc<ReValue>;
 
 pub fn new_up_value(v: Value) -> RuntimeUpValue {
-    Rc::new(v)
+    Rc::new(RefCell::new(v))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +27,7 @@ impl Closure {
     }
 
     pub fn set_up_value(&mut self, addr: ConstAddressType, v: Value) {
-        self.up_values[addr as usize] = Rc::new(v);
+        self.up_values[addr as usize].replace(v);
     }
 }
 

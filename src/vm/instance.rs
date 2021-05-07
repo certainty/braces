@@ -16,6 +16,7 @@ use super::{global::*, scheme::value::closure::Closure};
 use crate::vm::byte_code::chunk::ConstAddressType;
 use std::{
     borrow::Borrow,
+    cell::RefCell,
     rc::{self, Rc},
 };
 
@@ -69,13 +70,14 @@ pub struct Instance<'a> {
     stack: ValueStack,
     call_stack: CallStack,
     active_frame: *mut CallFrame,
-    up_values_for_next_closure: Vec<Rc<Value>>,
+    // could be a hashmap instead to speed up lookups
+    // TODO: hide the details of the RefCell
+    open_up_values: Vec<(ConstAddressType, Rc<RefCell<Value>>)>,
 }
 
 ////////////////////////////////////////////////////////
 // VM Implementation
 ///////////////////////////////////////////////////////
-
 type Result<T> = std::result::Result<T, Error>;
 
 // TODO:
@@ -107,7 +109,7 @@ impl<'a> Instance<'a> {
             call_stack,
             toplevel,
             active_frame,
-            up_values_for_next_closure: vec![],
+            open_up_values: vec![],
         }
     }
 
@@ -147,10 +149,10 @@ impl<'a> Instance<'a> {
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
-                &Instruction::CloseUpValue => self.close_up_values()?,
+                &Instruction::CloseUpValue => todo!(),
                 &Instruction::Return => {
                     let value = self.pop();
-                    self.close_up_values()?;
+                    // close the up values?
 
                     if self.pop_frame() <= 0 {
                         return Ok(value.clone());
@@ -169,7 +171,7 @@ impl<'a> Instance<'a> {
                 }
                 &Instruction::GetUpValue(addr) => {
                     let value = self.active_frame().closure.get_up_value(addr);
-                    self.push((*value).clone())?
+                    self.push(Value::UpValue(value))?
                 }
                 &Instruction::GetLocal(addr) => {
                     self.push(self.frame_get_slot(addr).clone())?;
@@ -286,39 +288,31 @@ impl<'a> Instance<'a> {
 
     fn setup_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
         if is_local {
-            let value = self.capture_up_value(addr);
-            self.up_values_for_next_closure.push(value);
+            self.capture_up_value(addr)?;
         } else {
-            self.up_values_for_next_closure
-                .push(self.active_frame().closure.get_up_value(addr));
+            self.open_up_values
+                .push((addr, self.active_frame().closure.get_up_value(addr)));
         }
         Ok(())
     }
 
-    fn capture_up_value(&mut self, addr: ConstAddressType) -> Rc<Value> {
-        let value = self.frame_get_slot(addr);
-        let idx = self
-            .up_values_for_next_closure
-            .iter()
-            .position(|e| &(**e) == value);
-
-        if let Some(addr) = idx {
-            self.up_values_for_next_closure[addr].clone()
+    fn capture_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        if self.open_up_values.iter().any(|(a, _)| addr == *a) {
+            return Ok(());
         } else {
-            Rc::new(Value::UpValue(Rc::new(value.clone())))
+            let value = self.frame_get_slot(addr).clone();
+            self.open_up_values
+                .push((addr, Rc::new(RefCell::new(value))));
+            Ok(())
         }
-    }
-
-    fn close_up_values(&mut self) -> Result<()> {
-        Ok(())
     }
 
     fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
         match self.read_constant(addr).clone() {
             Value::Procedure(proc) => {
-                let up_values = self.up_values_for_next_closure.to_owned();
+                let up_values = self.open_up_values.iter().map(|e| e.1.clone()).collect();
                 let closure = Closure::new(proc, up_values);
-                self.up_values_for_next_closure.truncate(0);
+                self.open_up_values.truncate(0);
                 self.push(Value::Closure(closure))
             }
             _ => return self.compiler_bug("Expected closure function"),

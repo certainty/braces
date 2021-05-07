@@ -5,12 +5,24 @@ use crate::vm::VM;
 use clap::Clap;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clap)]
 #[clap(version = "0.1", author = "David K.", about = "Start the REPL")]
 pub struct Opts {}
 
 pub fn execute(_opts: &Opts) {
+    let r1 = Rc::new(RefCell::new(10));
+    let r2 = r1.clone();
+
+    println!("{:p} {:p}", r1, r2);
+    println!("{} {}", r1.borrow(), r2.borrow());
+
+    r1.replace(12);
+
+    println!("{:p} {:p}", r1, r2);
+    println!("{} {}", r1.borrow(), r2.borrow());
+
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
