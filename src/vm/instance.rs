@@ -145,6 +145,7 @@ impl<'a> Instance<'a> {
                     Value::Procedure(proc) => self.push(Value::Closure(proc.into()))?,
                     _ => return self.compiler_bug("Expected closure function"),
                 },
+                &Instruction::ClosureVariable(addr, is_local) => todo!(),
                 &Instruction::Return => {
                     let value = self.pop();
 

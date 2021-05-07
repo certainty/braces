@@ -136,6 +136,10 @@ impl UpValues {
         }
     }
 
+    pub fn to_vec(&self) -> Vec<UpValue> {
+        self.up_values.clone()
+    }
+
     pub fn add(&mut self, local_addr: usize, is_local: bool) -> Result<ConstAddressType> {
         if self.up_values.len() >= self.max {
             Err(Error::TooManyUpValues)
@@ -230,7 +234,14 @@ impl Variables {
         if let Some(local_addr) = addr {
             Ok(Some(self.add_up_value(local_addr, true)?))
         } else {
-            Ok(None)
+            let parent = self.parent.as_ref().unwrap().clone();
+            let found_up_value_addr = parent.borrow_mut().resolve_up_value(name)?;
+
+            if let Some(upvalue_addr) = found_up_value_addr {
+                self.add_up_value(upvalue_addr, false).map(Some)
+            } else {
+                Ok(None)
+            }
         }
     }
 
@@ -565,9 +576,19 @@ impl CodeGenerator {
         let inst_addr = self
             .current_chunk()
             .write_instruction(Instruction::Closure(const_addr));
-
         self.current_chunk()
             .write_line(inst_addr, inst_addr, loc.line);
+
+        // add up-values
+        let up_values = self.variables.borrow().up_values.to_vec();
+        for up_value in up_values {
+            self.current_chunk()
+                .write_instruction(Instruction::ClosureVariable(
+                    up_value.address as ConstAddressType,
+                    up_value.is_local,
+                ));
+        }
+
         Ok(())
     }
 

@@ -13,6 +13,7 @@ pub enum Instruction {
     GetLocal(ConstAddressType),
     Const(ConstAddressType),
     Closure(ConstAddressType),
+    ClosureVariable(ConstAddressType, bool),
     JumpIfFalse(AddressType),
     Jump(AddressType),
     Call(usize), // number of arguments
