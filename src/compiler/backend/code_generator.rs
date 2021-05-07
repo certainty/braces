@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
@@ -107,6 +109,30 @@ impl Locals {
     }
 }
 
+type VariablesRef = Rc<RefCell<Variables>>;
+
+pub struct Variables {
+    parent: Option<VariablesRef>,
+    locals: Locals,
+}
+
+impl Variables {
+    pub fn child(parent: Option<VariablesRef>) -> VariablesRef {
+        Rc::new(RefCell::new(Variables {
+            locals: Locals::new(MAX_LOCALS),
+            parent,
+        }))
+    }
+
+    pub fn root() -> VariablesRef {
+        Self::child(None)
+    }
+
+    pub fn locals<'a>(&'a mut self) -> &'a mut Locals {
+        &mut self.locals
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Target {
     TopLevel,
@@ -115,6 +141,7 @@ pub enum Target {
 
 pub struct CodeGenerator {
     scope_depth: usize,
+    variables: VariablesRef,
     locals: Locals,
     values: value::Factory,
     target: Target,
@@ -122,11 +149,13 @@ pub struct CodeGenerator {
 }
 
 impl CodeGenerator {
-    pub fn new(target: Target) -> Self {
+    pub fn new(target: Target, parent_variables: Option<VariablesRef>) -> Self {
         let locals = Locals::new(MAX_LOCALS);
+        let variables = Variables::child(parent_variables);
 
         CodeGenerator {
             scope_depth: 0,
+            variables,
             locals,
             target,
             values: value::Factory::default(),
@@ -135,17 +164,22 @@ impl CodeGenerator {
     }
 
     pub fn generate(&mut self, ast: Vec<Expression>) -> Result<CompilationUnit> {
-        let proc =
-            Self::generate_procedure(Target::TopLevel, &Expression::body(ast), &Formals::empty())?;
+        let proc = Self::generate_procedure(
+            None,
+            Target::TopLevel,
+            &Expression::body(ast),
+            &Formals::empty(),
+        )?;
         Ok(CompilationUnit::new(self.values.clone(), proc))
     }
 
     pub fn generate_procedure(
+        parent_variables: Option<VariablesRef>,
         target: Target,
         ast: &BodyExpression,
         formals: &Formals,
     ) -> Result<value::procedure::Procedure> {
-        let mut generator = CodeGenerator::new(target.clone());
+        let mut generator = CodeGenerator::new(target.clone(), parent_variables);
 
         generator.begin_scope();
         for argument in formals.identifiers() {
@@ -321,7 +355,12 @@ impl CodeGenerator {
     }
 
     fn emit_lambda(&mut self, expr: &LambdaExpression) -> Result<()> {
-        let lambda = Self::generate_procedure(Target::Procedure(None), &expr.body, &expr.formals)?;
+        let lambda = Self::generate_procedure(
+            Some(self.variables.clone()),
+            Target::Procedure(None),
+            &expr.body,
+            &expr.formals,
+        )?;
         let proc = self.values.procedure(lambda);
 
         self.emit_closure(proc, expr.source_location())
