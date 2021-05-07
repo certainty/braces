@@ -62,11 +62,17 @@ impl<T: Write> Disassembler<T> {
             &Instruction::GetGlobal(const_address) => {
                 self.disassemble_constant(chunk, "OP_GET_GLOBAL", address, const_address)
             }
+            &Instruction::GetUpValue(_const_address) => {
+                todo!()
+            }
             &Instruction::GetLocal(_const_address) => {
                 self.disassemble_code_at(chunk, "OP_GET_LOCAL", address)
             }
             &Instruction::SetGlobal(const_address) => {
                 self.disassemble_constant(chunk, "OP_SET_GLOBAL", address, const_address)
+            }
+            &Instruction::SetUpValue(const_address) => {
+                todo!()
             }
             &Instruction::SetLocal(_const_address) => {
                 self.disassemble_code_at(chunk, "OP_SET_LOCAL", address)

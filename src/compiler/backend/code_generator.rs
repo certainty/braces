@@ -28,11 +28,14 @@ use crate::{
 use thiserror::Error;
 
 const MAX_LOCALS: usize = 256;
+const MAX_UP_VALUES: usize = MAX_LOCALS * 256;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Too many locals defined")]
     TooManyLocals,
+    #[error("Too many up values defined")]
+    TooManyUpValues,
     #[error("CompilerBug: {0}")]
     CompilerBug(String),
 }
@@ -109,23 +112,66 @@ impl Locals {
     }
 }
 
+pub struct UpValue {
+    address: usize,
+    is_local: bool,
+}
+impl UpValue {
+    pub fn new(address: usize, is_local: bool) -> Self {
+        Self { address, is_local }
+    }
+}
+
+pub struct UpValues {
+    max: usize,
+    up_values: Vec<UpValue>,
+}
+
+impl UpValues {
+    pub fn new(limit: usize) -> Self {
+        Self {
+            max: limit,
+            up_values: Vec::with_capacity(limit),
+        }
+    }
+
+    pub fn add(&mut self, local_addr: usize, is_local: bool) -> Result<()> {
+        if self.up_values.len() >= self.max {
+            Err(Error::TooManyUpValues)
+        } else {
+            self.up_values.push(UpValue::new(local_addr, is_local));
+            Ok(())
+        }
+    }
+
+    pub fn last_address(&self) -> ConstAddressType {
+        (self.up_values.len() - 1) as ConstAddressType
+    }
+}
+
 type VariablesRef = Rc<RefCell<Variables>>;
 
 pub struct Variables {
     parent: Option<VariablesRef>,
     locals: Locals,
+    up_values: UpValues,
 }
 
 impl Variables {
     pub fn child(parent: Option<VariablesRef>) -> VariablesRef {
         Rc::new(RefCell::new(Variables {
             locals: Locals::new(MAX_LOCALS),
+            up_values: UpValues::new(MAX_UP_VALUES),
             parent,
         }))
     }
 
     pub fn root() -> VariablesRef {
         Self::child(None)
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.parent.is_none()
     }
 
     pub fn locals<'a>(&'a mut self) -> &'a mut Locals {
@@ -254,6 +300,27 @@ impl CodeGenerator {
         self.variables.borrow().locals.resolve(name)
     }
 
+    fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<ConstAddressType>> {
+        if self.variables.borrow().is_root() {
+            return Ok(None);
+        }
+        let addr = self.variables.borrow().locals.resolve(name);
+
+        if let Some(local_addr) = addr {
+            Ok(Some(self.add_up_value(local_addr, true)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn add_up_value(&mut self, local_addr: usize, is_local: bool) -> Result<ConstAddressType> {
+        self.variables
+            .borrow_mut()
+            .up_values
+            .add(local_addr, is_local)?;
+        Ok(self.variables.borrow().up_values.last_address())
+    }
+
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
         // top level bindings aren't tracked on the stack
         if self.scope_depth == 0 {
@@ -376,6 +443,11 @@ impl CodeGenerator {
                 Instruction::GetLocal(addr as ConstAddressType),
                 id.source_location(),
             )
+        } else if let Some(addr) = self.resolve_up_value(id)? {
+            self.emit_instruction(
+                Instruction::GetUpValue(addr as ConstAddressType),
+                id.source_location(),
+            )
         } else {
             let id_sym = self.sym(&id.string());
             let const_addr = self.current_chunk().add_constant(id_sym);
@@ -391,6 +463,11 @@ impl CodeGenerator {
         if let Some(addr) = self.resolve_local(&expr.name) {
             self.emit_instruction(
                 Instruction::SetLocal(addr as ConstAddressType),
+                expr.source_location(),
+            )
+        } else if let Some(addr) = self.resolve_up_value(&expr.name)? {
+            self.emit_instruction(
+                Instruction::SetUpValue(addr as ConstAddressType),
                 expr.source_location(),
             )
         } else {

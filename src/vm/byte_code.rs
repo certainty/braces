@@ -6,8 +6,10 @@ use chunk::{AddressType, ConstAddressType};
 pub enum Instruction {
     Define(ConstAddressType),
     SetGlobal(ConstAddressType),
+    SetUpValue(ConstAddressType),
     SetLocal(ConstAddressType),
     GetGlobal(ConstAddressType),
+    GetUpValue(ConstAddressType),
     GetLocal(ConstAddressType),
     Const(ConstAddressType),
     Closure(ConstAddressType),

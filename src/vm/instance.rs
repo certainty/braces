@@ -163,11 +163,15 @@ impl<'a> Instance<'a> {
                         return self.runtime_error(error::undefined_variable(id));
                     }
                 }
+                &Instruction::GetUpValue(addr) => {
+                    todo!()
+                }
                 &Instruction::GetLocal(addr) => {
                     self.push(self.frame_get_slot(addr).clone())?;
                 }
-                &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0).clone()),
                 &Instruction::SetGlobal(addr) => self.set_global(addr)?,
+                &Instruction::SetUpValue(addr) => todo!(),
+                &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0).clone()),
                 &Instruction::Define(addr) => self.define_value(addr)?,
                 &Instruction::Call(args) => self.apply(args)?,
             }
