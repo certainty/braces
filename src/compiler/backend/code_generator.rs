@@ -165,11 +165,13 @@ pub struct Variables {
     parent: Option<VariablesRef>,
     locals: Locals,
     up_values: UpValues,
+    scope_depth: usize,
 }
 
 impl Variables {
     pub fn child(parent: Option<VariablesRef>) -> VariablesRef {
         Rc::new(RefCell::new(Variables {
+            scope_depth: 0,
             locals: Locals::new(MAX_LOCALS),
             up_values: UpValues::new(MAX_UP_VALUES),
             parent,
@@ -184,8 +186,61 @@ impl Variables {
         self.parent.is_none()
     }
 
-    pub fn locals<'a>(&'a mut self) -> &'a mut Locals {
-        &mut self.locals
+    pub fn is_top_level(&self) -> bool {
+        self.scope_depth == 0
+    }
+
+    pub fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    pub fn end_scope(&mut self) -> Result<usize> {
+        self.scope_depth -= 1;
+
+        let mut locals_popped: usize = 0;
+        let mut locals_len = self.locals.len();
+        let mut current_depth = self.locals.at(locals_len - 1).depth;
+
+        while locals_len > 0 && current_depth > self.scope_depth {
+            self.locals.pop()?;
+            locals_popped += 1;
+
+            locals_len -= 1;
+            current_depth = self.locals.at(locals_len - 1).depth;
+        }
+
+        Ok(locals_popped)
+    }
+
+    pub fn add_up_value(
+        &mut self,
+        local_addr: ConstAddressType,
+        is_local: bool,
+    ) -> Result<ConstAddressType> {
+        self.up_values.add(local_addr as usize, is_local)
+    }
+
+    pub fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<ConstAddressType>> {
+        if self.is_root() {
+            return Ok(None);
+        }
+
+        let addr = self.resolve_local(name);
+
+        if let Some(local_addr) = addr {
+            Ok(Some(self.add_up_value(local_addr, true)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn add_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
+        self.locals.add(name, self.scope_depth)?;
+        Ok(self.locals.last_address())
+    }
+
+    pub fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
+        self.locals.resolve(name).map(|i| i as ConstAddressType)
     }
 }
 
@@ -196,7 +251,6 @@ pub enum Target {
 }
 
 pub struct CodeGenerator {
-    scope_depth: usize,
     variables: VariablesRef,
     values: value::Factory,
     target: Target,
@@ -208,7 +262,6 @@ impl CodeGenerator {
         let variables = Variables::child(parent_variables);
 
         CodeGenerator {
-            scope_depth: 0,
             variables,
             target,
             values: value::Factory::default(),
@@ -278,65 +331,37 @@ impl CodeGenerator {
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     fn begin_scope(&mut self) {
-        self.scope_depth += 1;
+        self.variables.borrow_mut().begin_scope();
     }
 
     fn end_scope(&mut self) -> Result<()> {
-        self.scope_depth -= 1;
+        let popped = self.variables.borrow_mut().end_scope()?;
 
-        let mut locals_len = self.variables.borrow().locals.len();
-        let mut current_depth = self.variables.borrow().locals.at(locals_len - 1).depth;
-
-        while locals_len > 0 && current_depth > self.scope_depth {
+        for _ in 0..popped {
             self.current_chunk().write_instruction(Instruction::Pop);
-            self.variables.borrow_mut().locals.pop()?;
-
-            locals_len -= 1;
-            current_depth = self.variables.borrow().locals.at(locals_len - 1).depth;
         }
 
         Ok(())
     }
 
     fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
-        self.variables
-            .borrow_mut()
-            .locals
-            .add(name, self.scope_depth)?;
-        Ok(self.variables.borrow().locals.last_address())
+        self.variables.borrow_mut().add_local(name)
     }
 
-    fn resolve_local(&self, name: &Identifier) -> Option<usize> {
-        self.variables.borrow().locals.resolve(name)
+    fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
+        self.variables.borrow().resolve_local(name)
     }
 
     fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<ConstAddressType>> {
-        if self.variables.borrow().is_root() {
-            return Ok(None);
-        }
-        let addr = self.variables.borrow().locals.resolve(name);
-
-        if let Some(local_addr) = addr {
-            Ok(Some(self.add_up_value(local_addr, true)?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn add_up_value(&mut self, local_addr: usize, is_local: bool) -> Result<ConstAddressType> {
-        self.variables
-            .borrow_mut()
-            .up_values
-            .add(local_addr, is_local)
+        self.variables.borrow_mut().resolve_up_value(name)
     }
 
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
-        // top level bindings aren't tracked on the stack
-        if self.scope_depth == 0 {
+        if self.variables.borrow().is_top_level() {
             return Ok(());
         }
 
-        // make sure the variable doesn't already exist in current scope
+        //TODO: make sure the variable doesn't already exist in current scope
 
         // register the local in current scope
         self.register_local(id.clone())?;
