@@ -142,7 +142,6 @@ pub enum Target {
 pub struct CodeGenerator {
     scope_depth: usize,
     variables: VariablesRef,
-    locals: Locals,
     values: value::Factory,
     target: Target,
     chunk: Chunk,
@@ -150,13 +149,11 @@ pub struct CodeGenerator {
 
 impl CodeGenerator {
     pub fn new(target: Target, parent_variables: Option<VariablesRef>) -> Self {
-        let locals = Locals::new(MAX_LOCALS);
         let variables = Variables::child(parent_variables);
 
         CodeGenerator {
             scope_depth: 0,
             variables,
-            locals,
             target,
             values: value::Factory::default(),
             chunk: Chunk::new(),
@@ -231,23 +228,30 @@ impl CodeGenerator {
     fn end_scope(&mut self) -> Result<()> {
         self.scope_depth -= 1;
 
-        while self.locals.len() > 0
-            && self.locals.at(self.locals.len() - 1).depth > self.scope_depth
-        {
+        let mut locals_len = self.variables.borrow().locals.len();
+        let mut current_depth = self.variables.borrow().locals.at(locals_len - 1).depth;
+
+        while locals_len > 0 && current_depth > self.scope_depth {
             self.current_chunk().write_instruction(Instruction::Pop);
-            self.locals.pop()?;
+            self.variables.borrow_mut().locals.pop()?;
+
+            locals_len -= 1;
+            current_depth = self.variables.borrow().locals.at(locals_len - 1).depth;
         }
 
         Ok(())
     }
 
     fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
-        self.locals.add(name, self.scope_depth)?;
-        Ok(self.locals.last_address())
+        self.variables
+            .borrow_mut()
+            .locals
+            .add(name, self.scope_depth)?;
+        Ok(self.variables.borrow().locals.last_address())
     }
 
     fn resolve_local(&self, name: &Identifier) -> Option<usize> {
-        self.locals.resolve(name)
+        self.variables.borrow().locals.resolve(name)
     }
 
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
