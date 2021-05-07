@@ -148,6 +148,7 @@ impl<'a> Instance<'a> {
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
+                &Instruction::CloseUpValue => todo!(),
                 &Instruction::Return => {
                     let value = self.pop();
 

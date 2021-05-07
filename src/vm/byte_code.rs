@@ -14,6 +14,7 @@ pub enum Instruction {
     Const(ConstAddressType),
     Closure(ConstAddressType),
     UpValue(ConstAddressType, bool),
+    CloseUpValue,
     JumpIfFalse(AddressType),
     Jump(AddressType),
     Call(usize), // number of arguments

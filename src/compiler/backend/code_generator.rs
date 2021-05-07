@@ -42,21 +42,35 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Local {
     name: Identifier,
     depth: usize,
+    is_captured: bool,
 }
 
 impl Local {
-    pub fn new(name: Identifier, scope: usize) -> Self {
-        Local { name, depth: scope }
+    pub fn new(name: Identifier, scope: usize, is_captured: bool) -> Self {
+        Local {
+            name,
+            depth: scope,
+            is_captured,
+        }
+    }
+
+    pub fn capture(other: Local) -> Self {
+        Local {
+            name: other.name,
+            depth: other.depth,
+            is_captured: true,
+        }
     }
 
     pub fn for_vm() -> Self {
         Local {
             name: Identifier::synthetic(""),
             depth: 0,
+            is_captured: false,
         }
     }
 }
@@ -82,18 +96,23 @@ impl Locals {
         &self.locals[idx]
     }
 
+    pub fn mark_as_captured(&mut self, addr: ConstAddressType) {
+        let idx = addr as usize;
+        let existing = self.locals[idx].clone();
+        self.locals[idx] = Local::capture(existing);
+    }
+
     pub fn add(&mut self, name: Identifier, scope_depth: usize) -> Result<()> {
         if self.locals.len() >= self.max {
             Err(Error::TooManyLocals)
         } else {
-            self.locals.push(Local::new(name, scope_depth));
+            self.locals.push(Local::new(name, scope_depth, false));
             Ok(())
         }
     }
 
-    pub fn pop(&mut self) -> Result<()> {
-        self.locals.pop();
-        Ok(())
+    pub fn pop(&mut self) -> Result<Option<Local>> {
+        Ok(self.locals.pop())
     }
 
     pub fn last_address(&self) -> ConstAddressType {
@@ -198,22 +217,25 @@ impl Variables {
         self.scope_depth += 1;
     }
 
-    pub fn end_scope(&mut self) -> Result<usize> {
+    // Close the current scope and return information about the discarded variables
+    // Returns a Vec<bool> where each true value indicates that a captured variable has been popped
+    // and a false value means that the variable was not captured
+    pub fn end_scope(&mut self) -> Result<Vec<bool>> {
         self.scope_depth -= 1;
 
-        let mut locals_popped: usize = 0;
         let mut locals_len = self.locals.len();
         let mut current_depth = self.locals.at(locals_len - 1).depth;
+        let mut result: Vec<bool> = vec![];
 
         while locals_len > 0 && current_depth > self.scope_depth {
-            self.locals.pop()?;
-            locals_popped += 1;
+            let local = self.locals.pop()?.unwrap();
+            result.push(local.is_captured);
 
             locals_len -= 1;
             current_depth = self.locals.at(locals_len - 1).depth;
         }
 
-        Ok(locals_popped)
+        Ok(result)
     }
 
     pub fn add_up_value(
@@ -232,6 +254,7 @@ impl Variables {
         let addr = self.resolve_local(name);
 
         if let Some(local_addr) = addr {
+            self.locals.mark_as_captured(local_addr);
             Ok(Some(self.add_up_value(local_addr, true)?))
         } else {
             let parent = self.parent.as_ref().unwrap().clone();
@@ -351,10 +374,15 @@ impl CodeGenerator {
     }
 
     fn end_scope(&mut self) -> Result<()> {
-        let popped = self.variables.borrow_mut().end_scope()?;
+        let track = self.variables.borrow_mut().end_scope()?;
 
-        for _ in 0..popped {
-            self.current_chunk().write_instruction(Instruction::Pop);
+        for is_captured in track {
+            if is_captured {
+                self.current_chunk()
+                    .write_instruction(Instruction::CloseUpValue);
+            } else {
+                self.current_chunk().write_instruction(Instruction::Pop);
+            }
         }
 
         Ok(())
