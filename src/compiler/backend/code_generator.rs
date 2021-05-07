@@ -136,15 +136,17 @@ impl UpValues {
         }
     }
 
-    pub fn add(&mut self, local_addr: usize, is_local: bool) -> Result<()> {
+    pub fn add(&mut self, local_addr: usize, is_local: bool) -> Result<ConstAddressType> {
         if self.up_values.len() >= self.max {
             Err(Error::TooManyUpValues)
         } else {
             let value = UpValue::new(local_addr, is_local);
-            if !self.up_values.contains(&value) {
+            if let Some(addr) = self.up_values.iter().position(|v| v == &value) {
+                Ok(addr as ConstAddressType)
+            } else {
                 self.up_values.push(value);
+                Ok(self.last_address())
             }
-            Ok(())
         }
     }
 
@@ -325,8 +327,7 @@ impl CodeGenerator {
         self.variables
             .borrow_mut()
             .up_values
-            .add(local_addr, is_local)?;
-        Ok(self.variables.borrow().up_values.last_address())
+            .add(local_addr, is_local)
     }
 
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
@@ -609,12 +610,15 @@ mod tests {
     fn test_up_value_add_deduplicates() {
         let mut up_values = UpValues::new(10);
 
-        up_values.add(10, true).unwrap();
+        let first_addr = up_values.add(10, true).unwrap();
         up_values.add(20, true).unwrap();
         //again
-        up_values.add(10, true).unwrap();
+        let second_addr = up_values.add(10, true).unwrap();
         // again but not local
-        up_values.add(10, false).unwrap();
+        let third_addr = up_values.add(10, false).unwrap();
+
+        assert_eq!(first_addr, second_addr);
+        assert_ne!(first_addr, third_addr);
 
         assert_eq!(
             up_values.up_values,
