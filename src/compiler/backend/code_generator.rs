@@ -112,6 +112,7 @@ impl Locals {
     }
 }
 
+#[derive(PartialEq, Clone, Debug)]
 pub struct UpValue {
     address: usize,
     is_local: bool,
@@ -139,9 +140,16 @@ impl UpValues {
         if self.up_values.len() >= self.max {
             Err(Error::TooManyUpValues)
         } else {
-            self.up_values.push(UpValue::new(local_addr, is_local));
+            let value = UpValue::new(local_addr, is_local);
+            if !self.up_values.contains(&value) {
+                self.up_values.push(value);
+            }
             Ok(())
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.up_values.len()
     }
 
     pub fn last_address(&self) -> ConstAddressType {
@@ -595,5 +603,26 @@ mod tests {
         locals.add(Identifier::synthetic("barz"), 1).unwrap();
 
         assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0))
+    }
+
+    #[test]
+    fn test_up_value_add_deduplicates() {
+        let mut up_values = UpValues::new(10);
+
+        up_values.add(10, true).unwrap();
+        up_values.add(20, true).unwrap();
+        //again
+        up_values.add(10, true).unwrap();
+        // again but not local
+        up_values.add(10, false).unwrap();
+
+        assert_eq!(
+            up_values.up_values,
+            vec![
+                UpValue::new(10, true),
+                UpValue::new(20, true),
+                UpValue::new(10, false)
+            ]
+        )
     }
 }
