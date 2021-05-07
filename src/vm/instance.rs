@@ -1,5 +1,3 @@
-#[cfg(feature = "debug_vm")]
-use super::disassembler::Disassembler;
 use super::scheme::value;
 use super::scheme::value::error;
 use super::scheme::value::procedure::Procedure;
@@ -13,6 +11,7 @@ use super::{
 };
 use super::{byte_code::Instruction, scheme::value::procedure::Arity};
 use super::{debug, scheme::value::foreign};
+use super::{disassembler::Disassembler, scheme::value::closure};
 use super::{global::*, scheme::value::closure::Closure};
 use crate::vm::byte_code::chunk::ConstAddressType;
 use std::{
@@ -148,9 +147,10 @@ impl<'a> Instance<'a> {
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
-                &Instruction::CloseUpValue => todo!(),
+                &Instruction::CloseUpValue => self.close_up_values()?,
                 &Instruction::Return => {
                     let value = self.pop();
+                    self.close_up_values()?;
 
                     if self.pop_frame() <= 0 {
                         return Ok(value.clone());
@@ -284,7 +284,6 @@ impl<'a> Instance<'a> {
         self.stack.set(slot_address, value);
     }
 
-    // specific VM instructions
     fn setup_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
         if is_local {
             let value = self.capture_up_value(addr);
@@ -298,7 +297,20 @@ impl<'a> Instance<'a> {
 
     fn capture_up_value(&mut self, addr: ConstAddressType) -> Rc<Value> {
         let value = self.frame_get_slot(addr);
-        Rc::new(Value::UpValue(Rc::new(value.clone())))
+        let idx = self
+            .up_values_for_next_closure
+            .iter()
+            .position(|e| &(**e) == value);
+
+        if let Some(addr) = idx {
+            self.up_values_for_next_closure[addr].clone()
+        } else {
+            Rc::new(Value::UpValue(Rc::new(value.clone())))
+        }
+    }
+
+    fn close_up_values(&mut self) -> Result<()> {
+        Ok(())
     }
 
     fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
@@ -316,7 +328,7 @@ impl<'a> Instance<'a> {
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
         match &self.peek(args) {
-            &value::Value::Closure(cl) => self.apply_native(cl.proc.clone(), args),
+            &value::Value::Closure(cl) => self.apply_closure(cl.clone(), args),
             value::Value::Procedure(p) => self.apply_native(p.clone(), args),
             value::Value::ForeignProcedure(p) => self.apply_foreign(p.clone(), args),
             &other => return self.runtime_error(error::non_callable(other.clone())),
@@ -324,10 +336,21 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
+    fn apply_closure(&mut self, closure: Closure, arg_count: usize) -> Result<()> {
+        self.check_arity(&closure.proc, arg_count)?;
+        let arg_count = self.bind_arguments(&closure.proc, arg_count)?;
+        self.push_frame(closure, arg_count)?;
+        #[cfg(feature = "debug_vm")]
+        self.disassemble_frame();
+        Ok(())
+    }
+
+    #[inline]
     fn apply_native(&mut self, proc: std::rc::Rc<Procedure>, arg_count: usize) -> Result<()> {
         self.check_arity(&proc, arg_count)?;
         let arg_count = self.bind_arguments(&proc, arg_count)?;
-        self.push_frame(proc.into(), arg_count)?;
+        let closure = proc.into();
+        self.push_frame(closure, arg_count)?;
         #[cfg(feature = "debug_vm")]
         self.disassemble_frame();
         Ok(())
@@ -440,7 +463,6 @@ impl<'a> Instance<'a> {
         disassembler.disassemble_instruction(chunk, self.active_frame().ip);
     }
 
-    #[cfg(feature = "debug_vm")]
     fn disassemble_frame(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
         let base_addr = self.active_frame().stack_base;

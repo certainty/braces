@@ -30,7 +30,7 @@ impl Procedure {
         if let Self::Named(named) = self {
             named.name.clone()
         } else {
-            String::from("lambda")
+            String::from("")
         }
     }
 

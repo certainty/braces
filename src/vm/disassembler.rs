@@ -50,7 +50,7 @@ impl<T: Write> Disassembler<T> {
                 self.disassemble_closure(chunk, "OP_CLOSURE", address, addr)
             }
             &Instruction::UpValue(addr, is_local) => {
-                self.disassemble_closure_variable(chunk, "OP_UP_VALUE", address, addr, is_local)
+                self.disassemble_variable_access("OP_UP_VALUE", address, addr, is_local)
             }
             &Instruction::CloseUpValue => self.disassemble_simple("OP_CLOSE_UP_VALUE", address),
             &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
@@ -66,20 +66,20 @@ impl<T: Write> Disassembler<T> {
             &Instruction::GetGlobal(const_address) => {
                 self.disassemble_constant(chunk, "OP_GET_GLOBAL", address, const_address)
             }
-            &Instruction::GetUpValue(const_address) => {
-                self.disassemble_constant(chunk, "OP_GET_UP_VALUE", address, const_address)
+            &Instruction::GetUpValue(addr) => {
+                self.disassemble_variable_access("OP_GET_UP_VALUE", address, addr, true)
             }
-            &Instruction::GetLocal(_const_address) => {
-                self.disassemble_code_at(chunk, "OP_GET_LOCAL", address)
+            &Instruction::GetLocal(addr) => {
+                self.disassemble_variable_access("OP_GET_LOCAL", address, addr, true)
             }
             &Instruction::SetGlobal(const_address) => {
                 self.disassemble_constant(chunk, "OP_SET_GLOBAL", address, const_address)
             }
-            &Instruction::SetUpValue(const_address) => {
-                self.disassemble_constant(chunk, "OP_SET_UP_VALUE", address, const_address)
+            &Instruction::SetUpValue(addr) => {
+                self.disassemble_variable_access("OP_SET_UP_VALUE", address, addr, false)
             }
-            &Instruction::SetLocal(_const_address) => {
-                self.disassemble_code_at(chunk, "OP_SET_LOCAL", address)
+            &Instruction::SetLocal(addr) => {
+                self.disassemble_variable_access("OP_SET_LOCAL", address, addr, true)
             }
 
             &Instruction::Define(const_address) => {
@@ -93,14 +93,6 @@ impl<T: Write> Disassembler<T> {
 
     fn disassemble_simple(&mut self, name: &str, address: usize) -> usize {
         self.writer.write_fmt(format_args!("{}\n", name)).unwrap();
-        address + 1
-    }
-
-    fn disassemble_code_at(&mut self, chunk: &Chunk, name: &str, address: usize) -> usize {
-        let code = &chunk.code[address];
-        self.writer
-            .write_fmt(format_args!("{:<16} {:?} \n", name, code))
-            .unwrap();
         address + 1
     }
 
@@ -125,7 +117,7 @@ impl<T: Write> Disassembler<T> {
         let proc = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04} {}\n",
+                "{:<16} {:04}        {}\n",
                 name,
                 constant_address,
                 &self.disassemble_value(proc)
@@ -134,19 +126,19 @@ impl<T: Write> Disassembler<T> {
         address + 1
     }
 
-    fn disassemble_closure_variable(
+    fn disassemble_variable_access(
         &mut self,
-        chunk: &Chunk,
         name: &str,
         address: AddressType,
         constant_address: ConstAddressType,
         is_local: bool,
     ) -> usize {
         let label = if is_local { "local" } else { "upvalue" };
+
         self.writer
             .write_fmt(format_args!(
-                "{:04}    |              {} {}\n",
-                address, label, constant_address
+                "{:<16} {:04}         {}\n",
+                name, constant_address, label
             ))
             .unwrap();
         address + 1
@@ -162,7 +154,7 @@ impl<T: Write> Disassembler<T> {
         let constant = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}        '{}' mem[{:p}]\n",
+                "{:<16} {:04}        {}    @ {:p}\n",
                 name,
                 constant_address,
                 &self.disassemble_value(constant),
@@ -175,7 +167,9 @@ impl<T: Write> Disassembler<T> {
 
     fn disassemble_value(&self, value: &value::Value) -> String {
         match value {
-            value::Value::Procedure(_proc) => String::from("<procedure>"),
+            value::Value::Closure(closure) => format!("#<procedure {}>", closure.proc.name()),
+            value::Value::Procedure(proc) => format!("#<procedure {}>", proc.name()),
+            value::Value::Symbol(sym) => sym.as_str().to_string(),
             _ => format!("{:?}", value),
         }
     }

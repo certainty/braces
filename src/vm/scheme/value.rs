@@ -11,6 +11,7 @@ pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
+use closure::RuntimeUpValue;
 use std::convert::Into;
 use std::rc::Rc;
 use thiserror::Error;
@@ -37,7 +38,7 @@ pub enum Value {
     Unspecified,
     // these are not actually scheme values but rather runtime values that exist during execution
     Closure(closure::Closure),
-    UpValue(Rc<Value>),
+    UpValue(RuntimeUpValue),
 }
 
 impl Value {

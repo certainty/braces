@@ -1,21 +1,28 @@
 use super::procedure;
 use crate::vm::{byte_code::chunk::ConstAddressType, scheme::value::Value};
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
+
+//pub type RuntimeUpValue = Rc<RefCell<Value>>;
+pub type RuntimeUpValue = Rc<Value>;
+
+pub fn new_up_value(v: Value) -> RuntimeUpValue {
+    Rc::new(v)
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
-    pub up_values: Vec<Rc<Value>>,
+    pub up_values: Vec<RuntimeUpValue>,
     pub proc: Rc<procedure::Procedure>,
 }
 
 impl Closure {
-    pub fn new(proc: Rc<procedure::Procedure>, up_values: Vec<Rc<Value>>) -> Self {
+    pub fn new(proc: Rc<procedure::Procedure>, up_values: Vec<RuntimeUpValue>) -> Self {
         Self { proc, up_values }
     }
 }
 
 impl Closure {
-    pub fn get_up_value(&self, addr: ConstAddressType) -> Rc<Value> {
+    pub fn get_up_value(&self, addr: ConstAddressType) -> RuntimeUpValue {
         self.up_values[addr as usize].clone()
     }
 

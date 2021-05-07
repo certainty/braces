@@ -23,6 +23,7 @@ pub fn execute(_opts: &Opts) {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
+
                 match vm.run_string(&line, "repl") {
                     Ok(Value::Unspecified) => (),
                     Ok(v) => println!("{}", vm.write(&v)),
