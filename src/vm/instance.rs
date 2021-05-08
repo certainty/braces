@@ -70,6 +70,7 @@ pub struct Instance<'a> {
     stack: ValueStack,
     call_stack: CallStack,
     active_frame: *mut CallFrame,
+    saved_value: Value,
     // could be a hashmap instead to speed up lookups
     // TODO: hide the details of the RefCell
     open_up_values: Vec<(ConstAddressType, Rc<RefCell<Value>>)>,
@@ -109,6 +110,7 @@ impl<'a> Instance<'a> {
             call_stack,
             toplevel,
             active_frame,
+            saved_value: Value::Unspecified,
             open_up_values: vec![],
         }
     }
@@ -150,14 +152,17 @@ impl<'a> Instance<'a> {
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
                 &Instruction::CloseUpValue => todo!(),
+                &Instruction::Save => {
+                    self.saved_value = self.pop();
+                }
+                &Instruction::Restore => {
+                    self.push(self.saved_value.clone())?;
+                    self.saved_value = Value::Unspecified;
+                }
                 &Instruction::Return => {
-                    let value = self.pop();
-                    // close the up values?
-
                     if self.pop_frame() <= 0 {
+                        let value = self.pop();
                         return Ok(value.clone());
-                    } else {
-                        self.push(value.clone())?
                     }
                 }
                 &Instruction::GetGlobal(addr) => {

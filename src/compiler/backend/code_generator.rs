@@ -334,6 +334,7 @@ impl CodeGenerator {
             generator.declare_binding(&argument)?;
         }
         generator.emit_body(ast)?;
+        generator.end_scope()?;
         generator.emit_return()?;
 
         let up_value_count = generator.variables.borrow().up_values.len();
@@ -384,15 +385,20 @@ impl CodeGenerator {
     fn end_scope(&mut self) -> Result<()> {
         let processed_variables = self.variables.borrow_mut().end_scope()?;
 
-        for was_captured in processed_variables {
-            if was_captured {
-                self.current_chunk()
-                    .write_instruction(Instruction::CloseUpValue);
-            } else {
-                self.current_chunk().write_instruction(Instruction::Pop);
-            }
-        }
+        if processed_variables.len() > 0 {
+            self.current_chunk().write_instruction(Instruction::Save);
 
+            for was_captured in processed_variables {
+                if was_captured {
+                    self.current_chunk()
+                        .write_instruction(Instruction::CloseUpValue);
+                } else {
+                    self.current_chunk().write_instruction(Instruction::Pop);
+                }
+            }
+
+            self.current_chunk().write_instruction(Instruction::Restore);
+        }
         Ok(())
     }
 
@@ -792,6 +798,10 @@ mod tests {
                 Instruction::UpValue(0, true), //x #t
                 // build the closure
                 Instruction::Closure(_), // (lambda ..)
+                Instruction::Save,
+                Instruction::Pop, // x
+                Instruction::Pop, // y
+                Instruction::Restore,
                 Instruction::Return,
             ]
         );
