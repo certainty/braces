@@ -24,7 +24,7 @@ pub fn register(vm: &mut VM) {
 
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
 
-    register_core!(vm, "inspect", inspect, Arity::Exactly(0));
+    register_core!(vm, "inspect", inspect, Arity::Exactly(1));
 }
 
 //  R7RS 6.1

@@ -46,7 +46,6 @@ pub fn parse_sequence<'a, T: Source>(source: &'a mut T) -> Result<Vec<Datum>> {
     let input = Input::new_extra(&source_str, source_type);
     let (_rest, datum) = context("program", many1(parse_datum))(input)?;
 
-    // TODO: handle remaining input
     Ok(datum)
 }
 
@@ -496,7 +495,7 @@ fn consume_line_ending<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
 
 #[inline]
 fn parse_intra_line_ws<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
-    unit(alt((char(' '), char(' '))))(input)
+    unit(alt((char(' '), char('\t'))))(input)
 }
 
 #[inline]

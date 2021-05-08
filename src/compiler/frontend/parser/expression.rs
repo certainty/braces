@@ -198,6 +198,7 @@ impl HasSourceLocation for Expression {
 impl Expression {
     pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
         let ast = Parser.parse_datum_sequence(source)?;
+        //println!("{:?}", ast);
         ast.iter().map(Self::parse).collect()
     }
 

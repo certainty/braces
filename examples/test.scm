@@ -1,10 +1,10 @@
-; this is a comment
-(define identity (lambda (x) x))
+(define get-x '())
+(define set-x '())
 
-(identity "foo")
-
-(define do-it (lambda (x) (if x 'heads 'tails)))
-
-(do-it #t)
-(do-it #f)
+(let ((x #t))
+  (set! get-x (lambda () x))
+  (set! set-x (lambda (v)
+                (set! x v))))
+(set-x #\a)
+(get-x)
 

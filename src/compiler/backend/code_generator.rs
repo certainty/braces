@@ -225,17 +225,18 @@ impl Variables {
 
         let mut locals_len = self.locals.len();
         let mut current_depth = self.locals.at(locals_len - 1).depth;
-        let mut result: Vec<bool> = vec![];
+        let mut processed_variables: Vec<bool> = vec![];
 
         while locals_len > 0 && current_depth > self.scope_depth {
             let local = self.locals.pop()?.unwrap();
-            result.push(local.is_captured);
+            processed_variables.push(local.is_captured);
 
             locals_len -= 1;
             current_depth = self.locals.at(locals_len - 1).depth;
         }
 
-        Ok(result)
+        processed_variables.reverse();
+        Ok(processed_variables)
     }
 
     pub fn add_up_value(
@@ -268,13 +269,20 @@ impl Variables {
         }
     }
 
+    #[inline]
     pub fn add_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
         self.locals.add(name, self.scope_depth)?;
         Ok(self.locals.last_address())
     }
 
+    #[inline]
     pub fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
         self.locals.resolve(name).map(|i| i as ConstAddressType)
+    }
+
+    #[inline]
+    pub fn mark_local_as_captured(&mut self, address: ConstAddressType) -> Result<()> {
+        Ok(self.locals.mark_as_captured(address))
     }
 }
 
@@ -327,7 +335,6 @@ impl CodeGenerator {
         }
         generator.emit_body(ast)?;
         generator.emit_return()?;
-        generator.end_scope()?;
 
         let up_value_count = generator.variables.borrow().up_values.len();
 
@@ -369,15 +376,16 @@ impl CodeGenerator {
     //
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    #[inline]
     fn begin_scope(&mut self) {
         self.variables.borrow_mut().begin_scope();
     }
 
     fn end_scope(&mut self) -> Result<()> {
-        let track = self.variables.borrow_mut().end_scope()?;
+        let processed_variables = self.variables.borrow_mut().end_scope()?;
 
-        for is_captured in track {
-            if is_captured {
+        for was_captured in processed_variables {
+            if was_captured {
                 self.current_chunk()
                     .write_instruction(Instruction::CloseUpValue);
             } else {
@@ -388,18 +396,22 @@ impl CodeGenerator {
         Ok(())
     }
 
+    #[inline]
     fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
         self.variables.borrow_mut().add_local(name)
     }
 
+    #[inline]
     fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
         self.variables.borrow().resolve_local(name)
     }
 
+    #[inline]
     fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<ConstAddressType>> {
         self.variables.borrow_mut().resolve_up_value(name)
     }
 
+    #[inline]
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
         if self.variables.borrow().is_top_level() {
             return Ok(());
@@ -674,6 +686,9 @@ impl CodeGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::source::StringSource;
+    use crate::compiler::Compiler;
+    use crate::vm::scheme::value::procedure::Procedure;
 
     #[test]
     fn test_resolve_local() {
@@ -708,5 +723,98 @@ mod tests {
                 UpValue::new(10, false)
             ]
         )
+    }
+
+    #[test]
+    fn test_variabels_end_scope() {
+        let vars = Variables::root();
+
+        vars.borrow_mut().begin_scope();
+
+        vars.borrow_mut()
+            .add_local(Identifier::synthetic("foo"))
+            .unwrap();
+
+        let addr = vars
+            .borrow_mut()
+            .add_local(Identifier::synthetic("bar"))
+            .unwrap();
+
+        vars.borrow_mut().mark_local_as_captured(addr).unwrap();
+
+        vars.borrow_mut()
+            .add_local(Identifier::synthetic("baz"))
+            .unwrap();
+
+        vars.borrow_mut()
+            .add_local(Identifier::synthetic("baxz"))
+            .unwrap();
+
+        let processed = vars.borrow_mut().end_scope().unwrap();
+
+        assert_eq!(processed, vec![false, true, false, false])
+    }
+
+    #[test]
+    fn test_compile_closures() {
+        let chunk = compile(
+            "
+          (define foo (let ((x #t) (y 'foo))
+            (lambda () x)))
+
+          (foo)
+        ",
+        );
+
+        // top level
+        assert_matches!(
+            &chunk.code[..],
+            [
+                // create closure
+                Instruction::Closure(_), // define let closure
+                Instruction::True,
+                Instruction::Const(_), // 'foo
+                Instruction::Call(_),  // call let closure
+                // define foo
+                Instruction::Define(_),
+                // apply foo
+                Instruction::GetGlobal(_),
+                Instruction::Call(_),
+                Instruction::Return
+            ]
+        );
+
+        let let_closure = proc_from(&chunk.constants[0]); // the let closure
+        assert_matches!(
+            &let_closure.code().code[..],
+            [
+                // setup the up-value for the x constant
+                Instruction::UpValue(0, true), //x #t
+                // build the closure
+                Instruction::Closure(_), // (lambda ..)
+                Instruction::Return,
+            ]
+        );
+
+        let inner_closure = proc_from(&let_closure.code().constants[0]);
+        assert_matches!(
+            &inner_closure.code().code[..],
+            [Instruction::GetUpValue(0), Instruction::Return]
+        );
+    }
+
+    fn compile(input: &str) -> Chunk {
+        let mut compiler = Compiler::new();
+        let mut source = StringSource::new(input, "test");
+        let unit = compiler.compile_program(&mut source).unwrap();
+        unit.proc.code().clone()
+    }
+
+    fn proc_from(proc: &Value) -> &Procedure {
+        match proc {
+            Value::Procedure(p) => p,
+            Value::Closure(p) => &p.proc,
+            _ => panic!("Not a procedure"),
+        }
     }
 }

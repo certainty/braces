@@ -1,4 +1,5 @@
 use super::procedure;
+use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::{byte_code::chunk::ConstAddressType, scheme::value::Value};
 use std::{cell::RefCell, rc::Rc};
 
@@ -28,6 +29,10 @@ impl Closure {
 
     pub fn set_up_value(&mut self, addr: ConstAddressType, v: Value) {
         self.up_values[addr as usize].replace(v);
+    }
+
+    pub fn code<'a>(&'a self) -> &'a Chunk {
+        &self.proc.code()
     }
 }
 
