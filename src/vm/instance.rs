@@ -160,9 +160,19 @@ impl<'a> Instance<'a> {
                     self.saved_value = Value::Unspecified;
                 }
                 &Instruction::Return => {
-                    if self.pop_frame() <= 0 {
-                        let value = self.pop();
+                    // save the return value
+                    let value = self.pop();
+                    let (remaining, frame) = self.pop_frame();
+
+                    if remaining <= 0 {
+                        #[cfg(feature = "debug_vm")]
+                        println!("{}", debug::stack::pretty_print(&self.stack));
                         return Ok(value.clone());
+                    } else {
+                        // not the last frame
+                        // unwind the stack
+                        self.stack.truncate(frame.stack_base);
+                        self.push(value.clone())?;
                     }
                 }
                 &Instruction::GetGlobal(addr) => {
@@ -250,13 +260,13 @@ impl<'a> Instance<'a> {
     //
 
     #[inline]
-    fn pop_frame(&mut self) -> usize {
-        self.call_stack.pop();
+    fn pop_frame(&mut self) -> (usize, CallFrame) {
+        let frame = self.call_stack.pop();
         let len = self.call_stack.len();
         if len > 0 {
             self.active_frame = self.call_stack.top_mut_ptr();
         }
-        len
+        (len, frame)
     }
 
     #[inline]
@@ -327,11 +337,12 @@ impl<'a> Instance<'a> {
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
         match &self.peek(args) {
-            &value::Value::Closure(cl) => self.apply_closure(cl.clone(), args),
-            value::Value::Procedure(p) => self.apply_native(p.clone(), args),
-            value::Value::ForeignProcedure(p) => self.apply_foreign(p.clone(), args),
+            &value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
+            value::Value::Procedure(p) => self.apply_native(p.clone(), args)?,
+            value::Value::ForeignProcedure(p) => self.apply_foreign(p.clone(), args)?,
             &other => return self.runtime_error(error::non_callable(other.clone())),
-        }
+        };
+        Ok(())
     }
 
     #[inline]

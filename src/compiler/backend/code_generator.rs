@@ -508,6 +508,15 @@ impl CodeGenerator {
             Instruction::Call(application.operands.len()),
             application.source_location(),
         )?;
+
+        /*
+        self.current_chunk().write_instruction(Instruction::Save);
+        for _ in &application.operands {
+            self.current_chunk().write_instruction(Instruction::Pop);
+        }
+        self.current_chunk().write_instruction(Instruction::Restore);
+        */
+
         Ok(())
     }
 

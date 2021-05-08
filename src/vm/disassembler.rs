@@ -22,7 +22,6 @@ impl<T: Write> Disassembler<T> {
         while address < chunk.code.len() {
             address = self.disassemble_instruction(chunk, address);
         }
-
         self.writer.write("\n".as_bytes()).unwrap();
     }
 
