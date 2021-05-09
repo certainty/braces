@@ -332,17 +332,19 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
-        match &self.peek(args) {
-            &value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
+        let callable = self.peek(args).clone();
+
+        match callable {
+            value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
             value::Value::Procedure(procedure::Procedure::Native(p)) => {
                 self.apply_native(p.clone(), args)?
             }
             value::Value::Procedure(procedure::Procedure::Foreign(p)) => {
                 self.apply_foreign(p.clone(), args)?
             }
-            &other => {
+            other => {
                 println!("Non callable {:?} at stack pos: {}", other, args);
-                return self.runtime_error(error::non_callable(other.clone()));
+                return self.runtime_error(error::non_callable(other));
             }
         };
         Ok(())
