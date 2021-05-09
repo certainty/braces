@@ -394,8 +394,6 @@ impl CodeGenerator {
         let processed_variables = self.variables.borrow_mut().end_scope()?;
 
         if processed_variables.len() > 0 {
-            //     self.current_chunk().write_instruction(Instruction::Save);
-
             for was_captured in processed_variables {
                 if was_captured {
                     self.current_chunk()
@@ -404,8 +402,6 @@ impl CodeGenerator {
                     self.current_chunk().write_instruction(Instruction::Pop);
                 }
             }
-
-            //    self.current_chunk().write_instruction(Instruction::Restore);
         }
         Ok(())
     }
@@ -808,10 +804,8 @@ mod tests {
                 Instruction::UpValue(0, true), //x #t
                 // build the closure
                 Instruction::Closure(_), // (lambda ..)
-                Instruction::Save,
-                Instruction::Pop, // x
-                Instruction::Pop, // y
-                Instruction::Restore,
+                Instruction::Pop,
+                Instruction::Pop,
                 Instruction::Return,
             ]
         );
@@ -830,9 +824,10 @@ mod tests {
         unit.closure.code().clone()
     }
 
-    fn proc_from(proc: &Value) -> &native::Procedure {
+    fn proc_from(proc: &Value) -> Rc<native::Procedure> {
         match proc {
-            Value::Closure(p) => &p.proc,
+            Value::Procedure(n) if n.is_native() => n.as_native().clone(),
+            Value::Closure(p) => p.proc.clone(),
             _ => panic!("Not a procedure"),
         }
     }

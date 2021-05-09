@@ -42,9 +42,9 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Return => self.disassemble_simple("OP_RET", address),
-            &Instruction::Save => self.disassemble_simple("OP_SAVE", address),
-            &Instruction::Restore => self.disassemble_simple("OP_RESTORE", address),
-            &Instruction::Call(_args) => self.disassemble_simple("OP_CALL", address),
+            &Instruction::Call(args) => {
+                self.disassemble_simple(&format!("OP_CALL({})", args), address)
+            }
             &Instruction::Closure(addr) => {
                 self.disassemble_closure(chunk, "OP_CLOSURE", address, addr)
             }
@@ -164,7 +164,7 @@ impl<T: Write> Disassembler<T> {
         address + 1
     }
 
-    fn disassemble_value(&self, value: &value::Value) -> String {
+    pub fn disassemble_value(&self, value: &value::Value) -> String {
         match value {
             value::Value::Closure(closure) => format!(
                 "#<closure {}>",

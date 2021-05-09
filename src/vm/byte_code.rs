@@ -18,8 +18,6 @@ pub enum Instruction {
     JumpIfFalse(AddressType),
     Jump(AddressType),
     Call(usize), // number of arguments
-    Save,        // save the value on the top
-    Restore,     // restore the value on the tokp
     Break,       // Reserved for future use
     Return,
     Nop, // do nothing

@@ -66,7 +66,6 @@ pub struct Instance<'a> {
     stack: ValueStack,
     call_stack: CallStack,
     active_frame: *mut CallFrame,
-    saved_value: Value,
     // could be a hashmap instead to speed up lookups
     open_up_values: Vec<(ConstAddressType, RefValue)>,
 }
@@ -105,7 +104,6 @@ impl<'a> Instance<'a> {
             call_stack,
             toplevel,
             active_frame,
-            saved_value: Value::Unspecified,
             open_up_values: vec![],
         }
     }
@@ -147,15 +145,6 @@ impl<'a> Instance<'a> {
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
                 &Instruction::CloseUpValue => todo!(),
-                // do I actually need this?
-                &Instruction::Save => {
-                    self.saved_value = self.pop();
-                }
-                // do I need this?
-                &Instruction::Restore => {
-                    self.push(self.saved_value.clone())?;
-                    self.saved_value = Value::Unspecified;
-                }
                 &Instruction::Return => {
                     // save the return value
                     let value = self.pop();
@@ -167,7 +156,10 @@ impl<'a> Instance<'a> {
 
                     if remaining <= 0 {
                         #[cfg(feature = "debug_vm")]
-                        println!("{}", debug::stack::pretty_print(&self.stack));
+                        println!(
+                            "{}",
+                            debug::stack::pretty_print(&self.stack, self.active_frame().stack_base)
+                        );
                         return Ok(value);
                     }
                 }
@@ -267,7 +259,7 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn push_frame(&mut self, closure: value::closure::Closure, arg_count: usize) -> Result<()> {
-        let base = std::cmp::max(self.stack.len() - arg_count, 0);
+        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
         let frame = CallFrame::new(closure, base);
         self.call_stack.push(frame);
         self.active_frame = self.call_stack.top_mut_ptr();
@@ -286,15 +278,16 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn frame_get_slot(&self, slot_address: ConstAddressType) -> &Value {
-        let peek_distance =
-            self.stack.len() - (self.active_frame().stack_base + (slot_address as usize)) - 1;
-        self.peek(peek_distance)
+        let variable_base = self.active_frame().stack_base + 1;
+        let index = variable_base + (slot_address as usize);
+        self.stack.at(index)
     }
 
     #[inline]
     fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: Value) {
-        let slot_address = self.active_frame().stack_base + (slot_address as usize);
-        self.stack.set(slot_address, value);
+        let variable_base = self.active_frame().stack_base + 1;
+        let index = variable_base + (slot_address as usize);
+        self.stack.set(index, value);
     }
 
     fn setup_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
@@ -478,26 +471,23 @@ impl<'a> Instance<'a> {
         let mut disassembler = Disassembler::new(std::io::stdout());
         let chunk = self.active_frame().code();
 
-        println!("{}", debug::stack::pretty_print(&self.stack));
+        println!(
+            "{}",
+            debug::stack::pretty_print(&self.stack, self.active_frame().stack_base)
+        );
         disassembler.disassemble_instruction(chunk, self.active_frame().ip);
     }
 
     fn disassemble_frame(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());
-        let base_addr = self.active_frame().stack_base;
         let chunk = self.active_frame().code();
-        let proc_name = self
-            .active_frame()
-            .closure
-            .proc
-            .name()
-            .unwrap_or(String::from(""));
         println!("\n");
         disassembler.disassemble(
             chunk,
             &format!(
-                "ACTIVE FRAME (proc: {}, stack_base: {})",
-                proc_name, base_addr
+                "ACTIVE FRAME ({:?})",
+                disassembler
+                    .disassemble_value(&Value::Closure(self.active_frame().closure.clone()))
             ),
         );
         println!("\n");

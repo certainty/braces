@@ -86,7 +86,7 @@ fn test_vm_lambda() {
     assert_eq!(result, vm.values.bool_true());
 
     let result = vm
-        .run_string("(begin (define id (lambda (x) x)) (id #t))", "")
+        .run_string("(define id (lambda (x) x)) (id #t)", "")
         .unwrap();
     assert_eq!(result, vm.values.bool_true());
 
@@ -105,22 +105,22 @@ fn test_vm_lambda_formals() {
     let mut vm = VM::default();
 
     let result = vm
-        .run_string("(begin (define test (lambda (x) x)) (test #f))", "")
+        .run_string("(define test (lambda (x) x)) (test #f)", "")
         .unwrap();
     assert_eq!(result, vm.values.bool_false());
 
     let result = vm
-        .run_string("(begin (define test (lambda x x)) (test))", "")
+        .run_string("(define test (lambda x x)) (test)", "")
         .unwrap();
     assert_eq!(result, vm.values.proper_list(vec![]));
 
     let result = vm
-        .run_string("(begin (define test (lambda x x)) (test #f))", "")
+        .run_string("(define test (lambda x x)) (test #f)", "")
         .unwrap();
     assert_eq!(result, vm.values.proper_list(vec![vm.values.bool_false()]));
 
     let result = vm
-        .run_string("(begin (define test (lambda x x)) (test #f #t))", "")
+        .run_string("(define test (lambda x x)) (test #f #t)", "")
         .unwrap();
     assert_eq!(
         result,
@@ -130,7 +130,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) x)) (test #t #f #f))",
+            "(define test (lambda (x y z . rest) x)) (test #t #f #f)",
             "",
         )
         .unwrap();
@@ -138,7 +138,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) y)) (test #f #t #f))",
+            "(define test (lambda (x y z . rest) y)) (test #f #t #f)",
             "",
         )
         .unwrap();
@@ -146,7 +146,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) z)) (test #f #f #t))",
+            "(define test (lambda (x y z . rest) z)) (test #f #f #t)",
             "",
         )
         .unwrap();
@@ -154,7 +154,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) rest)) (test #f #t #t))",
+            "(define test (lambda (x y z . rest) rest)) (test #f #t #t)",
             "",
         )
         .unwrap();
@@ -162,7 +162,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) rest)) (test #f #f #f #t #t))",
+            "(define test (lambda (x y z . rest) rest)) (test #f #f #f #t #t)",
             "",
         )
         .unwrap();

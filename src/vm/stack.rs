@@ -32,6 +32,10 @@ impl<V> Stack<V> {
         }
     }
 
+    pub fn at<'a>(&'a self, idx: usize) -> &'a V {
+        &self.repr[idx]
+    }
+
     // Pop from the top of the stack.
     // The caller has to make sure that the stack is not empty.
     pub fn pop(&mut self) -> V {
