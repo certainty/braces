@@ -339,7 +339,6 @@ impl CodeGenerator {
             generator.declare_binding(&argument)?;
         }
         generator.emit_body(ast)?;
-        generator.end_scope()?;
         generator.emit_return()?;
 
         let up_value_count = generator.variables.borrow().up_values.len();
@@ -700,7 +699,6 @@ mod tests {
     use crate::compiler::source::StringSource;
     use crate::compiler::Compiler;
     use crate::vm::value::procedure::native;
-    use crate::vm::value::procedure::Procedure;
 
     #[test]
     fn test_resolve_local() {
@@ -804,8 +802,6 @@ mod tests {
                 Instruction::UpValue(0, true), //x #t
                 // build the closure
                 Instruction::Closure(_), // (lambda ..)
-                Instruction::Pop,
-                Instruction::Pop,
                 Instruction::Return,
             ]
         );
