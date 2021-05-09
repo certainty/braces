@@ -1,6 +1,8 @@
+pub mod foreign;
+pub mod native;
 use super::equality::SchemeEqual;
-use super::lambda;
 use crate::vm::byte_code::chunk::Chunk;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Arity {
@@ -13,32 +15,46 @@ pub trait HasArity {
     fn arity<'a>(&'a self) -> &'a Arity;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Procedure {
-    Named(lambda::NamedLambda),
-    Lambda(lambda::Lambda),
+    Native(Rc<native::Procedure>),
+    Foreign(Rc<foreign::Procedure>),
 }
 
 impl Procedure {
-    pub fn code<'a>(&'a self) -> &'a Chunk {
+    pub fn foreign(proc: foreign::Procedure) -> Self {
+        Self::Foreign(Rc::new(proc))
+    }
+
+    pub fn native(proc: native::Procedure) -> Self {
+        Self::Native(Rc::new(proc))
+    }
+
+    pub fn name(&self) -> Option<String> {
         match self {
-            Procedure::Named(proc) => &proc.lambda.chunk,
-            Procedure::Lambda(proc) => &proc.chunk,
+            Self::Native(proc) => proc.name(),
+            Self::Foreign(proc) => Some(proc.name.clone()),
         }
     }
 
-    pub fn name(&self) -> String {
-        if let Self::Named(named) = self {
-            named.name.clone()
-        } else {
-            String::from("")
+    pub fn is_native(&self) -> bool {
+        match self {
+            Self::Native(_) => true,
+            Self::Foreign(_) => false,
+        }
+    }
+
+    pub fn as_native(&self) -> Rc<native::Procedure> {
+        match self {
+            Self::Native(proc) => proc.clone(),
+            _ => panic!("Can't extract native procedure from closure"),
         }
     }
 
     pub fn up_value_count(&self) -> usize {
         match self {
-            Procedure::Named(proc) => proc.lambda.up_value_count,
-            Procedure::Lambda(proc) => proc.up_value_count,
+            Self::Native(proc) => proc.up_value_count,
+            _ => 0,
         }
     }
 }
@@ -46,24 +62,24 @@ impl Procedure {
 impl SchemeEqual<Procedure> for Procedure {
     fn is_eq(&self, other: &Procedure) -> bool {
         match (self, other) {
-            (Self::Named(lhs), Self::Named(rhs)) => lhs.is_eq(rhs),
-            (Self::Lambda(lhs), Self::Lambda(rhs)) => lhs.is_eq(rhs),
+            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_eq(rhs),
+            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_eq(rhs),
             _ => false,
         }
     }
 
     fn is_eqv(&self, other: &Procedure) -> bool {
         match (self, other) {
-            (Self::Named(lhs), Self::Named(rhs)) => lhs.is_eqv(rhs),
-            (Self::Lambda(lhs), Self::Lambda(rhs)) => lhs.is_eqv(rhs),
+            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_eqv(rhs),
+            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_eqv(rhs),
             _ => false,
         }
     }
 
     fn is_equal(&self, other: &Procedure) -> bool {
         match (self, other) {
-            (Self::Named(lhs), Self::Named(rhs)) => lhs.is_equal(rhs),
-            (Self::Lambda(lhs), Self::Lambda(rhs)) => lhs.is_equal(rhs),
+            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_equal(rhs),
+            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_equal(rhs),
             _ => false,
         }
     }
@@ -72,8 +88,8 @@ impl SchemeEqual<Procedure> for Procedure {
 impl HasArity for Procedure {
     fn arity<'a>(&'a self) -> &'a Arity {
         match self {
-            Procedure::Named(proc) => &proc.lambda.arity,
-            Procedure::Lambda(proc) => &proc.arity,
+            Procedure::Native(proc) => &proc.arity,
+            Procedure::Foreign(proc) => &proc.arity,
         }
     }
 }
@@ -81,29 +97,29 @@ impl HasArity for Procedure {
 impl HasArity for std::rc::Rc<Procedure> {
     fn arity<'a>(&'a self) -> &'a Arity {
         match &**self {
-            Procedure::Named(proc) => &proc.lambda.arity,
-            Procedure::Lambda(proc) => &proc.arity,
+            Procedure::Native(proc) => &proc.arity,
+            Procedure::Foreign(proc) => &proc.arity,
         }
     }
 }
 
 pub fn thunk(chunk: Chunk, up_value_count: usize) -> Procedure {
-    lambda(Arity::Exactly(0), chunk, up_value_count)
+    Procedure::Native(Rc::new(native::Procedure::thunk(chunk, up_value_count)))
 }
 
 pub fn lambda(arity: Arity, chunk: Chunk, up_value_count: usize) -> Procedure {
-    Procedure::Lambda(lambda::Lambda {
+    Procedure::Native(Rc::new(native::Procedure::lambda(
         arity,
         chunk,
         up_value_count,
-    })
+    )))
 }
 
 pub fn named(name: String, arity: Arity, chunk: Chunk, up_value_count: usize) -> Procedure {
-    let lambda = lambda::Lambda {
+    Procedure::Native(Rc::new(native::Procedure::named(
+        name,
         arity,
         chunk,
         up_value_count,
-    };
-    Procedure::Named(lambda::NamedLambda { name, lambda })
+    )))
 }

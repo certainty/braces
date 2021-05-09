@@ -166,8 +166,14 @@ impl<T: Write> Disassembler<T> {
 
     fn disassemble_value(&self, value: &value::Value) -> String {
         match value {
-            value::Value::Closure(closure) => format!("#<procedure {}>", closure.proc.name()),
-            value::Value::Procedure(proc) => format!("#<procedure {}>", proc.name()),
+            value::Value::Closure(closure) => format!(
+                "#<closure {}>",
+                closure.procedure().name().unwrap_or(String::from("lambda"))
+            ),
+            value::Value::Procedure(proc) => format!(
+                "#<procedure {}>",
+                proc.name().unwrap_or(String::from("lambda"))
+            ),
             value::Value::Symbol(sym) => sym.as_str().to_string(),
             _ => format!("{:?}", value),
         }

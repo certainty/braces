@@ -1,3 +1,4 @@
+use crate::vm::value::closure::Closure;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
@@ -318,7 +319,11 @@ impl CodeGenerator {
             &Expression::body(ast),
             &Formals::empty(),
         )?;
-        Ok(CompilationUnit::new(self.values.clone(), proc))
+
+        Ok(CompilationUnit::new(
+            self.values.clone(),
+            Closure::new(proc, vec![]),
+        ))
     }
 
     pub fn generate_procedure(
@@ -326,7 +331,7 @@ impl CodeGenerator {
         target: Target,
         ast: &BodyExpression,
         formals: &Formals,
-    ) -> Result<value::procedure::Procedure> {
+    ) -> Result<value::procedure::native::Procedure> {
         let mut generator = CodeGenerator::new(target.clone(), parent_variables);
 
         generator.begin_scope();
@@ -340,14 +345,17 @@ impl CodeGenerator {
         let up_value_count = generator.variables.borrow().up_values.len();
 
         match target {
-            Target::TopLevel => Ok(value::procedure::thunk(generator.chunk, up_value_count)),
-            Target::Procedure(Some(name)) => Ok(value::procedure::named(
+            Target::TopLevel => Ok(value::procedure::native::Procedure::thunk(
+                generator.chunk,
+                up_value_count,
+            )),
+            Target::Procedure(Some(name)) => Ok(value::procedure::native::Procedure::named(
                 name,
                 formals.arity(),
                 generator.chunk,
                 up_value_count,
             )),
-            Target::Procedure(None) => Ok(value::procedure::lambda(
+            Target::Procedure(None) => Ok(value::procedure::native::Procedure::lambda(
                 formals.arity(),
                 generator.chunk,
                 up_value_count,
@@ -529,7 +537,7 @@ impl CodeGenerator {
             &expr.body,
             &expr.formals,
         )?;
-        let proc = self.values.procedure(lambda);
+        let proc = self.values.native_procedure(lambda);
 
         self.emit_closure(proc, expr.source_location())
     }
@@ -695,6 +703,7 @@ mod tests {
     use super::*;
     use crate::compiler::source::StringSource;
     use crate::compiler::Compiler;
+    use crate::vm::value::procedure::native;
     use crate::vm::value::procedure::Procedure;
 
     #[test]
@@ -818,12 +827,11 @@ mod tests {
         let mut compiler = Compiler::new();
         let mut source = StringSource::new(input, "test");
         let unit = compiler.compile_program(&mut source).unwrap();
-        unit.proc.code().clone()
+        unit.closure.code().clone()
     }
 
-    fn proc_from(proc: &Value) -> &Procedure {
+    fn proc_from(proc: &Value) -> &native::Procedure {
         match proc {
-            Value::Procedure(p) => p,
             Value::Closure(p) => &p.proc,
             _ => panic!("Not a procedure"),
         }

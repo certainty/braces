@@ -29,20 +29,23 @@ pub fn pretty_print(stack: &Stack<Value>) -> String {
 
 fn stack_print(v: &Value) -> String {
     match v {
-        Value::Procedure(proc) => format!("#<procedure {}>", proc.name()),
+        Value::Procedure(proc) => format!(
+            "#<procedure {}>",
+            proc.name().unwrap_or(String::from("lambda"))
+        ),
         Value::Closure(closure) => {
             let up_values: Vec<String> = closure
                 .up_values
                 .iter()
-                .map(|e| format!("{} @ {:p}", stack_print(&e.borrow()), e))
+                .map(|e| format!("{} @ {:p}", stack_print(&e.as_ref()), e))
                 .collect();
             format!(
                 "#<closure {}  up-values: [{}]>",
-                closure.proc.name(),
+                closure.procedure().name().unwrap_or(String::from("lambda")),
                 up_values.join(", ")
             )
         }
-        Value::UpValue(inner) => stack_print(&inner.borrow()),
+        Value::UpValue(inner) => stack_print(&inner.as_ref()),
         v => format!("{:?}", v),
     }
 }

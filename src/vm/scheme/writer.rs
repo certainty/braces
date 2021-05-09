@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::sexp;
-use crate::vm::value::{foreign, procedure};
+use crate::vm::value::procedure;
 use crate::vm::value::{Factory, Value};
 use std::collections::HashSet;
 
@@ -35,10 +35,11 @@ impl Writer {
             Value::Char(c) => self.write_char(*c),
             Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
-            Value::Closure(closure) => self.write_procedure(&closure.proc),
-            Value::UpValue(inner) => self.write_impl(&inner.borrow(), values, quote),
+            Value::Closure(closure) => {
+                self.write_procedure(&procedure::Procedure::Native(closure.procedure_rc()))
+            }
+            Value::UpValue(inner) => self.write_impl(&inner.as_ref(), values, quote),
             Value::Procedure(proc) => self.write_procedure(&proc),
-            Value::ForeignProcedure(proc) => self.write_foreign_procedure(&proc),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -113,13 +114,17 @@ impl Writer {
 
     fn write_procedure(&self, proc: &procedure::Procedure) -> String {
         match proc {
-            procedure::Procedure::Named(named_lambda) => format!(
-                "#<procedure ({} {})>",
-                named_lambda.name,
-                self.write_formals(&named_lambda.lambda.arity)
+            procedure::Procedure::Native(proc) => format!(
+                "#<procedure {} ({})>",
+                proc.name().unwrap_or(String::from("")),
+                self.write_formals(&proc.arity)
             ),
-            procedure::Procedure::Lambda(lambda) => {
-                format!("#<procedure ({})>", self.write_formals(&lambda.arity))
+            procedure::Procedure::Foreign(proc) => {
+                format!(
+                    "#<procedure {} ({})>",
+                    proc.name,
+                    self.write_formals(&proc.arity)
+                )
             }
         }
     }
@@ -136,14 +141,6 @@ impl Writer {
             }
             procedure::Arity::Many => " . args".to_string(),
         }
-    }
-
-    fn write_foreign_procedure(&self, proc: &foreign::Procedure) -> String {
-        format!(
-            "#<foreign-procedure ({} {})>",
-            proc.name,
-            self.write_formals(&proc.arity)
-        )
     }
 
     #[inline]

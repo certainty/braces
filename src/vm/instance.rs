@@ -8,13 +8,13 @@ use super::stack::Stack;
 use super::value;
 use super::value::closure::Closure;
 use super::value::error;
-use super::value::foreign;
-use super::value::procedure::{Arity, HasArity, Procedure};
+use super::value::procedure::{self, Arity};
 use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
-use std::{cell::RefCell, rc::Rc};
+use crate::vm::value::RefValue;
+use std::rc::Rc;
 
 //////////////////////////////////////////////////
 // Welcome the call stack
@@ -46,12 +46,12 @@ impl CallFrame {
 
     #[inline]
     pub fn code(&self) -> &Chunk {
-        self.closure.proc.code()
+        self.closure.code()
     }
 
     #[inline]
     pub fn line_number_for_current_instruction(&self) -> Option<LineNumber> {
-        self.closure.proc.code().find_line(self.ip).map(|e| e.2)
+        self.closure.code().find_line(self.ip).map(|e| e.2)
     }
 }
 
@@ -68,8 +68,7 @@ pub struct Instance<'a> {
     active_frame: *mut CallFrame,
     saved_value: Value,
     // could be a hashmap instead to speed up lookups
-    // TODO: hide the details of the RefCell
-    open_up_values: Vec<(ConstAddressType, Rc<RefCell<Value>>)>,
+    open_up_values: Vec<(ConstAddressType, RefValue)>,
 }
 
 ////////////////////////////////////////////////////////
@@ -83,20 +82,20 @@ type Result<T> = std::result::Result<T, Error>;
 // Most notably access to the stack and the callstack (including ip increments)
 impl<'a> Instance<'a> {
     pub fn new(
-        proc: Procedure,
+        proc: procedure::native::Procedure,
         call_stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Self {
         let mut stack = ValueStack::new(call_stack_size * 255);
         let mut call_stack = CallStack::new(call_stack_size);
-        let initial_closure: Closure = proc.into();
+        let initial_closure: Closure = Closure::from(proc);
 
         // the first value on the stack is the initial procedure
         stack.push(Value::Closure(initial_closure.clone()));
 
         // the first active stack frame is that of the current procedure
-        call_stack.push(CallFrame::new(initial_closure.into(), 0));
+        call_stack.push(CallFrame::new(initial_closure, 0));
 
         let active_frame = call_stack.top_mut_ptr();
 
@@ -112,7 +111,7 @@ impl<'a> Instance<'a> {
     }
 
     pub fn interprete(
-        proc: Procedure,
+        proc: procedure::native::Procedure,
         stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
@@ -313,8 +312,7 @@ impl<'a> Instance<'a> {
             return Ok(());
         } else {
             let value = self.frame_get_slot(addr).clone();
-            self.open_up_values
-                .push((addr, Rc::new(RefCell::new(value))));
+            self.open_up_values.push((addr, RefValue::new(value)));
             Ok(())
         }
     }
@@ -323,10 +321,9 @@ impl<'a> Instance<'a> {
         match self.read_constant(addr).clone() {
             Value::Procedure(proc) => {
                 let up_values = self.open_up_values.iter().map(|e| e.1.clone()).collect();
-                let closure = Closure::new(proc, up_values);
+                let closure = Closure::from_rc(proc.as_native().clone(), up_values);
                 // That might be wrong :D
                 self.open_up_values.truncate(0);
-
                 self.push(Value::Closure(closure))
             }
             _ => return self.compiler_bug("Expected closure function"),
@@ -337,8 +334,12 @@ impl<'a> Instance<'a> {
     fn apply(&mut self, args: usize) -> Result<()> {
         match &self.peek(args) {
             &value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
-            value::Value::Procedure(p) => self.apply_native(p.clone(), args)?,
-            value::Value::ForeignProcedure(p) => self.apply_foreign(p.clone(), args)?,
+            value::Value::Procedure(procedure::Procedure::Native(p)) => {
+                self.apply_native(p.clone(), args)?
+            }
+            value::Value::Procedure(procedure::Procedure::Foreign(p)) => {
+                self.apply_foreign(p.clone(), args)?
+            }
             &other => {
                 println!("Non callable {:?} at stack pos: {}", other, args);
                 return self.runtime_error(error::non_callable(other.clone()));
@@ -349,8 +350,8 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn apply_closure(&mut self, closure: Closure, arg_count: usize) -> Result<()> {
-        self.check_arity(&closure.proc, arg_count)?;
-        let arg_count = self.bind_arguments(&closure.proc, arg_count)?;
+        self.check_arity(&closure.procedure().arity, arg_count)?;
+        let arg_count = self.bind_arguments(&closure.procedure().arity, arg_count)?;
         self.push_frame(closure, arg_count)?;
         #[cfg(feature = "debug_vm")]
         self.disassemble_frame();
@@ -358,9 +359,13 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn apply_native(&mut self, proc: std::rc::Rc<Procedure>, arg_count: usize) -> Result<()> {
-        self.check_arity(&proc, arg_count)?;
-        let arg_count = self.bind_arguments(&proc, arg_count)?;
+    fn apply_native(
+        &mut self,
+        proc: Rc<procedure::native::Procedure>,
+        arg_count: usize,
+    ) -> Result<()> {
+        self.check_arity(&proc.arity, arg_count)?;
+        let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();
         self.push_frame(closure, arg_count)?;
         #[cfg(feature = "debug_vm")]
@@ -371,10 +376,10 @@ impl<'a> Instance<'a> {
     #[inline]
     fn apply_foreign(
         &mut self,
-        proc: std::rc::Rc<foreign::Procedure>,
+        proc: Rc<procedure::foreign::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
-        self.check_arity(&proc, arg_count)?;
+        self.check_arity(&proc.arity, arg_count)?;
         let arguments = self.pop_n(arg_count).iter().cloned().collect();
         match proc.call(arguments) {
             Ok(v) => {
@@ -385,8 +390,8 @@ impl<'a> Instance<'a> {
         }
     }
 
-    fn bind_arguments<T: HasArity>(&mut self, proc: &T, arg_count: usize) -> Result<usize> {
-        match proc.arity() {
+    fn bind_arguments(&mut self, arity: &Arity, arg_count: usize) -> Result<usize> {
+        match arity {
             Arity::Exactly(_) => Ok(arg_count), // nothing to do as the variables are layed out as expected already on the stack
             Arity::AtLeast(n) => {
                 // stuff the last values into a new local
@@ -407,8 +412,8 @@ impl<'a> Instance<'a> {
         }
     }
 
-    fn check_arity<T: HasArity>(&self, proc: &T, arg_count: usize) -> Result<()> {
-        match proc.arity() {
+    fn check_arity(&self, arity: &Arity, arg_count: usize) -> Result<()> {
+        match arity {
             Arity::Exactly(n) if arg_count == *n => Ok(()),
             Arity::AtLeast(n) if arg_count >= *n => Ok(()),
             Arity::Many => Ok(()),
@@ -479,7 +484,12 @@ impl<'a> Instance<'a> {
         let mut disassembler = Disassembler::new(std::io::stdout());
         let base_addr = self.active_frame().stack_base;
         let chunk = self.active_frame().code();
-        let proc_name = self.active_frame().closure.proc.name();
+        let proc_name = self
+            .active_frame()
+            .closure
+            .proc
+            .name()
+            .unwrap_or(String::from(""));
         println!("\n");
         disassembler.disassemble(
             chunk,

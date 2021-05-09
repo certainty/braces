@@ -8,7 +8,7 @@ pub mod stack;
 pub mod value;
 
 use self::value::error;
-use self::value::foreign;
+use self::value::procedure::foreign;
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
@@ -80,7 +80,7 @@ impl VM {
         self.values.absorb(unit.values);
 
         Instance::interprete(
-            unit.proc,
+            unit.closure.procedure().clone(),
             self.stack_size,
             &mut self.toplevel,
             &mut self.values,

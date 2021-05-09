@@ -1,5 +1,5 @@
 use super::ffi::*;
-use crate::vm::value::foreign;
+use crate::vm::value::procedure::foreign;
 use crate::vm::value::Value;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
 use crate::vm::VM;
@@ -87,7 +87,7 @@ pub fn null_p(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn procedure_p(args: Vec<Value>) -> FunctionResult<Value> {
     match unary_procedure(&args)? {
         Value::Procedure(_) => Ok(Value::Bool(true)),
-        Value::ForeignProcedure(_) => Ok(Value::Bool(true)),
+        Value::Closure(_) => Ok(Value::Bool(true)),
         _ => Ok(Value::Bool(false)),
     }
 }
