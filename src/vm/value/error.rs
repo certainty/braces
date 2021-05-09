@@ -6,7 +6,7 @@ use thiserror::Error;
 pub enum RuntimeError {
     #[error("UndefinedVariableError: Variable `{0:?}` is undefined")]
     UndefinedVariable(Symbol),
-    #[error("ArityError: Function expected `{0:?}` arguments")]
+    #[error("ArityError: Function expected `{0:?}` arguments but received {1}")]
     ArityError(Arity, usize),
     #[error("ArgumentError: `{0}` is undefined")]
     ArgumentError(String),

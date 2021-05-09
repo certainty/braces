@@ -1,6 +1,6 @@
 use crate::compiler::error::UserMessage;
 use crate::vm;
-use crate::vm::scheme::value::Value;
+use crate::vm::value::Value;
 use crate::vm::VM;
 use clap::Clap;
 use rustyline::error::ReadlineError;

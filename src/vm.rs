@@ -5,9 +5,10 @@ pub mod global;
 pub mod instance;
 pub mod scheme;
 pub mod stack;
+pub mod value;
 
-use self::scheme::value::error;
-use self::scheme::value::{foreign, procedure::Arity};
+use self::value::error;
+use self::value::foreign;
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
@@ -15,11 +16,10 @@ use crate::compiler::Compiler;
 use global::TopLevel;
 use instance::Instance;
 use scheme::core;
-use scheme::value;
-use scheme::value::Value;
 use scheme::writer::Writer;
 use std::path::PathBuf;
 use thiserror::Error;
+use value::Value;
 
 #[derive(Error, Debug)]
 pub enum Error {

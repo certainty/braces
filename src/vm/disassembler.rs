@@ -1,6 +1,6 @@
 use super::byte_code::chunk::{AddressType, Chunk, ConstAddressType};
 use super::byte_code::Instruction;
-use super::scheme::value;
+use super::value;
 use std::io::Write;
 
 pub struct Disassembler<T: Write> {

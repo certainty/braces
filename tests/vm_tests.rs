@@ -1,5 +1,4 @@
-use braces::vm::scheme::value::Value;
-use braces::vm::scheme::value::{error, procedure::Arity};
+use braces::vm::value::{error, procedure::Arity, Value};
 use braces::vm::Error;
 use braces::vm::VM;
 use matches::assert_matches;
@@ -189,4 +188,63 @@ fn test_vm_conditional() {
 
     result = vm.run_string("(if #t #t)", "").unwrap();
     assert_eq!(result, vm.values.bool_true());
+}
+
+#[test]
+fn test_vm_closures() {
+    let mut vm = VM::default();
+    let result = vm
+        .run_string(
+            "
+               (define test (let ((x #t) (y 'ignored)) (lambda () (set! x (not x)) x)))
+               (define ls (lambda x x))
+               (ls (test) (test) (test))
+",
+            "",
+        )
+        .unwrap();
+    assert_eq!(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_false(),
+            vm.values.bool_true(),
+            vm.values.bool_false()
+        ])
+    );
+
+    let result = vm
+        .run_string(
+            "
+               (define test (let ((x #t) (y 'ignored)) (lambda () x)))
+               (test)
+",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+}
+
+#[test]
+fn test_vm_bugs() {
+    let mut vm = VM::default();
+
+    // results in arity error
+    let result = vm
+        .run_string(
+            "
+               (define ls (lambda x x))
+               (define test (lambda () #t))
+               (ls (test) #f (test))
+",
+            "",
+        )
+        .unwrap();
+    assert_eq!(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_true(),
+            vm.values.bool_false(),
+            vm.values.bool_true()
+        ])
+    );
 }

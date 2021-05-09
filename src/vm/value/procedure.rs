@@ -1,6 +1,7 @@
+use super::equality::SchemeEqual;
 use super::lambda;
 use crate::vm::byte_code::chunk::Chunk;
-use crate::vm::scheme::equality::SchemeEqual;
+
 #[derive(Debug, Clone)]
 pub enum Arity {
     Exactly(usize),

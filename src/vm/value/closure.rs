@@ -1,10 +1,9 @@
 use super::procedure;
 use crate::vm::byte_code::chunk::Chunk;
-use crate::vm::{byte_code::chunk::ConstAddressType, scheme::value::Value};
+use crate::vm::{byte_code::chunk::ConstAddressType, value::Value};
 use std::{cell::RefCell, rc::Rc};
 
 pub type RuntimeUpValue = Rc<RefCell<Value>>;
-//pub type RuntimeUpValue = Rc<ReValue>;
 
 pub fn new_up_value(v: Value) -> RuntimeUpValue {
     Rc::new(RefCell::new(v))

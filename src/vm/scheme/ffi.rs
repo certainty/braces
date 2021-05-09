@@ -1,5 +1,5 @@
-use super::value::Value;
-use super::value::{error, procedure::Arity};
+use crate::vm::value::Value;
+use crate::vm::value::{error, procedure::Arity};
 use thiserror::Error;
 
 pub type FunctionResult<T> = std::result::Result<T, error::RuntimeError>;

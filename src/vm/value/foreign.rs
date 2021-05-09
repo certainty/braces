@@ -1,7 +1,7 @@
+use super::equality::SchemeEqual;
 use super::procedure;
 use super::procedure::HasArity;
 use super::Value;
-use crate::vm::scheme::equality::SchemeEqual;
 use crate::vm::scheme::ffi::FunctionResult;
 
 pub type ProcedureImpl = dyn Fn(Vec<Value>) -> FunctionResult<Value>;

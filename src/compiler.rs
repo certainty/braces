@@ -4,7 +4,7 @@ pub mod frontend;
 pub mod source;
 pub mod source_location;
 pub mod utils;
-use crate::vm::scheme::value;
+use crate::vm::value;
 use backend::code_generator;
 use backend::code_generator::{CodeGenerator, Target};
 use frontend::parser::Parser;

@@ -19,8 +19,8 @@ use crate::vm::byte_code::chunk::ConstAddressType;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
 use crate::vm::disassembler::Disassembler;
-use crate::vm::scheme::value;
-use crate::vm::scheme::value::Value;
+use crate::vm::value;
+use crate::vm::value::Value;
 use crate::{
     compiler::frontend::parser::expression::identifier::Identifier,
     vm::byte_code::chunk::AddressType,
@@ -386,7 +386,7 @@ impl CodeGenerator {
         let processed_variables = self.variables.borrow_mut().end_scope()?;
 
         if processed_variables.len() > 0 {
-            self.current_chunk().write_instruction(Instruction::Save);
+            //     self.current_chunk().write_instruction(Instruction::Save);
 
             for was_captured in processed_variables {
                 if was_captured {
@@ -397,7 +397,7 @@ impl CodeGenerator {
                 }
             }
 
-            self.current_chunk().write_instruction(Instruction::Restore);
+            //    self.current_chunk().write_instruction(Instruction::Restore);
         }
         Ok(())
     }
@@ -508,14 +508,6 @@ impl CodeGenerator {
             Instruction::Call(application.operands.len()),
             application.source_location(),
         )?;
-
-        /*
-        self.current_chunk().write_instruction(Instruction::Save);
-        for _ in &application.operands {
-            self.current_chunk().write_instruction(Instruction::Pop);
-        }
-        self.current_chunk().write_instruction(Instruction::Restore);
-        */
 
         Ok(())
     }
@@ -703,7 +695,7 @@ mod tests {
     use super::*;
     use crate::compiler::source::StringSource;
     use crate::compiler::Compiler;
-    use crate::vm::scheme::value::procedure::Procedure;
+    use crate::vm::value::procedure::Procedure;
 
     #[test]
     fn test_resolve_local() {

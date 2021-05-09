@@ -19,7 +19,7 @@ impl<V> Stack<V> {
     }
     // discards everything up to the given base
     pub fn truncate(&mut self, base: usize) {
-        self.repr.truncate(base + 1)
+        self.repr.truncate(base)
     }
 
     // Push a value to the stack.

@@ -1,5 +1,5 @@
+use super::equality::SchemeEqual;
 use crate::compiler::utils::string_table;
-use crate::vm::scheme::equality::SchemeEqual;
 
 #[repr(transparent)]
 #[derive(Clone, PartialEq)]

@@ -1,5 +1,5 @@
-use crate::vm::scheme::value::Value;
 use crate::vm::stack::Stack;
+use crate::vm::value::Value;
 
 // Utilities to get insights into how the stacks are arranged
 

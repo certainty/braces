@@ -1,6 +1,6 @@
-use super::value::{foreign, procedure};
-use super::value::{Factory, Value};
 use crate::compiler::frontend::parser::sexp;
+use crate::vm::value::{foreign, procedure};
+use crate::vm::value::{Factory, Value};
 use std::collections::HashSet;
 
 /// The scheme writer is responsible to create external representations
@@ -187,8 +187,8 @@ mod tests {
     use super::*;
     use crate::compiler::frontend::parser::sexp;
     use crate::compiler::source::StringSource;
-    use crate::vm::scheme::value::arbitrary::SymbolString;
-    use crate::vm::scheme::value::Value;
+    use crate::vm::value::arbitrary::SymbolString;
+    use crate::vm::value::Value;
     use quickcheck;
 
     #[test]

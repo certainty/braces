@@ -1,24 +1,20 @@
-use super::scheme::value;
-use super::scheme::value::error;
-use super::scheme::value::procedure::Procedure;
-use super::scheme::value::symbol::Symbol;
-use super::scheme::value::Value;
+use super::byte_code::chunk::{Chunk, LineNumber};
+use super::byte_code::Instruction;
+#[cfg(feature = "debug_vm")]
+use super::debug;
+use super::disassembler::Disassembler;
+use super::global::*;
 use super::stack::Stack;
+use super::value;
+use super::value::closure::Closure;
+use super::value::error;
+use super::value::foreign;
+use super::value::procedure::{Arity, HasArity, Procedure};
+use super::value::symbol::Symbol;
+use super::value::Value;
 use super::Error;
-use super::{
-    byte_code::chunk::{Chunk, LineNumber},
-    scheme::value::procedure::HasArity,
-};
-use super::{byte_code::Instruction, scheme::value::procedure::Arity};
-use super::{debug, scheme::value::foreign};
-use super::{disassembler::Disassembler, scheme::value::closure};
-use super::{global::*, scheme::value::closure::Closure};
 use crate::vm::byte_code::chunk::ConstAddressType;
-use std::{
-    borrow::Borrow,
-    cell::RefCell,
-    rc::{self, Rc},
-};
+use std::{cell::RefCell, rc::Rc};
 
 //////////////////////////////////////////////////
 // Welcome the call stack
@@ -152,9 +148,11 @@ impl<'a> Instance<'a> {
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
                 &Instruction::CloseUpValue => todo!(),
+                // do I actually need this?
                 &Instruction::Save => {
                     self.saved_value = self.pop();
                 }
+                // do I need this?
                 &Instruction::Restore => {
                     self.push(self.saved_value.clone())?;
                     self.saved_value = Value::Unspecified;
@@ -164,15 +162,14 @@ impl<'a> Instance<'a> {
                     let value = self.pop();
                     let (remaining, frame) = self.pop_frame();
 
+                    // unwind the stack
+                    self.stack.truncate(frame.stack_base);
+                    self.push(value.clone())?;
+
                     if remaining <= 0 {
                         #[cfg(feature = "debug_vm")]
                         println!("{}", debug::stack::pretty_print(&self.stack));
-                        return Ok(value.clone());
-                    } else {
-                        // not the last frame
-                        // unwind the stack
-                        self.stack.truncate(frame.stack_base);
-                        self.push(value.clone())?;
+                        return Ok(value);
                     }
                 }
                 &Instruction::GetGlobal(addr) => {
@@ -327,7 +324,9 @@ impl<'a> Instance<'a> {
             Value::Procedure(proc) => {
                 let up_values = self.open_up_values.iter().map(|e| e.1.clone()).collect();
                 let closure = Closure::new(proc, up_values);
+                // That might be wrong :D
                 self.open_up_values.truncate(0);
+
                 self.push(Value::Closure(closure))
             }
             _ => return self.compiler_bug("Expected closure function"),
@@ -340,7 +339,10 @@ impl<'a> Instance<'a> {
             &value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
             value::Value::Procedure(p) => self.apply_native(p.clone(), args)?,
             value::Value::ForeignProcedure(p) => self.apply_foreign(p.clone(), args)?,
-            &other => return self.runtime_error(error::non_callable(other.clone())),
+            &other => {
+                println!("Non callable {:?} at stack pos: {}", other, args);
+                return self.runtime_error(error::non_callable(other.clone()));
+            }
         };
         Ok(())
     }

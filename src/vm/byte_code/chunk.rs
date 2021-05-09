@@ -1,5 +1,5 @@
 use crate::vm::byte_code::Instruction;
-use crate::vm::scheme::value::Value;
+use crate::vm::value::Value;
 use std::cmp::Ordering;
 
 pub type ConstAddressType = u16;

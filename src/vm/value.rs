@@ -1,6 +1,7 @@
 #[cfg(test)]
 pub mod arbitrary;
 pub mod closure;
+pub mod equality;
 pub mod error;
 pub mod foreign;
 pub mod lambda;
@@ -16,7 +17,7 @@ use std::convert::Into;
 use std::rc::Rc;
 use thiserror::Error;
 
-use super::equality::SchemeEqual;
+use equality::SchemeEqual;
 
 #[derive(Error, Debug)]
 pub enum Error {

@@ -1,7 +1,7 @@
 use super::ffi::*;
-use super::value::Value;
-use super::{equality::SchemeEqual, value::procedure::Arity};
-use crate::vm::scheme::value::foreign;
+use crate::vm::value::foreign;
+use crate::vm::value::Value;
+use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
 use crate::vm::VM;
 
 macro_rules! register_core {
