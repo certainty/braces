@@ -23,6 +23,12 @@
 - [x] procedure call
 - [x] assignment
 
+### Closures
+- [ ] close up values `(define test ((let x #t)) (let ((closure (lambda () (set! x (not x))))) (set! x (not x)) closure))`
+- [ ] make mutual reference of two procedures work with closures
+- [ ] make sure we don't create a memory leak
+
+
 ## Bugs
 
-- [ ] set! unbound variables should create an error
+- [x] set! unbound variables should create an error
