@@ -278,22 +278,29 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn frame_get_slot(&self, slot_address: ConstAddressType) -> &Value {
-        let variable_base = self.active_frame().stack_base + 1;
-        let index = variable_base + (slot_address as usize);
+        let index = self.frame_slot_address_to_stack_index(slot_address);
         self.stack.at(index)
     }
 
     #[inline]
+    fn frame_slot_address_to_stack_index(&self, slot_address: ConstAddressType) -> usize {
+        self.active_frame().stack_base + 1 + (slot_address as usize)
+    }
+
+    #[inline]
     fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: Value) {
-        let variable_base = self.active_frame().stack_base + 1;
-        let index = variable_base + (slot_address as usize);
+        let index = self.frame_slot_address_to_stack_index(slot_address);
         self.stack.set(index, value);
     }
 
+    // we need to make sure that this actually works
+    // currently too many upvalues are created since we don't recognize if they already exist
     fn setup_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
         if is_local {
+            // capture local as new up-value
             self.capture_up_value(addr)?;
         } else {
+            // up-value already exists in outer scope
             self.open_up_values
                 .push((addr, self.active_frame().closure.get_up_value(addr)));
         }
@@ -301,11 +308,13 @@ impl<'a> Instance<'a> {
     }
 
     fn capture_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
-        if self.open_up_values.iter().any(|(a, _)| addr == *a) {
+        let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
+
+        if self.open_up_values.iter().any(|(a, _)| stack_idx == *a) {
             return Ok(());
         } else {
             let value = self.frame_get_slot(addr).clone();
-            self.open_up_values.push((addr, RefValue::new(value)));
+            self.open_up_values.push((stack_idx, RefValue::new(value)));
             Ok(())
         }
     }
@@ -316,7 +325,7 @@ impl<'a> Instance<'a> {
                 let up_values = self.open_up_values.iter().map(|e| e.1.clone()).collect();
                 let closure = Closure::from_rc(proc.as_native().clone(), up_values);
                 // That might be wrong :D
-                self.open_up_values.truncate(0);
+                //self.open_up_values.truncate(0);
                 self.push(Value::Closure(closure))
             }
             _ => return self.compiler_bug("Expected closure function"),

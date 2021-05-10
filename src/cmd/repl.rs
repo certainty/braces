@@ -12,17 +12,6 @@ use std::{cell::RefCell, rc::Rc};
 pub struct Opts {}
 
 pub fn execute(_opts: &Opts) {
-    let r1 = Rc::new(RefCell::new(10));
-    let r2 = r1.clone();
-
-    println!("{:p} {:p}", r1, r2);
-    println!("{} {}", r1.borrow(), r2.borrow());
-
-    r1.replace(12);
-
-    println!("{:p} {:p}", r1, r2);
-    println!("{} {}", r1.borrow(), r2.borrow());
-
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");

@@ -203,6 +203,7 @@ fn test_vm_closures() {
             "",
         )
         .unwrap();
+
     assert_eq!(
         result,
         vm.values.proper_list(vec![
