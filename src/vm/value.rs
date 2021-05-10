@@ -67,7 +67,6 @@ pub enum Value {
     ProperList(list::List),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
-    UpValue(RefValue),
     Unspecified,
 }
 
@@ -98,7 +97,6 @@ impl SchemeEqual<Value> for Value {
 
     fn is_eq(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
             (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
@@ -265,4 +263,8 @@ mod tests {
         assert_eq!(v1, v1);
         assert_eq!(v1, v3);
     }
+
+    // TODO: add equality tests (especially for upvalues)
+
+    // TODO: add test for is_false() (especially for up-values)
 }

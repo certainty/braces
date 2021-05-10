@@ -38,7 +38,6 @@ impl Writer {
             Value::Closure(closure) => {
                 self.write_procedure(&procedure::Procedure::Native(closure.procedure_rc()))
             }
-            Value::UpValue(inner) => self.write_impl(&inner.as_ref(), values, quote),
             Value::Procedure(proc) => self.write_procedure(&proc),
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts

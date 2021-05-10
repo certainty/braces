@@ -60,7 +60,6 @@ fn stack_print(v: &Value) -> String {
                 up_values.join(", ")
             )
         }
-        Value::UpValue(inner) => stack_print(&inner.as_ref()),
         v => format!("{:?}", v),
     }
 }

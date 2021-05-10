@@ -174,7 +174,7 @@ impl<'a> Instance<'a> {
                 }
                 &Instruction::GetUpValue(addr) => {
                     let value = self.active_frame().closure.get_up_value(addr);
-                    self.push(Value::UpValue(value))?
+                    self.push(value.to_value())?
                 }
                 &Instruction::GetLocal(addr) => {
                     self.push(self.frame_get_slot(addr).clone())?;
