@@ -76,6 +76,7 @@ impl Local {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Locals {
     max: usize,
     locals: Vec<Local>,
@@ -93,6 +94,7 @@ impl Locals {
         i
     }
 
+    // this is wrong since we implicitly always claim the 0th slot for internal stuff
     pub fn at<'a>(&'a self, idx: usize) -> &'a Local {
         &self.locals[idx]
     }
@@ -125,10 +127,7 @@ impl Locals {
     }
 
     pub fn resolve(&self, id: &Identifier) -> Option<usize> {
-        self.locals
-            .iter()
-            .rposition(|l| l.name == *id)
-            .map(|e| e - 1)
+        self.locals.iter().rposition(|l| l.name == *id)
     }
 }
 
@@ -228,6 +227,8 @@ impl Variables {
         let mut current_depth = self.locals.at(locals_len - 1).depth;
         let mut processed_variables: Vec<bool> = vec![];
 
+        println!("Ending scope with: {:#?}", self.locals);
+
         while locals_len > 0 && current_depth > self.scope_depth {
             let local = self.locals.pop()?.unwrap();
             processed_variables.push(local.is_captured);
@@ -252,11 +253,11 @@ impl Variables {
         if self.is_root() {
             return Ok(None);
         }
-
         let addr = self.resolve_local(name);
 
         if let Some(local_addr) = addr {
             self.locals.mark_as_captured(local_addr);
+            println!("MARKED CAPTURED: {:?}", self.locals);
             Ok(Some(self.add_up_value(local_addr, true)?))
         } else {
             let parent = self.parent.as_ref().unwrap().clone();
@@ -339,6 +340,7 @@ impl CodeGenerator {
             generator.declare_binding(&argument)?;
         }
         generator.emit_body(ast)?;
+        generator.end_scope(false)?;
         generator.emit_return()?;
 
         let up_value_count = generator.variables.borrow().up_values.len();
@@ -389,7 +391,7 @@ impl CodeGenerator {
         self.variables.borrow_mut().begin_scope();
     }
 
-    fn end_scope(&mut self) -> Result<()> {
+    fn end_scope(&mut self, pop_locals: bool) -> Result<()> {
         let processed_variables = self.variables.borrow_mut().end_scope()?;
 
         if processed_variables.len() > 0 {
@@ -397,7 +399,10 @@ impl CodeGenerator {
                 if was_captured {
                     self.current_chunk()
                         .write_instruction(Instruction::CloseUpValue);
-                } else {
+                } else if pop_locals {
+                    // using this conditional is really hack
+                    // it should be safe to always pop locals at the end of a scope
+                    // but we need to safe result of the scope first and then push it back
                     self.current_chunk().write_instruction(Instruction::Pop);
                 }
             }
@@ -521,7 +526,7 @@ impl CodeGenerator {
         for exp in &expr.rest {
             self.emit_instructions(&*exp)?;
         }
-        self.end_scope()?;
+        self.end_scope(true)?;
         Ok(())
     }
 
@@ -708,7 +713,7 @@ mod tests {
         locals.add(Identifier::synthetic("bar"), 1).unwrap();
         locals.add(Identifier::synthetic("barz"), 1).unwrap();
 
-        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0))
+        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(1))
     }
 
     #[test]
@@ -799,10 +804,11 @@ mod tests {
             &let_closure.code().code[..],
             [
                 // setup the up-value for the x constant
-                Instruction::UpValue(0, true), //x #t
+                Instruction::UpValue(1, true), //x #t
                 // build the closure
                 Instruction::Closure(_), // (lambda ..)
-                Instruction::Return,
+                Instruction::CloseUpValue,
+                Instruction::Return
             ]
         );
 
