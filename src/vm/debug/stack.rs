@@ -44,6 +44,16 @@ pub fn pretty_print(stack: &Stack<Value>, frame_base: usize) -> String {
 
 fn stack_print(v: &Value) -> String {
     match v {
+        Value::ProperList(inner) => {
+            format!(
+                "({})",
+                inner
+                    .iter()
+                    .map(stack_print)
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            )
+        }
         Value::Procedure(proc) => format!(
             "#<procedure {}>",
             proc.name().unwrap_or(String::from("lambda"))
