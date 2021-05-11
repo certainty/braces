@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 use super::byte_code::chunk::{Chunk, LineNumber};
 use super::byte_code::Instruction;
 #[cfg(feature = "debug_vm")]
@@ -66,8 +68,7 @@ pub struct Instance<'a> {
     stack: ValueStack,
     call_stack: CallStack,
     active_frame: *mut CallFrame,
-    // could be a hashmap instead to speed up lookups
-    open_up_values: Vec<(ConstAddressType, RefValue)>,
+    open_up_values: FxHashMap<ConstAddressType, RefValue>,
 }
 
 ////////////////////////////////////////////////////////
@@ -104,7 +105,7 @@ impl<'a> Instance<'a> {
             call_stack,
             toplevel,
             active_frame,
-            open_up_values: vec![],
+            open_up_values: FxHashMap::default(),
         }
     }
 
@@ -144,12 +145,7 @@ impl<'a> Instance<'a> {
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
-                &Instruction::CloseUpValue(_addr) => {
-                    // close all up-values in the current stack frame
-                    // closing an upvalue means finding the current value of the local
-                    // that has been captured by the upvalue and setting the upvalue to the local's current (final) value
-                    ()
-                }
+                &Instruction::CloseUpValue(addr) => self.close_up_value(addr)?,
                 &Instruction::Return => {
                     // save the return value
                     let value = self.pop();
@@ -307,7 +303,16 @@ impl<'a> Instance<'a> {
         } else {
             // up-value already exists in outer scope
             self.open_up_values
-                .push((addr, self.active_frame().closure.get_up_value(addr)));
+                .insert(addr, self.active_frame().closure.get_up_value(addr));
+        }
+        Ok(())
+    }
+
+    fn close_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        let local_value = self.frame_get_slot(addr).clone();
+        if let Some(up_value) = self.open_up_values.get_mut(&addr) {
+            (*up_value).set(local_value);
+            // remove the up-value?
         }
         Ok(())
     }
@@ -319,7 +324,7 @@ impl<'a> Instance<'a> {
             return Ok(());
         } else {
             let value = self.frame_get_slot(addr).clone();
-            self.open_up_values.push((stack_idx, RefValue::new(value)));
+            self.open_up_values.insert(stack_idx, RefValue::new(value));
             Ok(())
         }
     }
@@ -350,7 +355,6 @@ impl<'a> Instance<'a> {
                 self.apply_foreign(p.clone(), args)?
             }
             other => {
-                println!("Non callable {:?} at stack pos: {}", other, args);
                 return self.runtime_error(error::non_callable(other));
             }
         };

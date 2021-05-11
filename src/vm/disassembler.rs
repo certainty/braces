@@ -51,8 +51,8 @@ impl<T: Write> Disassembler<T> {
             &Instruction::UpValue(addr, is_local) => {
                 self.disassemble_variable_access("OP_UP_VALUE", address, addr, is_local)
             }
-            &Instruction::CloseUpValue(_addr) => {
-                self.disassemble_simple("OP_CLOSE_UP_VALUE", address)
+            &Instruction::CloseUpValue(addr) => {
+                self.disassemble_variable_access("OP_CLOSE_UP_VALUE", address, addr, false)
             }
             &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
             &Instruction::Break => self.disassemble_simple("OP_BREAK", address),
@@ -100,7 +100,7 @@ impl<T: Write> Disassembler<T> {
     fn disassemble_jump(&mut self, name: &str, offset: usize, address: usize) -> usize {
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04} -> {:04}\n",
+                "{:<20} {:04} -> {:04}\n",
                 name, address, offset
             ))
             .unwrap();
@@ -118,7 +118,7 @@ impl<T: Write> Disassembler<T> {
         let proc = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}        {}\n",
+                "{:<20} {:04}        {}\n",
                 name,
                 constant_address,
                 &self.disassemble_value(proc)
@@ -138,7 +138,7 @@ impl<T: Write> Disassembler<T> {
 
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}         {}\n",
+                "{:<20} {:04}         {}\n",
                 name, constant_address, label
             ))
             .unwrap();
@@ -155,7 +155,7 @@ impl<T: Write> Disassembler<T> {
         let constant = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}        {}    @ {:p}\n",
+                "{:<20} {:04}        {}    @ {:p}\n",
                 name,
                 constant_address,
                 &self.disassemble_value(constant),

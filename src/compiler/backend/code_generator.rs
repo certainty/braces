@@ -226,7 +226,7 @@ impl Variables {
         let mut current_depth = self.locals.at(locals_len - 1).depth;
         let mut processed_variables: Vec<(ConstAddressType, bool)> = vec![];
 
-        println!("Ending scope with: {:#?}", self.locals);
+        //println!("Ending scope with: {:#?}", self.locals);
 
         while locals_len > 0 && current_depth > self.scope_depth {
             let local = self.locals.pop()?.unwrap();
@@ -256,7 +256,7 @@ impl Variables {
 
         if let Some(local_addr) = addr {
             self.locals.mark_as_captured(local_addr);
-            println!("MARKED CAPTURED: {:?}", self.locals);
+            //println!("MARKED CAPTURED: {:?}", self.locals);
             Ok(Some(self.add_up_value(local_addr, true)?))
         } else {
             let parent = self.parent.as_ref().unwrap().clone();

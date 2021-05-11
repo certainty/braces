@@ -191,7 +191,7 @@ fn test_vm_conditional() {
 }
 
 #[test]
-fn test_vm_closures() {
+fn test_vm_simple_closures() {
     let mut vm = VM::default();
     let result = vm
         .run_string(
@@ -223,6 +223,53 @@ fn test_vm_closures() {
         )
         .unwrap();
     assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "
+               (define test
+                  (let ((x #t))
+                      (let ((proc (lambda () x)))
+                        (set! x #f)
+                        proc)))
+               (test)
+",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_false());
+}
+
+#[test]
+fn test_vm_complex_closures() {
+    let mut vm = VM::default();
+    let result = vm
+        .run_string(
+            "
+               (define list (lambda ls ls))
+               (define set-x #t)
+               (define get-x #t)
+               (define make-closures (lambda (value)
+                 (let ((x value))
+                   (set! get-x (lambda () x))
+                   (set! set-x (lambda (new) (set! x new))))))
+
+              (make-closures #t)
+              (list (get-x) (set-x 'foo) (get-x))
+",
+            "",
+        )
+        .unwrap();
+
+    let foo_sym = vm.values.symbol("foo");
+    assert_eq!(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_true(),
+            vm.values.unspecified(),
+            foo_sym
+        ])
+    );
 }
 
 #[test]
