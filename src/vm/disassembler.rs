@@ -51,7 +51,9 @@ impl<T: Write> Disassembler<T> {
             &Instruction::UpValue(addr, is_local) => {
                 self.disassemble_variable_access("OP_UP_VALUE", address, addr, is_local)
             }
-            &Instruction::CloseUpValue => self.disassemble_simple("OP_CLOSE_UP_VALUE", address),
+            &Instruction::CloseUpValue(_addr) => {
+                self.disassemble_simple("OP_CLOSE_UP_VALUE", address)
+            }
             &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
             &Instruction::Break => self.disassemble_simple("OP_BREAK", address),
             &Instruction::Pop => self.disassemble_simple("OP_POP", address),

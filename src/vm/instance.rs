@@ -144,7 +144,12 @@ impl<'a> Instance<'a> {
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
-                &Instruction::CloseUpValue => todo!(),
+                &Instruction::CloseUpValue(_addr) => {
+                    // close all up-values in the current stack frame
+                    // closing an upvalue means finding the current value of the local
+                    // that has been captured by the upvalue and setting the upvalue to the local's current (final) value
+                    ()
+                }
                 &Instruction::Return => {
                     // save the return value
                     let value = self.pop();

@@ -94,7 +94,6 @@ impl Locals {
         i
     }
 
-    // this is wrong since we implicitly always claim the 0th slot for internal stuff
     pub fn at<'a>(&'a self, idx: usize) -> &'a Local {
         &self.locals[idx]
     }
@@ -220,18 +219,18 @@ impl Variables {
     // Close the current scope and return information about the discarded variables
     // Returns a Vec<bool> where each true value indicates that a captured variable has been popped
     // and a false value means that the variable was not captured
-    pub fn end_scope(&mut self) -> Result<Vec<bool>> {
+    pub fn end_scope(&mut self) -> Result<Vec<(ConstAddressType, bool)>> {
         self.scope_depth -= 1;
 
         let mut locals_len = self.locals.len();
         let mut current_depth = self.locals.at(locals_len - 1).depth;
-        let mut processed_variables: Vec<bool> = vec![];
+        let mut processed_variables: Vec<(ConstAddressType, bool)> = vec![];
 
         println!("Ending scope with: {:#?}", self.locals);
 
         while locals_len > 0 && current_depth > self.scope_depth {
             let local = self.locals.pop()?.unwrap();
-            processed_variables.push(local.is_captured);
+            processed_variables.push(((locals_len - 1) as ConstAddressType, local.is_captured));
 
             locals_len -= 1;
             current_depth = self.locals.at(locals_len - 1).depth;
@@ -395,10 +394,10 @@ impl CodeGenerator {
         let processed_variables = self.variables.borrow_mut().end_scope()?;
 
         if processed_variables.len() > 0 {
-            for was_captured in processed_variables {
+            for (addr, was_captured) in processed_variables {
                 if was_captured {
                     self.current_chunk()
-                        .write_instruction(Instruction::CloseUpValue);
+                        .write_instruction(Instruction::CloseUpValue(addr));
                 } else if pop_locals {
                     // using this conditional is really hack
                     // it should be safe to always pop locals at the end of a scope
@@ -767,7 +766,10 @@ mod tests {
 
         let processed = vars.borrow_mut().end_scope().unwrap();
 
-        assert_eq!(processed, vec![false, true, false, false])
+        assert_eq!(
+            processed,
+            vec![(1, false), (2, true), (3, false), (4, false)]
+        )
     }
 
     #[test]
@@ -807,7 +809,7 @@ mod tests {
                 Instruction::UpValue(1, true), //x #t
                 // build the closure
                 Instruction::Closure(_), // (lambda ..)
-                Instruction::CloseUpValue,
+                Instruction::CloseUpValue(_),
                 Instruction::Return
             ]
         );
