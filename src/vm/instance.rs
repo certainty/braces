@@ -68,6 +68,7 @@ pub struct Instance<'a> {
     stack: ValueStack,
     call_stack: CallStack,
     active_frame: *mut CallFrame,
+    // open up-values are indexed by absolute stack address
     open_up_values: FxHashMap<ConstAddressType, RefValue>,
 }
 
@@ -184,8 +185,12 @@ impl<'a> Instance<'a> {
                 &Instruction::SetUpValue(addr) => {
                     let value = self.peek(0).clone();
                     self.active_mut_frame().closure.set_up_value(addr, value);
+                    self.push(self.values.unspecified())?;
                 }
-                &Instruction::SetLocal(addr) => self.frame_set_slot(addr, self.peek(0).clone()),
+                &Instruction::SetLocal(addr) => {
+                    self.frame_set_slot(addr, self.peek(0).clone());
+                    self.push(self.values.unspecified())?;
+                }
                 &Instruction::Define(addr) => self.define_value(addr)?,
                 &Instruction::Call(args) => self.apply(args)?,
             }
@@ -302,17 +307,9 @@ impl<'a> Instance<'a> {
             self.capture_up_value(addr)?;
         } else {
             // up-value already exists in outer scope
+            let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
             self.open_up_values
-                .insert(addr, self.active_frame().closure.get_up_value(addr));
-        }
-        Ok(())
-    }
-
-    fn close_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
-        let local_value = self.frame_get_slot(addr).clone();
-        if let Some(up_value) = self.open_up_values.get_mut(&addr) {
-            (*up_value).set(local_value);
-            // remove the up-value?
+                .insert(stack_idx, self.active_frame().closure.get_up_value(addr));
         }
         Ok(())
     }
@@ -320,22 +317,32 @@ impl<'a> Instance<'a> {
     fn capture_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
 
-        if self.open_up_values.iter().any(|(a, _)| stack_idx == *a) {
+        if self.open_up_values.contains_key(&stack_idx) {
             return Ok(());
         } else {
-            let value = self.frame_get_slot(addr).clone();
+            let value = self.stack.at(addr as usize).clone();
             self.open_up_values.insert(stack_idx, RefValue::new(value));
             Ok(())
         }
     }
 
+    fn close_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
+        let local_value = self.stack.at(stack_idx as usize);
+
+        if let Some(mut up_value) = self.open_up_values.remove(&stack_idx) {
+            // set the up-value to it's final value
+            // Q: is this really needed?
+            up_value.set(local_value.clone());
+        }
+        Ok(())
+    }
+
     fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
         match self.read_constant(addr).clone() {
             Value::Procedure(proc) => {
-                let up_values = self.open_up_values.iter().map(|e| e.1.clone()).collect();
+                let up_values = self.open_up_values.values().cloned().collect();
                 let closure = Closure::from_rc(proc.as_native().clone(), up_values);
-                // That might be wrong :D
-                //self.open_up_values.truncate(0);
                 self.push(Value::Closure(closure))
             }
             _ => return self.compiler_bug("Expected closure function"),
