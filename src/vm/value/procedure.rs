@@ -47,7 +47,7 @@ impl Procedure {
     pub fn as_native(&self) -> Rc<native::Procedure> {
         match self {
             Self::Native(proc) => proc.clone(),
-            _ => panic!("Can't extract native procedure from closure"),
+            _ => panic!("Can't extract foreign procedure from closure"),
         }
     }
 
