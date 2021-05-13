@@ -320,7 +320,7 @@ impl<'a> Instance<'a> {
         if self.open_up_values.contains_key(&stack_idx) {
             return Ok(());
         } else {
-            let value = self.stack.at(addr as usize).clone();
+            let value = self.stack.at(stack_idx as usize).clone();
             self.open_up_values.insert(stack_idx, RefValue::new(value));
             Ok(())
         }
@@ -328,9 +328,7 @@ impl<'a> Instance<'a> {
 
     fn close_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
-
         self.open_up_values.remove(&stack_idx);
-
         Ok(())
     }
 

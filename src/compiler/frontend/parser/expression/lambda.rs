@@ -131,7 +131,7 @@ mod tests {
             Expression::lambda(
                 Formals::RestArg(Identifier::synthetic("all")),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
-                None,
+                Some(String::from("lambda")),
                 location(1, 1),
             ),
         );
@@ -141,7 +141,7 @@ mod tests {
             Expression::lambda(
                 Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
-                None,
+                Some(String::from("lambda")),
                 location(1, 1),
             ),
         );
@@ -151,7 +151,7 @@ mod tests {
             Expression::lambda(
                 Formals::ArgList(vec![]),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 12)).to_body_expression(),
-                None,
+                Some(String::from("lambda")),
                 location(1, 1),
             ),
         );
@@ -164,7 +164,7 @@ mod tests {
                     Identifier::synthetic("z"),
                 ),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
-                None,
+                Some(String::from("lambda")),
                 location(1, 1),
             ),
         );
