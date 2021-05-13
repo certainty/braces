@@ -1,6 +1,7 @@
+pub mod call_frame;
+use crate::vm::byte_code::chunk::AddressType;
 use rustc_hash::FxHashMap;
 
-use super::byte_code::chunk::{Chunk, LineNumber};
 use super::byte_code::Instruction;
 #[cfg(feature = "debug_vm")]
 use super::debug;
@@ -16,71 +17,31 @@ use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
 use crate::vm::value::RefValue;
+use call_frame::CallFrame;
 use std::rc::Rc;
 
-//////////////////////////////////////////////////
-// Welcome the call stack
-/////////////////////////////////////////////////
-
-// A callframe is a piece of control data
-// that is associated with every live-function
-
-#[derive(Debug)]
-pub struct CallFrame {
-    pub closure: Closure,
-    pub ip: usize,
-    pub stack_base: usize,
-}
-
-impl CallFrame {
-    pub fn new(closure: Closure, stack_base: usize) -> Self {
-        Self {
-            ip: 0,
-            stack_base,
-            closure,
-        }
-    }
-
-    #[inline]
-    pub fn set_ip(&mut self, address: usize) {
-        self.ip = address
-    }
-
-    #[inline]
-    pub fn code(&self) -> &Chunk {
-        self.closure.code()
-    }
-
-    #[inline]
-    pub fn line_number_for_current_instruction(&self) -> Option<LineNumber> {
-        self.closure.code().find_line(self.ip).map(|e| e.2)
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////
+type Result<T> = std::result::Result<T, Error>;
 
 type ValueStack = Stack<Value>;
 type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
+    // the value factory which can be shared between individual instance runs
     values: &'a mut value::Factory,
+    // top level environment which can be shared between individual instance runs
     toplevel: &'a mut TopLevel,
+    // a simple stack to manage intermediate values and locals
     stack: ValueStack,
+    // manage all live functions
     call_stack: CallStack,
+    // the currently active stack frame
     active_frame: *mut CallFrame,
     // open up-values are indexed by absolute stack address
     open_up_values: FxHashMap<ConstAddressType, RefValue>,
 }
 
-////////////////////////////////////////////////////////
-// VM Implementation
-///////////////////////////////////////////////////////
-type Result<T> = std::result::Result<T, Error>;
-
-// TODO:
-// The vm isn't optimised for performance yet.
-// There are several things that could be more efficient using unsafe pointer code
-// Most notably access to the stack and the callstack (including ip increments)
+// TODO: Optimize for performance
+// Likely candidates for optimizations are the stack(s)
 impl<'a> Instance<'a> {
     pub fn new(
         proc: procedure::native::Procedure,
@@ -129,70 +90,38 @@ impl<'a> Instance<'a> {
             self.debug_cycle();
 
             match self.next_instruction() {
-                &Instruction::Nop => (),
-                &Instruction::Break => (),
-                &Instruction::Pop => {
-                    self.pop();
-                }
                 &Instruction::True => self.push(self.values.bool_true())?,
                 &Instruction::False => self.push(self.values.bool_false())?,
                 &Instruction::Nil => self.push(self.values.nil())?,
-                &Instruction::JumpIfFalse(addr) => {
-                    if self.peek(0).is_false() {
-                        self.active_mut_frame().set_ip(addr)
-                    }
-                }
-                &Instruction::Jump(addr) => self.active_mut_frame().set_ip(addr),
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
-                &Instruction::Closure(addr) => self.create_closure(addr)?,
-                &Instruction::UpValue(addr, is_local) => self.setup_up_value(addr, is_local)?,
+
+                &Instruction::Define(addr) => self.define_value(addr)?,
+
+                &Instruction::GetGlobal(addr) => self.get_global(addr)?,
+                &Instruction::SetGlobal(addr) => self.set_global(addr)?,
+                &Instruction::UpValue(addr, is_local) => self.create_up_value(addr, is_local)?,
                 &Instruction::CloseUpValue(addr) => self.close_up_value(addr)?,
+                &Instruction::GetUpValue(addr) => self.get_up_value(addr)?,
+                &Instruction::SetUpValue(addr) => self.set_up_value(addr)?,
+                &Instruction::GetLocal(addr) => self.get_local(addr)?,
+                &Instruction::SetLocal(addr) => self.set_local(addr)?,
+
+                &Instruction::Closure(addr) => self.create_closure(addr)?,
+
+                &Instruction::Call(args) => self.apply(args)?,
+
+                &Instruction::JumpIfFalse(to) => self.jump_if_false(to)?,
+                &Instruction::Jump(to) => self.jump(to)?,
                 &Instruction::Return => {
-                    // save the return value
-                    let value = self.pop();
-                    let (remaining, frame) = self.pop_frame();
-
-                    // unwind the stack
-                    self.stack.truncate(frame.stack_base);
-                    self.push(value.clone())?;
-
-                    if remaining <= 0 {
-                        #[cfg(feature = "debug_vm")]
-                        println!(
-                            "{}",
-                            debug::stack::pretty_print(&self.stack, self.active_frame().stack_base)
-                        );
+                    if let Some(value) = self._return()? {
                         return Ok(value);
                     }
                 }
-                &Instruction::GetGlobal(addr) => {
-                    let id = self.read_identifier(addr)?;
-
-                    if let Some(value) = self.toplevel.get_owned(&id) {
-                        self.push(value)?;
-                    } else {
-                        return self.runtime_error(error::undefined_variable(id));
-                    }
+                &Instruction::Nop => (),   // do nothing
+                &Instruction::Break => (), // reserved for future use in a debugger
+                &Instruction::Pop => {
+                    self.pop();
                 }
-                &Instruction::GetUpValue(addr) => {
-                    let value = self.active_frame().closure.get_up_value(addr);
-                    self.push(value.to_value())?
-                }
-                &Instruction::GetLocal(addr) => {
-                    self.push(self.frame_get_slot(addr).clone())?;
-                }
-                &Instruction::SetGlobal(addr) => self.set_global(addr)?,
-                &Instruction::SetUpValue(addr) => {
-                    let value = self.peek(0).clone();
-                    self.active_mut_frame().closure.set_up_value(addr, value);
-                    self.push(self.values.unspecified())?;
-                }
-                &Instruction::SetLocal(addr) => {
-                    self.frame_set_slot(addr, self.peek(0).clone());
-                    self.push(self.values.unspecified())?;
-                }
-                &Instruction::Define(addr) => self.define_value(addr)?,
-                &Instruction::Call(args) => self.apply(args)?,
             }
         }
     }
@@ -210,12 +139,15 @@ impl<'a> Instance<'a> {
         self.active_frame().code().read_constant(addr)
     }
 
+    ///////////////////////////////////////////////////////////
     //
-    // Stack operations ->
+    // Manage the value stack
     //
+    ///////////////////////////////////////////////////////////
+
     #[inline]
     fn stack_reset(&mut self) -> Result<()> {
-        // TODO: implement in stack
+        // TODO: do we need this?
         Ok(())
     }
 
@@ -241,17 +173,40 @@ impl<'a> Instance<'a> {
         result
     }
 
+    // Return the item that is `distance` slots away from the top of the stack.
+    //
+    // Let the following be the stack:
+    //
+    //      ┌───────────────┐
+    // 03   │     0x1       │
+    //      ├───────────────┤
+    // 02   │     0x5       │
+    //      ├───────────────┤
+    // 01   │     0x10      │
+    //      └───────────────┘
+    //
+    // peek(0) returns 0x1
+    // peek(2) returns 0x10
+
     #[inline]
     fn peek(&self, distance: usize) -> &Value {
         self.stack.peek(distance)
     }
-    //
-    // <- Stack operations
-    //
 
+    ///////////////////////////////////////////////////////////
     //
-    // Call stack operations
+    // Manage the call stack and access frame local variables
     //
+    ///////////////////////////////////////////////////////////
+
+    #[inline]
+    fn push_frame(&mut self, closure: value::closure::Closure, arg_count: usize) -> Result<()> {
+        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
+        let frame = CallFrame::new(closure, base);
+        self.call_stack.push(frame);
+        self.active_frame = self.call_stack.top_mut_ptr();
+        Ok(())
+    }
 
     #[inline]
     fn pop_frame(&mut self) -> (usize, CallFrame) {
@@ -261,15 +216,6 @@ impl<'a> Instance<'a> {
             self.active_frame = self.call_stack.top_mut_ptr();
         }
         (len, frame)
-    }
-
-    #[inline]
-    fn push_frame(&mut self, closure: value::closure::Closure, arg_count: usize) -> Result<()> {
-        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
-        let frame = CallFrame::new(closure, base);
-        self.call_stack.push(frame);
-        self.active_frame = self.call_stack.top_mut_ptr();
-        Ok(())
     }
 
     #[inline]
@@ -299,9 +245,68 @@ impl<'a> Instance<'a> {
         self.stack.set(index, value);
     }
 
-    // we need to make sure that this actually works
-    // currently too many upvalues are created since we don't recognize if they already exist
-    fn setup_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
+    ///////////////////////////////////////////////////////
+    // Jumps and conditional jumps
+    //
+    ///////////////////////////////////////////////////////
+
+    #[inline]
+    fn jump(&mut self, to: AddressType) -> Result<()> {
+        self.active_mut_frame().set_ip(to);
+        Ok(())
+    }
+
+    #[inline]
+    fn jump_if_false(&mut self, to: AddressType) -> Result<()> {
+        if self.peek(0).is_false() {
+            self.active_mut_frame().set_ip(to)
+        }
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////
+    // Return from procedures / closures
+    //
+    ///////////////////////////////////////////////////////
+
+    fn _return(&mut self) -> Result<Option<Value>> {
+        // save the return value
+        let value = self.pop();
+        let (remaining, frame) = self.pop_frame();
+
+        // unwind the stack
+        self.stack.truncate(frame.stack_base);
+        self.push(value.clone())?;
+
+        if remaining <= 0 {
+            #[cfg(feature = "debug_vm")]
+            println!(
+                "{}",
+                debug::stack::pretty_print(&self.stack, self.active_frame().stack_base)
+            );
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
+    }
+
+    ///////////////////////////////////////////////////////
+    // Closure creation
+    //
+    ///////////////////////////////////////////////////////
+
+    fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
+        match self.read_constant(addr).clone() {
+            Value::Procedure(proc) => {
+                let up_values = self.open_up_values.values().cloned().collect();
+                let closure = Closure::from_rc(proc.as_native().clone(), up_values);
+                self.push(Value::Closure(closure))
+            }
+            _ => return self.compiler_bug("Expected closure function"),
+        }
+    }
+
+    fn create_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
         if is_local {
             // capture local as new up-value
             self.capture_up_value(addr)?;
@@ -326,22 +331,17 @@ impl<'a> Instance<'a> {
         }
     }
 
+    #[inline]
     fn close_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
         self.open_up_values.remove(&stack_idx);
         Ok(())
     }
 
-    fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
-        match self.read_constant(addr).clone() {
-            Value::Procedure(proc) => {
-                let up_values = self.open_up_values.values().cloned().collect();
-                let closure = Closure::from_rc(proc.as_native().clone(), up_values);
-                self.push(Value::Closure(closure))
-            }
-            _ => return self.compiler_bug("Expected closure function"),
-        }
-    }
+    ///////////////////////////////////////////////////////
+    // Apply procedures and closures
+    //
+    ///////////////////////////////////////////////////////
 
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
@@ -435,11 +435,32 @@ impl<'a> Instance<'a> {
         }
     }
 
+    ///////////////////////////////////////////////////////
+    // Managing variables in different scopes
+    //
+    ///////////////////////////////////////////////////////
+
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
         self.toplevel.set(id.clone(), v.clone());
         self.push(self.values.unspecified())?;
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////
+    // Global variables
+    ///////////////////////////////////////////////////////
+
+    #[inline]
+    fn get_global(&mut self, addr: ConstAddressType) -> Result<()> {
+        let id = self.read_identifier(addr)?;
+
+        if let Some(value) = self.toplevel.get_owned(&id) {
+            self.push(value)?;
+        } else {
+            self.runtime_error(error::undefined_variable(id))?;
+        }
         Ok(())
     }
 
@@ -456,6 +477,45 @@ impl<'a> Instance<'a> {
 
         Ok(())
     }
+
+    ///////////////////////////////////////////////////////
+    // Closure variables aka up-values
+    ///////////////////////////////////////////////////////
+
+    #[inline]
+    fn get_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        let value = self.active_frame().closure.get_up_value(addr);
+        self.push(value.to_value())?;
+        Ok(())
+    }
+
+    #[inline]
+    fn set_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
+        let value = self.peek(0).clone();
+        self.active_mut_frame().closure.set_up_value(addr, value);
+        self.push(self.values.unspecified())?;
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////
+    // Local variables
+    ///////////////////////////////////////////////////////
+
+    #[inline]
+    fn get_local(&mut self, addr: ConstAddressType) -> Result<()> {
+        self.push(self.frame_get_slot(addr).clone())
+    }
+
+    #[inline]
+    fn set_local(&mut self, addr: ConstAddressType) -> Result<()> {
+        self.frame_set_slot(addr, self.peek(0).clone());
+        self.push(self.values.unspecified())?;
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////
+    // Various utilities and helpers
+    ///////////////////////////////////////////////////////
 
     fn read_identifier(&mut self, addr: ConstAddressType) -> Result<Symbol> {
         if let Value::Symbol(s) = self.read_constant(addr) {
@@ -484,7 +544,6 @@ impl<'a> Instance<'a> {
     }
 
     // Debug the VM
-
     #[cfg(feature = "debug_vm")]
     fn debug_cycle(&mut self) {
         let mut disassembler = Disassembler::new(std::io::stdout());

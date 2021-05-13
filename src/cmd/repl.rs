@@ -5,7 +5,6 @@ use crate::vm::VM;
 use clap::Clap;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clap)]
 #[clap(version = "0.1", author = "David K.", about = "Start the REPL")]
