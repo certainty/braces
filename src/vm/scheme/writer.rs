@@ -115,7 +115,7 @@ impl Writer {
         match proc {
             procedure::Procedure::Native(proc) => format!(
                 "#<procedure {} ({})>",
-                proc.name().unwrap_or(String::from("")),
+                proc.name().clone().unwrap_or(String::from("")),
                 self.write_formals(&proc.arity)
             ),
             procedure::Procedure::Foreign(proc) => {

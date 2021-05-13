@@ -22,7 +22,12 @@ impl LetExpression {
         match self {
             Self::Let(bindings, body, source) => {
                 let formals = Formals::ArgList(bindings.iter().cloned().map(|e| e.0).collect());
-                let lambda = Expression::lambda(formals, (**body).clone(), source.clone());
+                let lambda = Expression::lambda(
+                    formals,
+                    (**body).clone(),
+                    Some(String::from("core#let")),
+                    source.clone(),
+                );
                 let operands = bindings.iter().cloned().map(|e| e.1).collect();
                 Expression::apply(lambda, operands, source.clone())
             }

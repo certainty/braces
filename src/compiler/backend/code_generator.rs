@@ -1,4 +1,5 @@
 use crate::vm::value::closure::Closure;
+use crate::vm::value::procedure::Arity;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
@@ -345,7 +346,9 @@ impl CodeGenerator {
         let up_value_count = generator.variables.borrow().up_values.len();
 
         match target {
-            Target::TopLevel => Ok(value::procedure::native::Procedure::thunk(
+            Target::TopLevel => Ok(value::procedure::native::Procedure::named(
+                String::from("core#toplevel"),
+                Arity::Exactly(0),
                 generator.chunk,
                 up_value_count,
             )),
@@ -532,12 +535,11 @@ impl CodeGenerator {
     fn emit_lambda(&mut self, expr: &LambdaExpression) -> Result<()> {
         let lambda = Self::generate_procedure(
             Some(self.variables.clone()),
-            Target::Procedure(None),
+            Target::Procedure(expr.label.clone()),
             &expr.body,
             &expr.formals,
         )?;
         let proc = self.values.native_procedure(lambda);
-
         self.emit_closure(proc, expr.source_location())
     }
 

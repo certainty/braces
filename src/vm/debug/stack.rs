@@ -64,9 +64,11 @@ fn stack_print(v: &Value) -> String {
                 .iter()
                 .map(|e| format!("{} @ {:p}", stack_print(&e.as_ref()), e))
                 .collect();
+            let label = closure.name().clone();
+
             format!(
                 "#<closure {}  up-values: [{}]>",
-                closure.procedure().name().unwrap_or(String::from("lambda")),
+                label.unwrap_or(String::from("lambda")),
                 up_values.join(", ")
             )
         }

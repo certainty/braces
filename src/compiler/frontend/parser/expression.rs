@@ -226,9 +226,10 @@ impl Expression {
     pub fn lambda(
         formals: lambda::Formals,
         body: BodyExpression,
+        label: Option<String>,
         loc: SourceLocation,
     ) -> Expression {
-        Expression::Lambda(lambda::build(formals, body, loc))
+        Expression::Lambda(lambda::build(formals, body, label, loc))
     }
 
     pub fn define(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {

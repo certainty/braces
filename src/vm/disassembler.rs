@@ -170,7 +170,11 @@ impl<T: Write> Disassembler<T> {
         match value {
             value::Value::Closure(closure) => format!(
                 "#<closure {}>",
-                closure.procedure().name().unwrap_or(String::from("lambda"))
+                closure
+                    .procedure()
+                    .name()
+                    .clone()
+                    .unwrap_or(String::from("lambda"))
             ),
             value::Value::Procedure(proc) => format!(
                 "#<procedure {}>",

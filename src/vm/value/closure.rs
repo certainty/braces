@@ -34,6 +34,10 @@ impl Closure {
     pub fn procedure<'a>(&'a self) -> &'a procedure::native::Procedure {
         &self.proc
     }
+
+    pub fn name<'a>(&'a self) -> &'a Option<String> {
+        &self.procedure().name
+    }
 }
 
 impl Closure {
@@ -59,6 +63,7 @@ impl From<procedure::native::Procedure> for Closure {
     fn from(v: procedure::native::Procedure) -> Self {
         let proc = Rc::new(v);
         let up_values = Vec::with_capacity(proc.up_value_count);
+
         Closure { proc, up_values }
     }
 }

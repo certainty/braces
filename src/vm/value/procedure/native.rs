@@ -37,8 +37,8 @@ impl Procedure {
         &self.chunk
     }
 
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
+    pub fn name<'a>(&'a self) -> &'a Option<String> {
+        &self.name
     }
 }
 

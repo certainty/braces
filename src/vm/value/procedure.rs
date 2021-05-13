@@ -32,7 +32,7 @@ impl Procedure {
 
     pub fn name(&self) -> Option<String> {
         match self {
-            Self::Native(proc) => proc.name(),
+            Self::Native(proc) => proc.name().clone(),
             Self::Foreign(proc) => Some(proc.name.clone()),
         }
     }

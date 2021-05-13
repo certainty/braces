@@ -14,6 +14,7 @@ use crate::vm::value::procedure::Arity;
 pub struct LambdaExpression {
     pub formals: Formals,
     pub body: BodyExpression,
+    pub label: Option<String>, // in case of form rewrites to lambda we track where this lambda was generated from
     location: SourceLocation,
 }
 
@@ -56,11 +57,17 @@ impl Formals {
     }
 }
 
-pub fn build(formals: Formals, body: BodyExpression, location: SourceLocation) -> LambdaExpression {
+pub fn build(
+    formals: Formals,
+    body: BodyExpression,
+    label: Option<String>,
+    location: SourceLocation,
+) -> LambdaExpression {
     LambdaExpression {
         formals,
         body,
         location,
+        label,
     }
 }
 
@@ -85,6 +92,7 @@ pub fn do_parse_lambda(
             Ok(LambdaExpression {
                 formals,
                 body,
+                label: Some(String::from("lambda")),
                 location: loc.clone(),
             })
         }
@@ -123,6 +131,7 @@ mod tests {
             Expression::lambda(
                 Formals::RestArg(Identifier::synthetic("all")),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
+                None,
                 location(1, 1),
             ),
         );
@@ -132,6 +141,7 @@ mod tests {
             Expression::lambda(
                 Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
+                None,
                 location(1, 1),
             ),
         );
@@ -141,6 +151,7 @@ mod tests {
             Expression::lambda(
                 Formals::ArgList(vec![]),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 12)).to_body_expression(),
+                None,
                 location(1, 1),
             ),
         );
@@ -153,6 +164,7 @@ mod tests {
                     Identifier::synthetic("z"),
                 ),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
+                None,
                 location(1, 1),
             ),
         );
