@@ -155,9 +155,6 @@ impl CodeGenerator {
                     self.current_chunk()
                         .write_instruction(Instruction::CloseUpValue(addr));
                 } else if pop_locals {
-                    // using this conditional is really hack
-                    // it should be safe to always pop locals at the end of a scope
-                    // but we need to safe result of the scope first and then push it back
                     self.current_chunk().write_instruction(Instruction::Pop);
                 }
             }
@@ -212,9 +209,7 @@ impl CodeGenerator {
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr)?,
-            Expression::Let(let_exp) => {
-                self.emit_instructions(&let_exp.to_lambda())?;
-            }
+            Expression::Let(let_exp) => self.emit_instructions(&let_exp.to_lambda())?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(expr) => self.emit_begin(expr)?,
@@ -324,7 +319,7 @@ impl CodeGenerator {
         // push the value of the expression
         self.emit_instructions(&expr.value)?;
 
-        // is it local
+        // is it local?
         if let Some(addr) = self.resolve_local(&expr.name) {
             self.emit_instruction(
                 Instruction::SetLocal(addr as ConstAddressType),

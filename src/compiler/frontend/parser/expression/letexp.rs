@@ -18,6 +18,7 @@ pub enum LetExpression {
 
 impl LetExpression {
     // re-write to equivalent lambda expression
+    // TODO: should this be done in an explicit compiler pass?
     pub fn to_lambda(&self) -> Expression {
         match self {
             Self::Let(bindings, body, source) => {
