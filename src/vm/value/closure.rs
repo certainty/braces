@@ -65,13 +65,13 @@ impl From<procedure::native::Procedure> for Closure {
 
 impl SchemeEqual<Closure> for Closure {
     fn is_eq(&self, other: &Closure) -> bool {
-        self.procedure().is_eq(other.procedure())
+        Rc::ptr_eq(&self.proc, &other.proc)
     }
     fn is_eqv(&self, other: &Closure) -> bool {
-        self.procedure().is_eqv(other.procedure())
+        self.is_eq(other)
     }
 
     fn is_equal(&self, other: &Closure) -> bool {
-        self.procedure().is_equal(other.procedure())
+        self.is_eq(other)
     }
 }

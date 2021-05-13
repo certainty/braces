@@ -90,6 +90,7 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
+            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
             _ => false,
         }
@@ -103,6 +104,7 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::InternedString(_)) => false,
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
+            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
             _ => false,
@@ -120,6 +122,7 @@ impl SchemeEqual<Value> for Value {
             }
             (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
+            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),
             (Value::Unspecified, Value::Unspecified) => true,
             _ => false,

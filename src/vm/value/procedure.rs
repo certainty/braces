@@ -62,24 +62,24 @@ impl Procedure {
 impl SchemeEqual<Procedure> for Procedure {
     fn is_eq(&self, other: &Procedure) -> bool {
         match (self, other) {
-            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_eq(rhs),
-            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_eq(rhs),
+            (Self::Native(lhs), Self::Native(rhs)) => Rc::ptr_eq(lhs, rhs),
+            (Self::Foreign(lhs), Self::Foreign(rhs)) => Rc::ptr_eq(lhs, rhs),
             _ => false,
         }
     }
 
     fn is_eqv(&self, other: &Procedure) -> bool {
         match (self, other) {
-            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_eqv(rhs),
-            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_eqv(rhs),
+            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_eq(rhs),
+            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_eq(rhs),
             _ => false,
         }
     }
 
     fn is_equal(&self, other: &Procedure) -> bool {
         match (self, other) {
-            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_equal(rhs),
-            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_equal(rhs),
+            (Self::Native(lhs), Self::Native(rhs)) => lhs.is_eq(rhs),
+            (Self::Foreign(lhs), Self::Foreign(rhs)) => lhs.is_eq(rhs),
             _ => false,
         }
     }
