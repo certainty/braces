@@ -328,13 +328,9 @@ impl<'a> Instance<'a> {
 
     fn close_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
-        let local_value = self.stack.at(stack_idx as usize);
 
-        if let Some(mut up_value) = self.open_up_values.remove(&stack_idx) {
-            // set the up-value to it's final value
-            // Q: is this really needed?
-            up_value.set(local_value.clone());
-        }
+        self.open_up_values.remove(&stack_idx);
+
         Ok(())
     }
 

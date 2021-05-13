@@ -36,7 +36,7 @@ impl Closure {
     }
 
     pub fn name<'a>(&'a self) -> &'a Option<String> {
-        &self.procedure().name
+        &self.procedure().name()
     }
 }
 
