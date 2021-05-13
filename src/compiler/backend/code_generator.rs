@@ -1,7 +1,7 @@
 use crate::vm::value::closure::Closure;
 use crate::vm::value::procedure::Arity;
-use std::{cell::RefCell, rc::Rc};
 
+use super::variables::{Variables, VariablesRef};
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
@@ -29,9 +29,6 @@ use crate::{
 };
 use thiserror::Error;
 
-const MAX_LOCALS: usize = 256;
-const MAX_UP_VALUES: usize = MAX_LOCALS * 256;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Too many locals defined")]
@@ -42,251 +39,7 @@ pub enum Error {
     CompilerBug(String),
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug, Clone)]
-pub struct Local {
-    name: Identifier,
-    depth: usize,
-    is_captured: bool,
-}
-
-impl Local {
-    pub fn new(name: Identifier, scope: usize, is_captured: bool) -> Self {
-        Local {
-            name,
-            depth: scope,
-            is_captured,
-        }
-    }
-
-    pub fn capture(other: Local) -> Self {
-        Local {
-            name: other.name,
-            depth: other.depth,
-            is_captured: true,
-        }
-    }
-
-    pub fn for_vm() -> Self {
-        Local {
-            name: Identifier::synthetic(""),
-            depth: 0,
-            is_captured: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Locals {
-    max: usize,
-    locals: Vec<Local>,
-}
-
-impl Locals {
-    pub fn new(limit: usize) -> Self {
-        let mut i = Self {
-            max: limit,
-            locals: Vec::with_capacity(limit),
-        };
-
-        // first slot is reserved for the vm
-        i.locals.push(Local::for_vm());
-        i
-    }
-
-    pub fn at<'a>(&'a self, idx: usize) -> &'a Local {
-        &self.locals[idx]
-    }
-
-    pub fn mark_as_captured(&mut self, addr: ConstAddressType) {
-        let idx = addr as usize;
-        let existing = self.locals[idx].clone();
-        self.locals[idx] = Local::capture(existing);
-    }
-
-    pub fn add(&mut self, name: Identifier, scope_depth: usize) -> Result<()> {
-        if self.locals.len() >= self.max {
-            Err(Error::TooManyLocals)
-        } else {
-            self.locals.push(Local::new(name, scope_depth, false));
-            Ok(())
-        }
-    }
-
-    pub fn pop(&mut self) -> Result<Option<Local>> {
-        Ok(self.locals.pop())
-    }
-
-    pub fn last_address(&self) -> ConstAddressType {
-        (self.locals.len() - 1) as ConstAddressType
-    }
-
-    pub fn len(&self) -> usize {
-        self.locals.len()
-    }
-
-    pub fn resolve(&self, id: &Identifier) -> Option<usize> {
-        self.locals.iter().rposition(|l| l.name == *id)
-    }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub struct UpValue {
-    address: usize,
-    is_local: bool,
-}
-impl UpValue {
-    pub fn new(address: usize, is_local: bool) -> Self {
-        Self { address, is_local }
-    }
-}
-
-pub struct UpValues {
-    max: usize,
-    up_values: Vec<UpValue>,
-}
-
-impl UpValues {
-    pub fn new(limit: usize) -> Self {
-        Self {
-            max: limit,
-            up_values: Vec::with_capacity(limit),
-        }
-    }
-
-    pub fn to_vec(&self) -> Vec<UpValue> {
-        self.up_values.clone()
-    }
-
-    pub fn add(&mut self, local_addr: usize, is_local: bool) -> Result<ConstAddressType> {
-        if self.up_values.len() >= self.max {
-            Err(Error::TooManyUpValues)
-        } else {
-            let value = UpValue::new(local_addr, is_local);
-            if let Some(addr) = self.up_values.iter().position(|v| v == &value) {
-                Ok(addr as ConstAddressType)
-            } else {
-                self.up_values.push(value);
-                Ok(self.last_address())
-            }
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.up_values.len()
-    }
-
-    pub fn last_address(&self) -> ConstAddressType {
-        (self.up_values.len() - 1) as ConstAddressType
-    }
-}
-
-type VariablesRef = Rc<RefCell<Variables>>;
-
-pub struct Variables {
-    parent: Option<VariablesRef>,
-    locals: Locals,
-    up_values: UpValues,
-    scope_depth: usize,
-}
-
-impl Variables {
-    pub fn child(parent: Option<VariablesRef>) -> VariablesRef {
-        Rc::new(RefCell::new(Variables {
-            scope_depth: 0,
-            locals: Locals::new(MAX_LOCALS),
-            up_values: UpValues::new(MAX_UP_VALUES),
-            parent,
-        }))
-    }
-
-    pub fn root() -> VariablesRef {
-        Self::child(None)
-    }
-
-    pub fn is_root(&self) -> bool {
-        self.parent.is_none()
-    }
-
-    pub fn is_top_level(&self) -> bool {
-        self.scope_depth == 0
-    }
-
-    pub fn begin_scope(&mut self) {
-        self.scope_depth += 1;
-    }
-
-    // Close the current scope and return information about the discarded variables
-    // Returns a Vec<bool> where each true value indicates that a captured variable has been popped
-    // and a false value means that the variable was not captured
-    pub fn end_scope(&mut self) -> Result<Vec<(ConstAddressType, bool)>> {
-        self.scope_depth -= 1;
-
-        let mut locals_len = self.locals.len();
-        let mut current_depth = self.locals.at(locals_len - 1).depth;
-        let mut processed_variables: Vec<(ConstAddressType, bool)> = vec![];
-
-        //println!("Ending scope with: {:#?}", self.locals);
-
-        while locals_len > 0 && current_depth > self.scope_depth {
-            let local = self.locals.pop()?.unwrap();
-            processed_variables.push(((locals_len - 1) as ConstAddressType, local.is_captured));
-
-            locals_len -= 1;
-            current_depth = self.locals.at(locals_len - 1).depth;
-        }
-
-        processed_variables.reverse();
-        Ok(processed_variables)
-    }
-
-    pub fn add_up_value(
-        &mut self,
-        local_addr: ConstAddressType,
-        is_local: bool,
-    ) -> Result<ConstAddressType> {
-        self.up_values.add(local_addr as usize, is_local)
-    }
-
-    pub fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<ConstAddressType>> {
-        if self.is_root() {
-            return Ok(None);
-        }
-        let addr = self.resolve_local(name);
-
-        if let Some(local_addr) = addr {
-            self.locals.mark_as_captured(local_addr);
-            //println!("MARKED CAPTURED: {:?}", self.locals);
-            Ok(Some(self.add_up_value(local_addr, true)?))
-        } else {
-            let parent = self.parent.as_ref().unwrap().clone();
-            let found_up_value_addr = parent.borrow_mut().resolve_up_value(name)?;
-
-            if let Some(upvalue_addr) = found_up_value_addr {
-                self.add_up_value(upvalue_addr, false).map(Some)
-            } else {
-                Ok(None)
-            }
-        }
-    }
-
-    #[inline]
-    pub fn add_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
-        self.locals.add(name, self.scope_depth)?;
-        Ok(self.locals.last_address())
-    }
-
-    #[inline]
-    pub fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
-        self.locals.resolve(name).map(|i| i as ConstAddressType)
-    }
-
-    #[inline]
-    pub fn mark_local_as_captured(&mut self, address: ConstAddressType) -> Result<()> {
-        Ok(self.locals.mark_as_captured(address))
-    }
-}
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 pub enum Target {
@@ -421,6 +174,12 @@ impl CodeGenerator {
     fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
         self.variables.borrow().resolve_local(name)
     }
+
+    /////////////////////////////////////////////////
+    //
+    // TODO: explain how up-values are handles
+    //
+    /////////////////////////////////////////////////
 
     #[inline]
     fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<ConstAddressType>> {
@@ -705,74 +464,7 @@ mod tests {
     use crate::compiler::source::StringSource;
     use crate::compiler::Compiler;
     use crate::vm::value::procedure::native;
-
-    #[test]
-    fn test_resolve_local() {
-        let mut locals = Locals::new(10);
-
-        locals.add(Identifier::synthetic("foo"), 1).unwrap();
-        locals.add(Identifier::synthetic("bar"), 1).unwrap();
-        locals.add(Identifier::synthetic("barz"), 1).unwrap();
-
-        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(1))
-    }
-
-    #[test]
-    fn test_up_value_add_deduplicates() {
-        let mut up_values = UpValues::new(10);
-
-        let first_addr = up_values.add(10, true).unwrap();
-        up_values.add(20, true).unwrap();
-        //again
-        let second_addr = up_values.add(10, true).unwrap();
-        // again but not local
-        let third_addr = up_values.add(10, false).unwrap();
-
-        assert_eq!(first_addr, second_addr);
-        assert_ne!(first_addr, third_addr);
-
-        assert_eq!(
-            up_values.up_values,
-            vec![
-                UpValue::new(10, true),
-                UpValue::new(20, true),
-                UpValue::new(10, false)
-            ]
-        )
-    }
-
-    #[test]
-    fn test_variabels_end_scope() {
-        let vars = Variables::root();
-
-        vars.borrow_mut().begin_scope();
-
-        vars.borrow_mut()
-            .add_local(Identifier::synthetic("foo"))
-            .unwrap();
-
-        let addr = vars
-            .borrow_mut()
-            .add_local(Identifier::synthetic("bar"))
-            .unwrap();
-
-        vars.borrow_mut().mark_local_as_captured(addr).unwrap();
-
-        vars.borrow_mut()
-            .add_local(Identifier::synthetic("baz"))
-            .unwrap();
-
-        vars.borrow_mut()
-            .add_local(Identifier::synthetic("baxz"))
-            .unwrap();
-
-        let processed = vars.borrow_mut().end_scope().unwrap();
-
-        assert_eq!(
-            processed,
-            vec![(1, false), (2, true), (3, false), (4, false)]
-        )
-    }
+    use std::rc::Rc;
 
     #[test]
     fn test_compile_closures() {
