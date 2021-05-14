@@ -37,7 +37,7 @@ pub struct Instance<'a> {
     // the currently active stack frame
     active_frame: *mut CallFrame,
     // open up-values are indexed by absolute stack address
-    open_up_values: FxHashMap<ConstAddressType, RefValue>,
+    open_up_values: FxHashMap<AddressType, RefValue>,
 }
 
 // TODO: Optimize for performance
@@ -228,18 +228,18 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn frame_get_slot(&self, slot_address: ConstAddressType) -> &Value {
+    fn frame_get_slot(&self, slot_address: AddressType) -> &Value {
         let index = self.frame_slot_address_to_stack_index(slot_address);
         self.stack.at(index)
     }
 
     #[inline]
-    fn frame_slot_address_to_stack_index(&self, slot_address: ConstAddressType) -> usize {
+    fn frame_slot_address_to_stack_index(&self, slot_address: AddressType) -> usize {
         self.active_frame().stack_base + (slot_address as usize)
     }
 
     #[inline]
-    fn frame_set_slot(&mut self, slot_address: ConstAddressType, value: Value) {
+    fn frame_set_slot(&mut self, slot_address: AddressType, value: Value) {
         let index = self.frame_slot_address_to_stack_index(slot_address);
         self.stack.set(index, value);
     }
@@ -305,21 +305,21 @@ impl<'a> Instance<'a> {
         }
     }
 
-    fn create_up_value(&mut self, addr: ConstAddressType, is_local: bool) -> Result<()> {
+    fn create_up_value(&mut self, addr: AddressType, is_local: bool) -> Result<()> {
         if is_local {
             // capture local as new up-value
             self.capture_up_value(addr)?;
         } else {
             // up-value already exists in outer scope
-            let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
+            let stack_idx = self.frame_slot_address_to_stack_index(addr);
             self.open_up_values
                 .insert(stack_idx, self.active_frame().closure.get_up_value(addr));
         }
         Ok(())
     }
 
-    fn capture_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
-        let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
+    fn capture_up_value(&mut self, addr: AddressType) -> Result<()> {
+        let stack_idx = self.frame_slot_address_to_stack_index(addr);
 
         if self.open_up_values.contains_key(&stack_idx) {
             return Ok(());
@@ -331,8 +331,8 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn close_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
-        let stack_idx = self.frame_slot_address_to_stack_index(addr) as ConstAddressType;
+    fn close_up_value(&mut self, addr: AddressType) -> Result<()> {
+        let stack_idx = self.frame_slot_address_to_stack_index(addr);
         self.open_up_values.remove(&stack_idx);
         Ok(())
     }
@@ -482,14 +482,14 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
 
     #[inline]
-    fn get_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
+    fn get_up_value(&mut self, addr: AddressType) -> Result<()> {
         let value = self.active_frame().closure.get_up_value(addr);
         self.push(value.to_value())?;
         Ok(())
     }
 
     #[inline]
-    fn set_up_value(&mut self, addr: ConstAddressType) -> Result<()> {
+    fn set_up_value(&mut self, addr: AddressType) -> Result<()> {
         let value = self.peek(0).clone();
         self.active_mut_frame().closure.set_up_value(addr, value);
         self.push(self.values.unspecified())?;
@@ -501,12 +501,12 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
 
     #[inline]
-    fn get_local(&mut self, addr: ConstAddressType) -> Result<()> {
+    fn get_local(&mut self, addr: AddressType) -> Result<()> {
         self.push(self.frame_get_slot(addr).clone())
     }
 
     #[inline]
-    fn set_local(&mut self, addr: ConstAddressType) -> Result<()> {
+    fn set_local(&mut self, addr: AddressType) -> Result<()> {
         self.frame_set_slot(addr, self.peek(0).clone());
         self.push(self.values.unspecified())?;
         Ok(())

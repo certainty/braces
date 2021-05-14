@@ -131,7 +131,7 @@ impl<T: Write> Disassembler<T> {
         &mut self,
         name: &str,
         address: AddressType,
-        constant_address: ConstAddressType,
+        variable_address: usize,
         is_local: bool,
     ) -> usize {
         let label = if is_local { "local" } else { "upvalue" };
@@ -139,7 +139,7 @@ impl<T: Write> Disassembler<T> {
         self.writer
             .write_fmt(format_args!(
                 "{:<20} {:04}         {}\n",
-                name, constant_address, label
+                name, variable_address, label
             ))
             .unwrap();
         address + 1

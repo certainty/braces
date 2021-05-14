@@ -1,8 +1,8 @@
 use super::procedure;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::value::equality::SchemeEqual;
+use crate::vm::value::RefValue;
 use crate::vm::Value;
-use crate::vm::{byte_code::chunk::ConstAddressType, value::RefValue};
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,12 +41,12 @@ impl Closure {
 }
 
 impl Closure {
-    pub fn get_up_value(&self, addr: ConstAddressType) -> RefValue {
-        self.up_values[addr as usize].clone()
+    pub fn get_up_value(&self, addr: usize) -> RefValue {
+        self.up_values[addr].clone()
     }
 
-    pub fn set_up_value(&mut self, addr: ConstAddressType, v: Value) {
-        self.up_values[addr as usize].set(v);
+    pub fn set_up_value(&mut self, addr: usize, v: Value) {
+        self.up_values[addr].set(v);
     }
 }
 

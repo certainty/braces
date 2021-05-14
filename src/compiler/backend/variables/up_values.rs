@@ -1,18 +1,17 @@
 use crate::compiler::backend::code_generator::{Error, Result};
-use crate::vm::byte_code::chunk::AddressType;
-use crate::vm::byte_code::chunk::ConstAddressType;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct UpValue {
-    pub address: AddressType,
+    pub address: usize,
     pub is_local: bool,
 }
 impl UpValue {
-    pub fn new(address: AddressType, is_local: bool) -> Self {
+    pub fn new(address: usize, is_local: bool) -> Self {
         Self { address, is_local }
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct UpValues {
     max: usize,
     up_values: Vec<UpValue>,
@@ -26,17 +25,18 @@ impl UpValues {
         }
     }
 
+    #[inline]
     pub fn to_vec(&self) -> Vec<UpValue> {
         self.up_values.clone()
     }
 
-    pub fn add(&mut self, local_addr: usize, is_local: bool) -> Result<ConstAddressType> {
+    pub fn add(&mut self, local_addr: usize, is_local: bool) -> Result<usize> {
         if self.up_values.len() >= self.max {
             Err(Error::TooManyUpValues)
         } else {
             let value = UpValue::new(local_addr, is_local);
             if let Some(addr) = self.up_values.iter().position(|v| v == &value) {
-                Ok(addr as ConstAddressType)
+                Ok(addr)
             } else {
                 self.up_values.push(value);
                 Ok(self.last_address())
@@ -44,12 +44,14 @@ impl UpValues {
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.up_values.len()
     }
 
-    pub fn last_address(&self) -> ConstAddressType {
-        (self.up_values.len() - 1) as ConstAddressType
+    #[inline]
+    pub fn last_address(&self) -> usize {
+        self.up_values.len() - 1
     }
 }
 

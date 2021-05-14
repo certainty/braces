@@ -17,7 +17,6 @@ use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::Chunk;
-use crate::vm::byte_code::chunk::ConstAddressType;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
 use crate::vm::disassembler::Disassembler;
@@ -96,7 +95,7 @@ impl CodeGenerator {
         generator.end_scope(false)?;
         generator.emit_return()?;
 
-        let up_value_count = generator.variables.borrow().up_values.len();
+        let up_value_count = generator.variables.up_value_count();
 
         match target {
             Target::TopLevel => Ok(value::procedure::native::Procedure::named(
@@ -129,25 +128,13 @@ impl CodeGenerator {
         self.values.interned_string(s)
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Locals and local tracking
-    //
-    // In order to make locals efficient and fast, they're represented as values on the stack.
-    // This way access to locals is an indexed access into the VM's stack.
-    // In order to make sure that the address calculation works correctly the code-generator
-    // tracks (emulates) the state of the stack. Each new scope is introduced by a binding construct
-    // which means there will be a new stack frame pushed.
-    // TODO: add better documentation on how this works
-    //
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
-
     #[inline]
     fn begin_scope(&mut self) {
-        self.variables.borrow_mut().begin_scope();
+        self.variables.begin_scope();
     }
 
     fn end_scope(&mut self, pop_locals: bool) -> Result<()> {
-        let processed_variables = self.variables.borrow_mut().end_scope()?;
+        let processed_variables = self.variables.end_scope()?;
 
         if processed_variables.len() > 0 {
             for (addr, was_captured) in processed_variables {
@@ -163,13 +150,13 @@ impl CodeGenerator {
     }
 
     #[inline]
-    fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
-        self.variables.borrow_mut().add_local(name)
+    fn register_local(&mut self, name: Identifier) -> Result<usize> {
+        self.variables.add_local(name)
     }
 
     #[inline]
-    fn resolve_local(&self, name: &Identifier) -> Option<ConstAddressType> {
-        self.variables.borrow().resolve_local(name)
+    fn resolve_local(&self, name: &Identifier) -> Option<usize> {
+        self.variables.resolve_local(name)
     }
 
     /////////////////////////////////////////////////
@@ -179,13 +166,13 @@ impl CodeGenerator {
     /////////////////////////////////////////////////
 
     #[inline]
-    fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<ConstAddressType>> {
-        self.variables.borrow_mut().resolve_up_value(name)
+    fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<usize>> {
+        self.variables.resolve_up_value(name)
     }
 
     #[inline]
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
-        if self.variables.borrow().is_top_level() {
+        if self.variables.is_top_level() {
             return Ok(());
         }
 
@@ -299,15 +286,9 @@ impl CodeGenerator {
 
     fn emit_get_variable(&mut self, id: &Identifier) -> Result<()> {
         if let Some(addr) = self.resolve_local(id) {
-            self.emit_instruction(
-                Instruction::GetLocal(addr as ConstAddressType),
-                id.source_location(),
-            )
+            self.emit_instruction(Instruction::GetLocal(addr), id.source_location())
         } else if let Some(addr) = self.resolve_up_value(id)? {
-            self.emit_instruction(
-                Instruction::GetUpValue(addr as ConstAddressType),
-                id.source_location(),
-            )
+            self.emit_instruction(Instruction::GetUpValue(addr), id.source_location())
         } else {
             let id_sym = self.sym(&id.string());
             let const_addr = self.current_chunk().add_constant(id_sym);
@@ -321,15 +302,9 @@ impl CodeGenerator {
 
         // is it local?
         if let Some(addr) = self.resolve_local(&expr.name) {
-            self.emit_instruction(
-                Instruction::SetLocal(addr as ConstAddressType),
-                expr.source_location(),
-            )
+            self.emit_instruction(Instruction::SetLocal(addr), expr.source_location())
         } else if let Some(addr) = self.resolve_up_value(&expr.name)? {
-            self.emit_instruction(
-                Instruction::SetUpValue(addr as ConstAddressType),
-                expr.source_location(),
-            )
+            self.emit_instruction(Instruction::SetUpValue(addr), expr.source_location())
         } else {
             // top level variable
             let id_sym = self.sym(&expr.name.string());
@@ -389,12 +364,10 @@ impl CodeGenerator {
     // a closure is compiled to a sequence of up-value markers followed by the closure
     fn emit_closure(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
         // add up-values
-        let up_values = self.variables.borrow().up_values.to_vec();
+        let up_values = self.variables.up_values_vec();
         for up_value in up_values {
-            self.current_chunk().write_instruction(Instruction::UpValue(
-                up_value.address as ConstAddressType,
-                up_value.is_local,
-            ));
+            self.current_chunk()
+                .write_instruction(Instruction::UpValue(up_value.address, up_value.is_local));
         }
 
         // now add the closure

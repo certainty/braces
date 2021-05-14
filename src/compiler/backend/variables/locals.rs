@@ -1,8 +1,7 @@
 use crate::compiler::backend::code_generator::{Error, Result};
 use crate::compiler::frontend::parser::expression::identifier::Identifier;
-use crate::vm::byte_code::chunk::ConstAddressType;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Local {
     pub name: Identifier,
     pub depth: usize,
@@ -35,7 +34,7 @@ impl Local {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Locals {
     max: usize,
     locals: Vec<Local>,
@@ -57,8 +56,7 @@ impl Locals {
         &self.locals[idx]
     }
 
-    pub fn mark_as_captured(&mut self, addr: ConstAddressType) {
-        let idx = addr as usize;
+    pub fn mark_as_captured(&mut self, idx: usize) {
         let existing = self.locals[idx].clone();
         self.locals[idx] = Local::capture(existing);
     }
@@ -76,8 +74,8 @@ impl Locals {
         Ok(self.locals.pop())
     }
 
-    pub fn last_address(&self) -> ConstAddressType {
-        (self.locals.len() - 1) as ConstAddressType
+    pub fn last_address(&self) -> usize {
+        self.locals.len() - 1
     }
 
     pub fn len(&self) -> usize {

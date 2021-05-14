@@ -4,17 +4,17 @@ use chunk::{AddressType, ConstAddressType};
 #[repr(u8)]
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    Define(ConstAddressType),
-    SetGlobal(ConstAddressType),
-    SetUpValue(ConstAddressType),
-    SetLocal(ConstAddressType),
-    GetGlobal(ConstAddressType),
-    GetUpValue(ConstAddressType),
-    GetLocal(ConstAddressType),
     Const(ConstAddressType),
+    Define(ConstAddressType),
     Closure(ConstAddressType),
-    UpValue(ConstAddressType, bool),
-    CloseUpValue(ConstAddressType),
+    SetGlobal(ConstAddressType),
+    GetGlobal(ConstAddressType),
+    SetUpValue(AddressType),
+    GetUpValue(AddressType),
+    SetLocal(AddressType),
+    GetLocal(AddressType),
+    UpValue(AddressType, bool),
+    CloseUpValue(AddressType),
     JumpIfFalse(AddressType),
     Jump(AddressType),
     Call(usize), // number of arguments
