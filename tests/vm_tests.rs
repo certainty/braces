@@ -1,5 +1,4 @@
-use braces::vm::scheme::value::Value;
-use braces::vm::scheme::value::{error, procedure::Arity};
+use braces::vm::value::{error, procedure::Arity, Value};
 use braces::vm::Error;
 use braces::vm::VM;
 use matches::assert_matches;
@@ -66,6 +65,7 @@ fn test_vm_set() {
         result,
         Err(Error::RuntimeError(
             error::RuntimeError::UndefinedVariable(_),
+            _,
             _
         ))
     );
@@ -87,7 +87,7 @@ fn test_vm_lambda() {
     assert_eq!(result, vm.values.bool_true());
 
     let result = vm
-        .run_string("(begin (define id (lambda (x) x)) (id #t))", "")
+        .run_string("(define id (lambda (x) x)) (id #t)", "")
         .unwrap();
     assert_eq!(result, vm.values.bool_true());
 
@@ -96,6 +96,7 @@ fn test_vm_lambda() {
         result,
         Err(Error::RuntimeError(
             error::RuntimeError::ArityError(Arity::Exactly(1), _),
+            _,
             _
         ))
     );
@@ -106,22 +107,22 @@ fn test_vm_lambda_formals() {
     let mut vm = VM::default();
 
     let result = vm
-        .run_string("(begin (define test (lambda (x) x)) (test #f))", "")
+        .run_string("(define test (lambda (x) x)) (test #f)", "")
         .unwrap();
     assert_eq!(result, vm.values.bool_false());
 
     let result = vm
-        .run_string("(begin (define test (lambda x x)) (test))", "")
+        .run_string("(define test (lambda x x)) (test)", "")
         .unwrap();
     assert_eq!(result, vm.values.proper_list(vec![]));
 
     let result = vm
-        .run_string("(begin (define test (lambda x x)) (test #f))", "")
+        .run_string("(define test (lambda x x)) (test #f)", "")
         .unwrap();
     assert_eq!(result, vm.values.proper_list(vec![vm.values.bool_false()]));
 
     let result = vm
-        .run_string("(begin (define test (lambda x x)) (test #f #t))", "")
+        .run_string("(define test (lambda x x)) (test #f #t)", "")
         .unwrap();
     assert_eq!(
         result,
@@ -131,7 +132,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) x)) (test #t #f #f))",
+            "(define test (lambda (x y z . rest) x)) (test #t #f #f)",
             "",
         )
         .unwrap();
@@ -139,7 +140,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) y)) (test #f #t #f))",
+            "(define test (lambda (x y z . rest) y)) (test #f #t #f)",
             "",
         )
         .unwrap();
@@ -147,7 +148,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) z)) (test #f #f #t))",
+            "(define test (lambda (x y z . rest) z)) (test #f #f #t)",
             "",
         )
         .unwrap();
@@ -155,7 +156,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) rest)) (test #f #t #t))",
+            "(define test (lambda (x y z . rest) rest)) (test #f #t #t)",
             "",
         )
         .unwrap();
@@ -163,7 +164,7 @@ fn test_vm_lambda_formals() {
 
     let result = vm
         .run_string(
-            "(begin (define test (lambda (x y z . rest) rest)) (test #f #f #f #t #t))",
+            "(define test (lambda (x y z . rest) rest)) (test #f #f #f #t #t)",
             "",
         )
         .unwrap();
@@ -189,4 +190,111 @@ fn test_vm_conditional() {
 
     result = vm.run_string("(if #t #t)", "").unwrap();
     assert_eq!(result, vm.values.bool_true());
+}
+
+#[test]
+fn test_vm_simple_closures() {
+    let mut vm = VM::default();
+    let result = vm
+        .run_string(
+            "
+               (define test (let ((x #t) (y 'ignored)) (lambda () (set! x (not x)) x)))
+               (define ls (lambda x x))
+               (ls (test) (test) (test))
+",
+            "",
+        )
+        .unwrap();
+
+    assert_eq!(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_false(),
+            vm.values.bool_true(),
+            vm.values.bool_false()
+        ])
+    );
+
+    let result = vm
+        .run_string(
+            "
+               (define test (let ((x #t) (y 'ignored)) (lambda () x)))
+               (test)
+",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_true());
+
+    let result = vm
+        .run_string(
+            "
+               (define test
+                  (let ((x #t))
+                      (let ((proc (lambda () x)))
+                        (set! x #f)
+                        proc)))
+               (test)
+",
+            "",
+        )
+        .unwrap();
+    assert_eq!(result, vm.values.bool_false());
+}
+
+#[test]
+fn test_vm_complex_closures() {
+    let mut vm = VM::default();
+    let result = vm
+        .run_string(
+            "
+               (define list (lambda ls ls))
+               (define set-x #t)
+               (define get-x #t)
+               (define make-closures (lambda (value)
+                 (let ((x value))
+                   (set! get-x (lambda () x))
+                   (set! set-x (lambda (new) (set! x new))))))
+
+              (make-closures #t)
+              (list (get-x) (set-x 'foo) (get-x))
+",
+            "",
+        )
+        .unwrap();
+
+    let foo_sym = vm.values.symbol("foo");
+    assert_eq!(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_true(),
+            vm.values.unspecified(),
+            foo_sym
+        ])
+    );
+}
+
+#[test]
+fn test_vm_bugs() {
+    let mut vm = VM::default();
+
+    // results in arity error
+    let result = vm
+        .run_string(
+            "
+               (define ls (lambda x x))
+               (define test (lambda () #t))
+               (ls (test) #f (test))
+",
+            "",
+        )
+        .unwrap();
+    assert_eq!(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_true(),
+            vm.values.bool_false(),
+            vm.values.bool_true()
+        ])
+    );
 }

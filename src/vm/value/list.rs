@@ -1,5 +1,5 @@
+use super::equality::SchemeEqual;
 use super::Value;
-use crate::vm::scheme::equality::SchemeEqual;
 use im::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};

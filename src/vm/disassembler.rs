@@ -1,6 +1,6 @@
 use super::byte_code::chunk::{AddressType, Chunk, ConstAddressType};
 use super::byte_code::Instruction;
-use super::scheme::value;
+use super::value;
 use std::io::Write;
 
 pub struct Disassembler<T: Write> {
@@ -19,10 +19,7 @@ impl<T: Write> Disassembler<T> {
             .write_fmt(format_args!("== {} ==\n", context))
             .unwrap();
 
-        //println!("{:?}", chunk.code);
         while address < chunk.code.len() {
-            //println!("address: {}, len: {}", address, chunk.code.len());
-            //std::thread::sleep_ms(2000);
             address = self.disassemble_instruction(chunk, address);
         }
         self.writer.write("\n".as_bytes()).unwrap();
@@ -45,10 +42,17 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Return => self.disassemble_simple("OP_RET", address),
-            &Instruction::Call(_args) => {
-                self.disassemble_simple("OP_CALL", address)
-                // This creates an endless loop
-                //self.disassemble_code_at(chunk, "OP_CALL", address - (args as usize) - 1)
+            &Instruction::Call(args) => {
+                self.disassemble_simple(&format!("OP_CALL({})", args), address)
+            }
+            &Instruction::Closure(addr) => {
+                self.disassemble_closure(chunk, "OP_CLOSURE", address, addr)
+            }
+            &Instruction::UpValue(addr, is_local) => {
+                self.disassemble_variable_access("OP_UP_VALUE", address, addr, is_local)
+            }
+            &Instruction::CloseUpValue(addr) => {
+                self.disassemble_variable_access("OP_CLOSE_UP_VALUE", address, addr, false)
             }
             &Instruction::Nop => self.disassemble_simple("OP_NOP", address),
             &Instruction::Break => self.disassemble_simple("OP_BREAK", address),
@@ -63,14 +67,20 @@ impl<T: Write> Disassembler<T> {
             &Instruction::GetGlobal(const_address) => {
                 self.disassemble_constant(chunk, "OP_GET_GLOBAL", address, const_address)
             }
-            &Instruction::GetLocal(_const_address) => {
-                self.disassemble_code_at(chunk, "OP_GET_LOCAL", address)
+            &Instruction::GetUpValue(addr) => {
+                self.disassemble_variable_access("OP_GET_UP_VALUE", address, addr, true)
+            }
+            &Instruction::GetLocal(addr) => {
+                self.disassemble_variable_access("OP_GET_LOCAL", address, addr, true)
             }
             &Instruction::SetGlobal(const_address) => {
                 self.disassemble_constant(chunk, "OP_SET_GLOBAL", address, const_address)
             }
-            &Instruction::SetLocal(_const_address) => {
-                self.disassemble_code_at(chunk, "OP_SET_LOCAL", address)
+            &Instruction::SetUpValue(addr) => {
+                self.disassemble_variable_access("OP_SET_UP_VALUE", address, addr, false)
+            }
+            &Instruction::SetLocal(addr) => {
+                self.disassemble_variable_access("OP_SET_LOCAL", address, addr, true)
             }
 
             &Instruction::Define(const_address) => {
@@ -87,22 +97,51 @@ impl<T: Write> Disassembler<T> {
         address + 1
     }
 
-    fn disassemble_code_at(&mut self, chunk: &Chunk, name: &str, address: usize) -> usize {
-        let code = &chunk.code[address];
-        self.writer
-            .write_fmt(format_args!("{:<16} {:?} \n", name, code))
-            .unwrap();
-        address + 1
-    }
-
     fn disassemble_jump(&mut self, name: &str, offset: usize, address: usize) -> usize {
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04} -> {:04}\n",
+                "{:<20} {:04} -> {:04}\n",
                 name, address, offset
             ))
             .unwrap();
 
+        address + 1
+    }
+
+    fn disassemble_closure(
+        &mut self,
+        chunk: &Chunk,
+        name: &str,
+        address: AddressType,
+        constant_address: ConstAddressType,
+    ) -> usize {
+        let proc = &chunk.constants[constant_address as usize];
+        self.writer
+            .write_fmt(format_args!(
+                "{:<20} {:04}        {}\n",
+                name,
+                constant_address,
+                &self.disassemble_value(proc)
+            ))
+            .unwrap();
+        address + 1
+    }
+
+    fn disassemble_variable_access(
+        &mut self,
+        name: &str,
+        address: AddressType,
+        variable_address: usize,
+        is_local: bool,
+    ) -> usize {
+        let label = if is_local { "local" } else { "upvalue" };
+
+        self.writer
+            .write_fmt(format_args!(
+                "{:<20} {:04}         {}\n",
+                name, variable_address, label
+            ))
+            .unwrap();
         address + 1
     }
 
@@ -116,7 +155,7 @@ impl<T: Write> Disassembler<T> {
         let constant = &chunk.constants[constant_address as usize];
         self.writer
             .write_fmt(format_args!(
-                "{:<16} {:04}        '{}' mem[{:p}]\n",
+                "{:<20} {:04}        {}    @ {:p}\n",
                 name,
                 constant_address,
                 &self.disassemble_value(constant),
@@ -127,9 +166,21 @@ impl<T: Write> Disassembler<T> {
         address + 1
     }
 
-    fn disassemble_value(&self, value: &value::Value) -> String {
+    pub fn disassemble_value(&self, value: &value::Value) -> String {
         match value {
-            value::Value::Procedure(_proc) => String::from("<procedure>"),
+            value::Value::Closure(closure) => format!(
+                "#<closure {}>",
+                closure
+                    .procedure()
+                    .name()
+                    .clone()
+                    .unwrap_or(String::from("lambda"))
+            ),
+            value::Value::Procedure(proc) => format!(
+                "#<procedure {}>",
+                proc.name().unwrap_or(String::from("lambda"))
+            ),
+            value::Value::Symbol(sym) => sym.as_str().to_string(),
             _ => format!("{:?}", value),
         }
     }

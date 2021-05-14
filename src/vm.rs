@@ -5,9 +5,10 @@ pub mod global;
 pub mod instance;
 pub mod scheme;
 pub mod stack;
-
-use self::scheme::value::error;
-use self::scheme::value::{foreign, procedure::Arity};
+pub mod stack_trace;
+pub mod value;
+use self::value::error;
+use self::value::procedure::foreign;
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
@@ -15,18 +16,17 @@ use crate::compiler::Compiler;
 use global::TopLevel;
 use instance::Instance;
 use scheme::core;
-use scheme::value;
-use scheme::value::Value;
 use scheme::writer::Writer;
 use std::path::PathBuf;
 use thiserror::Error;
+use value::Value;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
     #[error("RuntimeError at {1}: {0}")]
-    RuntimeError(error::RuntimeError, usize),
+    RuntimeError(error::RuntimeError, usize, stack_trace::StackTrace),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
 }
@@ -80,7 +80,7 @@ impl VM {
         self.values.absorb(unit.values);
 
         Instance::interprete(
-            unit.proc,
+            unit.closure,
             self.stack_size,
             &mut self.toplevel,
             &mut self.values,

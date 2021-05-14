@@ -4,7 +4,7 @@ pub mod frontend;
 pub mod source;
 pub mod source_location;
 pub mod utils;
-use crate::vm::scheme::value;
+use crate::vm::value;
 use backend::code_generator;
 use backend::code_generator::{CodeGenerator, Target};
 use frontend::parser::Parser;
@@ -29,12 +29,12 @@ pub struct Compiler {
 #[derive(Clone, Debug)]
 pub struct CompilationUnit {
     pub values: value::Factory,
-    pub proc: value::procedure::Procedure,
+    pub closure: value::closure::Closure,
 }
 
 impl CompilationUnit {
-    pub fn new(values: value::Factory, proc: value::procedure::Procedure) -> Self {
-        CompilationUnit { values, proc }
+    pub fn new(values: value::Factory, closure: value::closure::Closure) -> Self {
+        CompilationUnit { values, closure }
     }
 }
 
@@ -45,13 +45,13 @@ impl Compiler {
 
     pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
         let ast = self.parser.parse_program(source)?;
-        let mut code_gen = CodeGenerator::new(Target::TopLevel);
+        let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
         Ok(code_gen.generate(ast)?)
     }
 
     pub fn compile_expression<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
         let ast = self.parser.parse_expression(source)?;
-        let mut code_gen = CodeGenerator::new(Target::TopLevel);
+        let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
 
         Ok(code_gen.generate(vec![ast])?)
     }

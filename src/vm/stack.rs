@@ -17,6 +17,11 @@ impl<V> Stack<V> {
             repr: Vec::with_capacity(cap),
         }
     }
+    // discards everything up to the given base
+    pub fn truncate(&mut self, base: usize) {
+        self.repr.truncate(base)
+    }
+
     // Push a value to the stack.
     // If it exceeds the stack's capacity it will panic
     pub fn push(&mut self, v: V) {
@@ -25,6 +30,10 @@ impl<V> Stack<V> {
         } else {
             panic!("Stack overflow")
         }
+    }
+
+    pub fn at<'a>(&'a self, idx: usize) -> &'a V {
+        &self.repr[idx]
     }
 
     // Pop from the top of the stack.

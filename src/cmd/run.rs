@@ -19,7 +19,9 @@ pub fn execute(opts: &Opts) {
     match vm.run_file(std::path::PathBuf::from(opts.input.clone())) {
         Ok(_) => (),
         Err(vm::Error::CompilerError(e)) => e.print_user_friendly_message(),
-        Err(e @ vm::Error::RuntimeError(_, _)) => eprintln!("{}", e),
+        Err(vm::Error::RuntimeError(msg, line, stack_trace)) => {
+            eprintln!("{}:{}\n{}", msg, line, stack_trace.as_string())
+        }
         Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
     }
 }

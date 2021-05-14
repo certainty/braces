@@ -1,8 +1,8 @@
 #[cfg(test)]
 pub mod arbitrary;
+pub mod closure;
+pub mod equality;
 pub mod error;
-pub mod foreign;
-pub mod lambda;
 pub mod list;
 pub mod procedure;
 pub mod string;
@@ -10,16 +10,50 @@ pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
+use std::cell::Ref;
+use std::cell::RefCell;
 use std::convert::Into;
 use std::rc::Rc;
 use thiserror::Error;
 
-use super::equality::SchemeEqual;
+use equality::SchemeEqual;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Not an interned value")]
     NotInterned,
+}
+
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct RefValue {
+    inner: Rc<RefCell<Value>>,
+}
+
+impl RefValue {
+    pub fn new(v: Value) -> Self {
+        RefValue {
+            inner: Rc::new(RefCell::new(v)),
+        }
+    }
+
+    pub fn to_value(&self) -> Value {
+        self.inner.borrow().clone()
+    }
+
+    pub fn as_ref<'a>(&'a self) -> Ref<Value> {
+        self.inner.borrow()
+    }
+
+    pub fn set(&mut self, v: Value) {
+        self.inner.replace(v);
+    }
+}
+
+impl PartialEq for RefValue {
+    fn eq(&self, other: &RefValue) -> bool {
+        self.inner.as_ptr() == other.inner.as_ptr()
+    }
 }
 
 /// Runtime representation of values
@@ -31,8 +65,8 @@ pub enum Value {
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
-    Procedure(Rc<procedure::Procedure>),
-    ForeignProcedure(Rc<foreign::Procedure>),
+    Procedure(procedure::Procedure),
+    Closure(closure::Closure),
     Unspecified,
 }
 
@@ -55,6 +89,7 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::InternedString(_)) => false,
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
+            (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
             _ => false,
@@ -63,7 +98,6 @@ impl SchemeEqual<Value> for Value {
 
     fn is_eq(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
             (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
@@ -71,7 +105,7 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
-            (Value::ForeignProcedure(lhs), Value::ForeignProcedure(rhs)) => lhs.is_eq(rhs),
+            (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
             _ => false,
         }
@@ -89,6 +123,7 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
+            (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),
             (Value::Unspecified, Value::Unspecified) => true,
             _ => false,
         }
@@ -166,12 +201,16 @@ impl Factory {
         }
     }
 
-    pub fn procedure(&mut self, v: procedure::Procedure) -> Value {
-        Value::Procedure(Rc::new(v))
+    pub fn foreign_procedure(&mut self, v: procedure::foreign::Procedure) -> Value {
+        Value::Procedure(procedure::Procedure::foreign(v))
     }
 
-    pub fn foreign_procedure(&mut self, v: foreign::Procedure) -> Value {
-        Value::ForeignProcedure(Rc::new(v))
+    pub fn native_procedure(&mut self, v: procedure::native::Procedure) -> Value {
+        Value::Procedure(procedure::Procedure::native(v))
+    }
+
+    pub fn closure(&mut self, v: procedure::native::Procedure) -> Value {
+        Value::Closure(closure::Closure::new(v, vec![]))
     }
 
     pub fn from_datum(&mut self, d: &Datum) -> Value {
@@ -211,4 +250,24 @@ impl Factory {
             .map(InternedString)
             .collect()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn test_ref_value() {
+        let v1 = RefValue::new(Value::Bool(true));
+        let v2 = RefValue::new(Value::Bool(true));
+        let v3 = v1.clone();
+
+        assert_ne!(v1, v2);
+        assert_eq!(v1, v1);
+        assert_eq!(v1, v3);
+    }
+
+    // TODO: add equality tests (especially for upvalues)
+
+    // TODO: add test for is_false() (especially for up-values)
 }

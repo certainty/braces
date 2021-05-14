@@ -1,3 +1,24 @@
+///////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+// ## Internals
+//
+//
+// ### Design choices
+//
+// #### Compilation of procedures
+//
+// The compile uses a chunk-per-procedure approach, which means that final compilation result
+// is not a single contingent chunk of instructions, but each procedure will be compiled to a chunk instead.
+// The individually compiled procedures are stored as values in the compilation units constants table
+// and will thus be accessible by the VM. This compilation model gives rather clear semantics in terms
+// of execution since it allows to easily activate individual procedures without having to do extensive
+// computation of addresses.
+
+use crate::vm::value::closure::Closure;
+use crate::vm::value::procedure::Arity;
+
+use super::variables::{Variables, VariablesRef};
 use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::expression::{
@@ -13,99 +34,28 @@ use crate::compiler::frontend::parser::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::Chunk;
-use crate::vm::byte_code::chunk::ConstAddressType;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
 use crate::vm::disassembler::Disassembler;
-use crate::vm::scheme::value;
-use crate::vm::scheme::value::Value;
+use crate::vm::value;
+use crate::vm::value::Value;
 use crate::{
     compiler::frontend::parser::expression::identifier::Identifier,
     vm::byte_code::chunk::AddressType,
 };
 use thiserror::Error;
 
-const MAX_LOCALS: usize = 256;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Too many locals defined")]
     TooManyLocals,
+    #[error("Too many up values defined")]
+    TooManyUpValues,
     #[error("CompilerBug: {0}")]
     CompilerBug(String),
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug)]
-pub struct Local {
-    name: Identifier,
-    depth: usize,
-}
-
-impl Local {
-    pub fn new(name: Identifier, scope: usize) -> Self {
-        Local { name, depth: scope }
-    }
-
-    pub fn for_vm() -> Self {
-        Local {
-            name: Identifier::synthetic(""),
-            depth: 0,
-        }
-    }
-}
-
-pub struct Locals {
-    max: usize,
-    locals: Vec<Local>,
-}
-
-impl Locals {
-    pub fn new(limit: usize) -> Self {
-        let mut i = Self {
-            max: limit,
-            locals: Vec::with_capacity(limit),
-        };
-
-        // first slot is reserved for the vm
-        i.locals.push(Local::for_vm());
-        i
-    }
-
-    pub fn at<'a>(&'a self, idx: usize) -> &'a Local {
-        &self.locals[idx]
-    }
-
-    pub fn add(&mut self, name: Identifier, scope_depth: usize) -> Result<()> {
-        if self.locals.len() >= self.max {
-            Err(Error::TooManyLocals)
-        } else {
-            self.locals.push(Local::new(name, scope_depth));
-            Ok(())
-        }
-    }
-
-    pub fn pop(&mut self) -> Result<()> {
-        self.locals.pop();
-        Ok(())
-    }
-
-    pub fn last_address(&self) -> ConstAddressType {
-        (self.locals.len() - 1) as ConstAddressType
-    }
-
-    pub fn len(&self) -> usize {
-        self.locals.len()
-    }
-
-    pub fn resolve(&self, id: &Identifier) -> Option<usize> {
-        self.locals
-            .iter()
-            .rposition(|l| l.name == *id)
-            .map(|e| e - 1)
-    }
-}
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 pub enum Target {
@@ -114,20 +64,18 @@ pub enum Target {
 }
 
 pub struct CodeGenerator {
-    scope_depth: usize,
-    locals: Locals,
+    variables: VariablesRef,
     values: value::Factory,
     target: Target,
     chunk: Chunk,
 }
 
 impl CodeGenerator {
-    pub fn new(target: Target) -> Self {
-        let locals = Locals::new(MAX_LOCALS);
+    pub fn new(target: Target, parent_variables: Option<VariablesRef>) -> Self {
+        let variables = Variables::child(parent_variables);
 
         CodeGenerator {
-            scope_depth: 0,
-            locals,
+            variables,
             target,
             values: value::Factory::default(),
             chunk: Chunk::new(),
@@ -135,36 +83,55 @@ impl CodeGenerator {
     }
 
     pub fn generate(&mut self, ast: Vec<Expression>) -> Result<CompilationUnit> {
-        let proc =
-            Self::generate_procedure(Target::TopLevel, &Expression::body(ast), &Formals::empty())?;
-        Ok(CompilationUnit::new(self.values.clone(), proc))
+        let proc = Self::generate_procedure(
+            None,
+            Target::TopLevel,
+            &Expression::body(ast),
+            &Formals::empty(),
+        )?;
+
+        Ok(CompilationUnit::new(
+            self.values.clone(),
+            Closure::new(proc, vec![]),
+        ))
     }
 
     pub fn generate_procedure(
+        parent_variables: Option<VariablesRef>,
         target: Target,
         ast: &BodyExpression,
         formals: &Formals,
-    ) -> Result<value::procedure::Procedure> {
-        let mut generator = CodeGenerator::new(target.clone());
+    ) -> Result<value::procedure::native::Procedure> {
+        let mut generator = CodeGenerator::new(target.clone(), parent_variables);
 
         generator.begin_scope();
         for argument in formals.identifiers() {
             generator.declare_binding(&argument)?;
         }
         generator.emit_body(ast)?;
+        generator.end_scope(false)?;
         generator.emit_return()?;
-        generator.end_scope()?;
+
+        let up_value_count = generator.variables.up_value_count();
 
         match target {
-            Target::TopLevel => Ok(value::procedure::thunk(generator.chunk)),
-            Target::Procedure(Some(name)) => Ok(value::procedure::named(
+            Target::TopLevel => Ok(value::procedure::native::Procedure::named(
+                String::from("core#toplevel"),
+                Arity::Exactly(0),
+                generator.chunk,
+                up_value_count,
+            )),
+            Target::Procedure(Some(name)) => Ok(value::procedure::native::Procedure::named(
                 name,
                 formals.arity(),
                 generator.chunk,
+                up_value_count,
             )),
-            Target::Procedure(None) => {
-                Ok(value::procedure::lambda(formals.arity(), generator.chunk))
-            }
+            Target::Procedure(None) => Ok(value::procedure::native::Procedure::lambda(
+                formals.arity(),
+                generator.chunk,
+                up_value_count,
+            )),
         }
     }
 
@@ -178,51 +145,55 @@ impl CodeGenerator {
         self.values.interned_string(s)
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Locals and local tracking
-    //
-    // In order to make locals efficient and fast, they're represented as values on the stack.
-    // This way access to locals is an indexed access into the VM's stack.
-    // In order to make sure that the address calculation works correctly the code-generator
-    // tracks (emulates) the state of the stack. Each new scope is introduced by a binding construct
-    // which means there will be a new stack frame pushed.
-    // TODO: add better documentation on how this works
-    //
-    ////////////////////////////////////////////////////////////////////////////////////////////////////
-
+    #[inline]
     fn begin_scope(&mut self) {
-        self.scope_depth += 1;
+        self.variables.begin_scope();
     }
 
-    fn end_scope(&mut self) -> Result<()> {
-        self.scope_depth -= 1;
+    fn end_scope(&mut self, pop_locals: bool) -> Result<()> {
+        let processed_variables = self.variables.end_scope()?;
 
-        while self.locals.len() > 0
-            && self.locals.at(self.locals.len() - 1).depth > self.scope_depth
-        {
-            self.current_chunk().write_instruction(Instruction::Pop);
-            self.locals.pop()?;
+        if processed_variables.len() > 0 {
+            for (addr, was_captured) in processed_variables {
+                if was_captured {
+                    self.current_chunk()
+                        .write_instruction(Instruction::CloseUpValue(addr));
+                } else if pop_locals {
+                    self.current_chunk().write_instruction(Instruction::Pop);
+                }
+            }
         }
-
         Ok(())
     }
 
-    fn register_local(&mut self, name: Identifier) -> Result<ConstAddressType> {
-        self.locals.add(name, self.scope_depth)?;
-        Ok(self.locals.last_address())
+    #[inline]
+    fn register_local(&mut self, name: Identifier) -> Result<usize> {
+        self.variables.add_local(name)
     }
 
+    #[inline]
     fn resolve_local(&self, name: &Identifier) -> Option<usize> {
-        self.locals.resolve(name)
+        self.variables.resolve_local(name)
     }
 
+    /////////////////////////////////////////////////
+    //
+    // TODO: explain how up-values are handles
+    //
+    /////////////////////////////////////////////////
+
+    #[inline]
+    fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<usize>> {
+        self.variables.resolve_up_value(name)
+    }
+
+    #[inline]
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
-        // top level bindings aren't tracked on the stack
-        if self.scope_depth == 0 {
+        if self.variables.is_top_level() {
             return Ok(());
         }
 
-        // make sure the variable doesn't already exist in current scope
+        //TODO: make sure the variable doesn't already exist in current scope
 
         // register the local in current scope
         self.register_local(id.clone())?;
@@ -242,9 +213,7 @@ impl CodeGenerator {
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr)?,
-            Expression::Let(let_exp) => {
-                self.emit_instructions(&let_exp.to_lambda())?;
-            }
+            Expression::Let(let_exp) => self.emit_instructions(&let_exp.to_lambda())?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(expr) => self.emit_begin(expr)?,
@@ -298,6 +267,20 @@ impl CodeGenerator {
         Ok(())
     }
 
+    // Emit instructions to call a procedure
+    //
+    // First we emit the instruction for the operator and the for all the operands.
+    // Finally we emit the `call` instruction with the number of operands that have been applied.
+    //
+    // The following code: `(foo 'bar 'baz)` might results in something like:
+    //
+    // Const(0)
+    // GetGlobal(0)
+    // Const(1)
+    // Const(2)
+    // Call(2)
+    //
+    //
     fn emit_apply(&mut self, application: &ApplicationExpression) -> Result<()> {
         self.emit_instructions(&application.operator)?;
         for operand in &application.operands {
@@ -307,31 +290,42 @@ impl CodeGenerator {
             Instruction::Call(application.operands.len()),
             application.source_location(),
         )?;
+
         Ok(())
     }
 
+    // Emit the instructions for a sequence of expressions
+    //
+    // `(begin )` introduces a new scope and thus this function
+    // emits the instructions that are required to clean-up when
+    // the scope is left again.
+    //
     fn emit_begin(&mut self, expr: &BeginExpression) -> Result<()> {
         self.begin_scope();
         self.emit_instructions(&expr.first)?;
         for exp in &expr.rest {
             self.emit_instructions(&*exp)?;
         }
-        self.end_scope()?;
+        self.end_scope(true)?;
         Ok(())
     }
 
     fn emit_lambda(&mut self, expr: &LambdaExpression) -> Result<()> {
-        let lambda = Self::generate_procedure(Target::Procedure(None), &expr.body, &expr.formals)?;
-        let proc = self.values.procedure(lambda);
-        self.emit_constant(proc, expr.source_location())
+        let lambda = Self::generate_procedure(
+            Some(self.variables.clone()),
+            Target::Procedure(expr.label.clone()),
+            &expr.body,
+            &expr.formals,
+        )?;
+        let proc = self.values.native_procedure(lambda);
+        self.emit_closure(proc, expr.source_location())
     }
 
     fn emit_get_variable(&mut self, id: &Identifier) -> Result<()> {
         if let Some(addr) = self.resolve_local(id) {
-            self.emit_instruction(
-                Instruction::GetLocal(addr as ConstAddressType),
-                id.source_location(),
-            )
+            self.emit_instruction(Instruction::GetLocal(addr), id.source_location())
+        } else if let Some(addr) = self.resolve_up_value(id)? {
+            self.emit_instruction(Instruction::GetUpValue(addr), id.source_location())
         } else {
             let id_sym = self.sym(&id.string());
             let const_addr = self.current_chunk().add_constant(id_sym);
@@ -343,12 +337,11 @@ impl CodeGenerator {
         // push the value of the expression
         self.emit_instructions(&expr.value)?;
 
-        // is it local
+        // is it local?
         if let Some(addr) = self.resolve_local(&expr.name) {
-            self.emit_instruction(
-                Instruction::SetLocal(addr as ConstAddressType),
-                expr.source_location(),
-            )
+            self.emit_instruction(Instruction::SetLocal(addr), expr.source_location())
+        } else if let Some(addr) = self.resolve_up_value(&expr.name)? {
+            self.emit_instruction(Instruction::SetUpValue(addr), expr.source_location())
         } else {
             // top level variable
             let id_sym = self.sym(&expr.name.string());
@@ -405,6 +398,26 @@ impl CodeGenerator {
         Ok(())
     }
 
+    // a closure is compiled to a sequence of up-value markers followed by the closure
+    fn emit_closure(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
+        // add up-values
+        let up_values = self.variables.up_values_vec();
+        for up_value in up_values {
+            self.current_chunk()
+                .write_instruction(Instruction::UpValue(up_value.address, up_value.is_local));
+        }
+
+        // now add the closure
+        let const_addr = self.current_chunk().add_constant(value);
+        let inst_addr = self
+            .current_chunk()
+            .write_instruction(Instruction::Closure(const_addr));
+        self.current_chunk()
+            .write_line(inst_addr, inst_addr, loc.line);
+
+        Ok(())
+    }
+
     fn emit_lit(&mut self, datum: &datum::Datum) -> Result<()> {
         match datum.sexp() {
             datum::Sexp::Bool(true) => self.emit_instruction(Instruction::True, &datum.location)?,
@@ -453,15 +466,72 @@ impl CodeGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::source::StringSource;
+    use crate::compiler::Compiler;
+    use crate::vm::value::procedure::native;
+    use std::rc::Rc;
 
     #[test]
-    fn test_resolve_local() {
-        let mut locals = Locals::new(10);
+    fn test_compile_closures() {
+        let chunk = compile(
+            "
+          (define foo (let ((x #t) (y 'foo))
+            (lambda () x)))
 
-        locals.add(Identifier::synthetic("foo"), 1).unwrap();
-        locals.add(Identifier::synthetic("bar"), 1).unwrap();
-        locals.add(Identifier::synthetic("barz"), 1).unwrap();
+          (foo)
+        ",
+        );
 
-        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0))
+        // top level
+        assert_matches!(
+            &chunk.code[..],
+            [
+                // create closure
+                Instruction::Closure(_), // define let closure
+                Instruction::True,
+                Instruction::Const(_), // 'foo
+                Instruction::Call(_),  // call let closure
+                // define foo
+                Instruction::Define(_),
+                // apply foo
+                Instruction::GetGlobal(_),
+                Instruction::Call(_),
+                Instruction::Return
+            ]
+        );
+
+        let let_closure = proc_from(&chunk.constants[0]); // the let closure
+        assert_matches!(
+            &let_closure.code().code[..],
+            [
+                // setup the up-value for the x constant
+                Instruction::UpValue(0, true), //x #t
+                // build the closure
+                Instruction::Closure(_), // (lambda ..)
+                Instruction::CloseUpValue(_),
+                Instruction::Return
+            ]
+        );
+
+        let inner_closure = proc_from(&let_closure.code().constants[0]);
+        assert_matches!(
+            &inner_closure.code().code[..],
+            [Instruction::GetUpValue(0), Instruction::Return]
+        );
+    }
+
+    fn compile(input: &str) -> Chunk {
+        let mut compiler = Compiler::new();
+        let mut source = StringSource::new(input, "test");
+        let unit = compiler.compile_program(&mut source).unwrap();
+        unit.closure.code().clone()
+    }
+
+    fn proc_from(proc: &Value) -> Rc<native::Procedure> {
+        match proc {
+            Value::Procedure(n) if n.is_native() => n.as_native().clone(),
+            Value::Closure(p) => p.proc.clone(),
+            _ => panic!("Not a procedure"),
+        }
     }
 }

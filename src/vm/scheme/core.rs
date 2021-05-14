@@ -1,7 +1,7 @@
 use super::ffi::*;
-use super::value::Value;
-use super::{equality::SchemeEqual, value::procedure::Arity};
-use crate::vm::scheme::value::foreign;
+use crate::vm::value::procedure::foreign;
+use crate::vm::value::Value;
+use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
 use crate::vm::VM;
 
 macro_rules! register_core {
@@ -24,7 +24,7 @@ pub fn register(vm: &mut VM) {
 
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
 
-    register_core!(vm, "inspect", inspect, Arity::Exactly(0));
+    register_core!(vm, "inspect", inspect, Arity::Exactly(1));
 }
 
 //  R7RS 6.1
@@ -87,7 +87,7 @@ pub fn null_p(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn procedure_p(args: Vec<Value>) -> FunctionResult<Value> {
     match unary_procedure(&args)? {
         Value::Procedure(_) => Ok(Value::Bool(true)),
-        Value::ForeignProcedure(_) => Ok(Value::Bool(true)),
+        Value::Closure(_) => Ok(Value::Bool(true)),
         _ => Ok(Value::Bool(false)),
     }
 }

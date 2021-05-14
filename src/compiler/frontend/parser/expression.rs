@@ -198,6 +198,7 @@ impl HasSourceLocation for Expression {
 impl Expression {
     pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
         let ast = Parser.parse_datum_sequence(source)?;
+        //println!("{:?}", ast);
         ast.iter().map(Self::parse).collect()
     }
 
@@ -225,9 +226,10 @@ impl Expression {
     pub fn lambda(
         formals: lambda::Formals,
         body: BodyExpression,
+        label: Option<String>,
         loc: SourceLocation,
     ) -> Expression {
-        Expression::Lambda(lambda::build(formals, body, loc))
+        Expression::Lambda(lambda::build(formals, body, label, loc))
     }
 
     pub fn define(id: Identifier, expr: Expression, loc: SourceLocation) -> Expression {

@@ -1,19 +1,19 @@
+use super::equality::SchemeEqual;
 use super::procedure;
-use super::procedure::HasArity;
+use super::procedure::{Arity, HasArity};
 use super::Value;
-use crate::vm::scheme::equality::SchemeEqual;
 use crate::vm::scheme::ffi::FunctionResult;
 
 pub type ProcedureImpl = dyn Fn(Vec<Value>) -> FunctionResult<Value>;
 
 pub struct Procedure {
     pub name: String,
-    pub arity: procedure::Arity,
+    pub arity: Arity,
     proc: Box<ProcedureImpl>,
 }
 
 impl Procedure {
-    pub fn new<S, I>(name: S, op: I, arity: procedure::Arity) -> Self
+    pub fn new<S, I>(name: S, op: I, arity: Arity) -> Self
     where
         S: Into<String>,
         I: 'static + Fn(Vec<Value>) -> FunctionResult<Value>,
@@ -31,13 +31,13 @@ impl Procedure {
 }
 
 impl HasArity for Procedure {
-    fn arity<'a>(&'a self) -> &'a procedure::Arity {
+    fn arity<'a>(&'a self) -> &'a Arity {
         &self.arity
     }
 }
 
 impl HasArity for std::rc::Rc<Procedure> {
-    fn arity<'a>(&'a self) -> &'a procedure::Arity {
+    fn arity<'a>(&'a self) -> &'a Arity {
         &self.arity
     }
 }
