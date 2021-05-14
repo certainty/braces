@@ -1,3 +1,39 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// # Stack based virtual machine for our scheme implementation
+//
+// This is the implementation of the virtual machine for our scheme implementation. It's a standard stack based
+// VM that borrows concepts from LUA's VM implementation to make it non-naive. However there is probably still alot
+// of room for improvement in terms of performance.
+//
+// ## Usage
+//
+// Most of the time you shouldn't have to use `Instance` directly but use the `VM` interface instead.
+// That will give you access to high-level functions that compile and run code on the VM. However in case you
+// build your own code this low level interface might come in handy.
+//
+// Examples:
+// ```
+// // first compile some source
+// let source_code = String::from("(let ((x #t)) (lambda () x))");
+// let mut source = StringSource::new(source_code, "test");
+// let mut compiler  = Compiler::new();
+// let unit = compiler.compile_program(&mut source)?;
+//
+// // instantiate the vm with the top-level bindings and the known values and get the result
+//
+// let result = Instance::interprete(unit.closure, 256, TopLevel::new(), unit.values)?;
+// println!("{:#?}", result);
+// ```
+//
+// ## Internals
+//
+// What follows is a more in depth documentation of how the VM works and some of the design choices that have been made.
+//
+//
+// ### Design choices
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 pub mod call_frame;
 use crate::vm::byte_code::chunk::AddressType;
 use rustc_hash::FxHashMap;
@@ -176,13 +212,13 @@ impl<'a> Instance<'a> {
     //
     // Let the following be the stack:
     //
-    //      ┌───────────────┐
-    // 03   │     0x1       │
-    //      ├───────────────┤
-    // 02   │     0x5       │
-    //      ├───────────────┤
-    // 01   │     0x10      │
-    //      └───────────────┘
+    //     ┌───────────────┐
+    // 3   │     0x1       │
+    //     ├───────────────┤
+    // 2   │     0x5       │
+    //     ├───────────────┤
+    // 1   │     0x10      │
+    //     └───────────────┘
     //
     // peek(0) returns 0x1
     // peek(2) returns 0x10
@@ -194,10 +230,54 @@ impl<'a> Instance<'a> {
 
     ///////////////////////////////////////////////////////////
     //
-    // Manage the call stack and access frame local variables
+    // Manage the call stack and access frame local variables.
     //
     ///////////////////////////////////////////////////////////
 
+    // Activate a new stack frame with the provided closure and arguments.
+    //
+    // This prepares the call-stack with the next closures to execute.
+    // Note that we always deal with closures to keep the VM code simpler.
+    // It doesn't always mean that there are up-values that have been captured.
+    //
+    // In order to activate the closure the following things have to be done:
+    //
+    // 1. A new call frame has to be created
+    // 2. The base address for the stack frame has to be computed
+    // 3. The new call frame is pushed to the call stack
+    // 4. The active_frame is set to the new top of the stack
+    //
+    // ## Stack layout of active closures
+    //
+    // The closure that is about to be executed will get access to a portion of the value
+    // stack which it can use to manage local variables and temporary values. The VM
+    // will push the closure itself to the value stack, followed by the values of the arguments
+    // for the closure. The position where the closure has been pushed will become the stack_base,
+    // which is used  to calculate slot-access for the current active frame.
+    //
+    // So after `push_frame` has returned the stack will look like this:
+    //
+    //      ┌─────────────┐
+    //  11  │ Arg 2       │
+    //      ├─────────────┤
+    //  10  │ Arg 1       │
+    //      ├─────────────┤
+    //  9   │ Arg 0       │
+    //      ├─────────────┤
+    //  8   │ Closure     │◄───────── stack_base
+    //      ├─────────────┤
+    //  7   │ Temp        │
+    //      ├─────────────┤
+    //  6   │ Temp        │
+    //      ├─────────────┤
+    //  5   │ Temp        │
+    //      └─────────────┘
+    //
+    // The stack base for the closure will be 8 in this case.
+    // The data before that belongs to the previously active closure and wont be touched.
+    // The values at the stack addresses 9, 10 and 11 will hold the arguments that re provided
+    // to the procedure represented by the closure.
+    //
     #[inline]
     fn push_frame(&mut self, closure: value::closure::Closure, arg_count: usize) -> Result<()> {
         let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
@@ -207,6 +287,11 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
+    // Remove the currently active stack frame
+    // and restore the `active_frame` to the previous one.
+    //
+    // It returns the frame that has been removed and the length
+    // of the call-stack after the frame has been popped.
     #[inline]
     fn pop_frame(&mut self) -> (usize, CallFrame) {
         let frame = self.call_stack.pop();
@@ -217,25 +302,59 @@ impl<'a> Instance<'a> {
         (len, frame)
     }
 
+    // Retrieve a reference to the currently active frame.
+    // This is the always the frame at the top of the call-stack
+    // which is currently executed.
     #[inline]
     fn active_frame(&self) -> &CallFrame {
         unsafe { &(*self.active_frame) }
     }
 
+    // Retrieve a mutable reference to the currently active frame.
+    //
+    // This function is unsafe but is required to efficiently increment
+    // the instruction pointer.
     #[inline]
     fn active_mut_frame(&self) -> &mut CallFrame {
         unsafe { &mut (*self.active_frame) }
     }
 
+    // Compute the absolute stack index, from the provided slot_address.
+    // A frame slot is the relative address of a value on the value-stack for
+    // the currently active frame.
+    //
+    //     ┌─────────────┐
+    //  6  │ Slot3       │
+    //     ├─────────────┤
+    //  5  │ Slot2       │
+    //     ├─────────────┤
+    //  4  │ Slot1       │
+    //     ├─────────────┤
+    //  3  │ Closure     │◄───────── stack_base
+    //     ├─────────────┤
+    //  2  │ Temp        │
+    //     ├─────────────┤
+    //  1  │ Temp        │
+    //     ├─────────────┤
+    //  0  │ Temp        │
+    //     └─────────────┘
+    //
+    // frame_get_slot(0) would return 3.
+    // frame_get_slot(1) would return 4.
+    //
+    // As you can see all access is relative to the stack_base,
+    // which is associated with the active frame.
+    //
+    #[inline]
+    fn frame_slot_address_to_stack_index(&self, slot_address: AddressType) -> usize {
+        self.active_frame().stack_base + (slot_address as usize) + 1
+    }
+
+    // Retrieve the value from a given slot of the currently active frame.
     #[inline]
     fn frame_get_slot(&self, slot_address: AddressType) -> &Value {
         let index = self.frame_slot_address_to_stack_index(slot_address);
         self.stack.at(index)
-    }
-
-    #[inline]
-    fn frame_slot_address_to_stack_index(&self, slot_address: AddressType) -> usize {
-        self.active_frame().stack_base + (slot_address as usize) + 1
     }
 
     #[inline]
@@ -245,6 +364,7 @@ impl<'a> Instance<'a> {
     }
 
     ///////////////////////////////////////////////////////
+    //
     // Jumps and conditional jumps
     //
     ///////////////////////////////////////////////////////
@@ -265,6 +385,46 @@ impl<'a> Instance<'a> {
 
     ///////////////////////////////////////////////////////
     // Return from procedures / closures
+    //
+    // The main job of return is to remove the active stack frame
+    // and unwind the stack so that execution can continue.
+    // It also makes sure that result of the closure will become the new top value
+    // on the stack.
+    //
+    // ## Stack effect
+    //
+    // After this function has returned all the locals and temporary values of the active stack frame will have been popped.
+    // and the closure will be replaced by the final result of its execution.
+    //
+    // Stack before return:
+    //
+    //     ┌─────────────┐
+    //  6  │ 'foobar     │ ◄───────── stack top
+    //     ├─────────────┤
+    //  5  │ #t          │
+    //     ├─────────────┤
+    //  4  │ #f          │
+    //     ├─────────────┤
+    //  3  │ Closure     │◄───────── stack_base
+    //     ├─────────────┤
+    //  2  │ "some"      │
+    //     ├─────────────┤
+    //  1  │ 'baz        │
+    //     ├─────────────┤
+    //  0  │ #t          │
+    //     └─────────────┘
+    //
+    // Stack after return:
+    //
+    //     ┌─────────────┐
+    //  3  │ 'foobar     │ ◄───────── stack top
+    //     ├─────────────┤
+    //  2  │ "some"      │
+    //     ├─────────────┤
+    //  1  │ 'baz        │
+    //     ├─────────────┤
+    //  0  │ #t          │
+    //     └─────────────┘
     //
     ///////////////////////////////////////////////////////
 
@@ -292,8 +452,13 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
     // Closure creation
     //
-    ///////////////////////////////////////////////////////
-
+    // Reads the procedure from the address specified by `addr`
+    // and creates a closure out of it. A closure is code + up-values so this
+    // collects all the `open_up_values` and provides these to the closure.
+    //
+    // ## Stack effect
+    //
+    // The top of the stack will hold the resulting closure.
     fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
         match self.read_constant(addr).clone() {
             Value::Procedure(proc) => {
@@ -361,6 +526,14 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
+    ///////////////////////////////////////////////////////
+    // Apply closures to the supplied arguments
+    //
+    //
+    // ## Stack effect
+    //
+    // Pushes the arguments onto the stack
+    //
     #[inline]
     fn apply_closure(&mut self, closure: Closure, arg_count: usize) -> Result<()> {
         self.check_arity(&closure.procedure().arity, arg_count)?;
@@ -371,6 +544,13 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
+    ///////////////////////////////////////////////////////
+    // Apply a native procedure to the supplied arguments
+    //
+    //
+    // ## Stack effect
+    //
+    //
     #[inline]
     fn apply_native(
         &mut self,
@@ -385,7 +565,20 @@ impl<'a> Instance<'a> {
         self.disassemble_frame();
         Ok(())
     }
-
+    ///////////////////////////////////////////////////////
+    // Apply a native procedure to the supplied arguments
+    //
+    //
+    // ## Call stack
+    //
+    // Foreign procedure calls don't result in a call-frame being pushed.
+    // Instead the VM directly executes the foreign procedures and pushes the result
+    // onto the stack.
+    //
+    // ## Stack effect
+    //
+    // Pushes the result of the application onto the stack.
+    //
     #[inline]
     fn apply_foreign(
         &mut self,
@@ -402,6 +595,57 @@ impl<'a> Instance<'a> {
             Err(e) => self.runtime_error(e),
         }
     }
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // Provide the arguments for the procedure that is about to be executed.
+    //
+    // Arguments are just local values, which means they are represented
+    // as values on the stack. The called function accesses them in the usual
+    // manner via direct stack access.
+    //
+    // This function takes care of transferring the arguments correctly according
+    // to the function's arity. This means there are three cases to consider:
+    //
+    // ## 1. Exact amount of arguments
+    //
+    // In that case there is not much to do, since the variables will already be in place on the stack.
+    //
+    // ## 2. At least n arguments
+    //
+    // In this case the function makes sure that at least n arguments are supplied. This fist n are
+    // already at the right place on the stack. However all the additional arguments, if supplied, will
+    // be represented with a single variable, which holds a list. This means extra arguments are popped
+    // from the stack and new list value holding the values of those variables will be pushed onto the stack.
+    //
+    // argc = 4 and n = 2
+    //
+    //      ┌──────────────┐
+    //   3  │ 'foo         │
+    //      ├──────────────┤               ┌──────────────┐
+    //   2  │ 'bar         │            2  │ '(foo bar)   │
+    //      ├──────────────┤  ────►        ├──────────────┤
+    //   1  │ 'baz         │            1  │ 'baz         │
+    //      ├──────────────┤               ├──────────────┤
+    //   0  │ 'fro         │            0  │ 'fro         │
+    //      └──────────────┘               └──────────────┘
+    //
+    // ## 3. Variable amount of arguments
+    //
+    // In this case all provided arguments will be accumulated into a single local variable (single slot value)
+    // which will hold the list of provided values.
+    //
+    // args = 4
+    //
+    //       ┌──────────────┐
+    //    3  │ 'foo         │
+    //       ├──────────────┤
+    //    2  │ 'bar         │            ┌──────────────────┐
+    //       ├──────────────┤  ────►  0  │'(foo bar baz fro)│
+    //    1  │ 'baz         │            └──────────────────┘
+    //       ├──────────────┤
+    //    0  │ 'fro         │
+    //       └──────────────┘
 
     fn bind_arguments(&mut self, arity: &Arity, arg_count: usize) -> Result<usize> {
         match arity {
@@ -435,6 +679,7 @@ impl<'a> Instance<'a> {
     }
 
     ///////////////////////////////////////////////////////
+    //
     // Managing variables in different scopes
     //
     ///////////////////////////////////////////////////////

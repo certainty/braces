@@ -1,3 +1,20 @@
+///////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+// ## Internals
+//
+//
+// ### Design choices
+//
+// #### Compilation of procedures
+//
+// The compile uses a chunk-per-procedure approach, which means that final compilation result
+// is not a single contingent chunk of instructions, but each procedure will be compiled to a chunk instead.
+// The individually compiled procedures are stored as values in the compilation units constants table
+// and will thus be accessible by the VM. This compilation model gives rather clear semantics in terms
+// of execution since it allows to easily activate individual procedures without having to do extensive
+// computation of addresses.
+
 use crate::vm::value::closure::Closure;
 use crate::vm::value::procedure::Arity;
 
