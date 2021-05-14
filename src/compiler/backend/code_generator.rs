@@ -468,7 +468,7 @@ mod tests {
             &let_closure.code().code[..],
             [
                 // setup the up-value for the x constant
-                Instruction::UpValue(1, true), //x #t
+                Instruction::UpValue(0, true), //x #t
                 // build the closure
                 Instruction::Closure(_), // (lambda ..)
                 Instruction::CloseUpValue(_),

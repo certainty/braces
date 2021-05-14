@@ -24,14 +24,6 @@ impl Local {
             is_captured: true,
         }
     }
-
-    pub fn for_vm() -> Self {
-        Local {
-            name: Identifier::synthetic(""),
-            depth: 0,
-            is_captured: false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,14 +34,10 @@ pub struct Locals {
 
 impl Locals {
     pub fn new(limit: usize) -> Self {
-        let mut i = Self {
+        Self {
             max: limit,
             locals: Vec::with_capacity(limit),
-        };
-
-        // first slot is reserved for the vm
-        i.locals.push(Local::for_vm());
-        i
+        }
     }
 
     pub fn at<'a>(&'a self, idx: usize) -> &'a Local {
@@ -61,6 +49,10 @@ impl Locals {
         self.locals[idx] = Local::capture(existing);
     }
 
+    // Add a local to the specified scope_depth
+    //
+    // If more locals are tracked than the limit allows it returns `Error::TooManyLocals`
+    // otherwise it adds the local as non-captured.
     pub fn add(&mut self, name: Identifier, scope_depth: usize) -> Result<()> {
         if self.locals.len() >= self.max {
             Err(Error::TooManyLocals)
@@ -74,14 +66,19 @@ impl Locals {
         Ok(self.locals.pop())
     }
 
-    pub fn last_address(&self) -> usize {
-        self.locals.len() - 1
+    pub fn last_address(&self) -> Option<usize> {
+        if self.locals.len() > 0 {
+            Some(self.locals.len() - 1)
+        } else {
+            None
+        }
     }
 
     pub fn len(&self) -> usize {
         self.locals.len()
     }
 
+    // Find the index of last local that has been defined with this name.
     pub fn resolve(&self, id: &Identifier) -> Option<usize> {
         self.locals.iter().rposition(|l| l.name == *id)
     }
@@ -92,13 +89,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_resolve_local() {
+    fn last_address() {
+        let mut locals = Locals::new(10);
+
+        assert_eq!(locals.last_address(), None);
+
+        locals.add(Identifier::synthetic("foo"), 1).unwrap();
+
+        assert_eq!(locals.last_address(), Some(0));
+    }
+
+    #[test]
+    fn add_locals() {
+        let mut locals = Locals::new(10);
+
+        locals.add(Identifier::synthetic("foo"), 1).unwrap();
+        locals.add(Identifier::synthetic("bar"), 1).unwrap();
+    }
+
+    #[test]
+    fn resolve_local_finds_locals() {
         let mut locals = Locals::new(10);
 
         locals.add(Identifier::synthetic("foo"), 1).unwrap();
         locals.add(Identifier::synthetic("bar"), 1).unwrap();
         locals.add(Identifier::synthetic("barz"), 1).unwrap();
 
-        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(1))
+        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0))
     }
 }

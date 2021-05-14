@@ -92,7 +92,7 @@
 pub mod locals;
 pub mod up_values;
 
-use crate::compiler::backend::code_generator::Result;
+use crate::compiler::backend::code_generator::{Error, Result};
 use crate::compiler::backend::variables::up_values::UpValue;
 use crate::compiler::frontend::parser::expression::identifier::Identifier;
 use locals::Locals;
@@ -170,15 +170,24 @@ impl VariablesRef {
         self.inner.borrow_mut().scope_depth -= 1;
 
         let mut locals_len = self.inner.borrow().locals.len();
+
+        if locals_len <= 0 {
+            return Ok(vec![]);
+        }
+
         let mut current_depth = self.inner.borrow().locals.at(locals_len - 1).depth;
         let mut processed_variables: Vec<(usize, bool)> = vec![];
 
-        while locals_len > 0 && current_depth > self.inner.borrow().scope_depth {
+        while current_depth > self.inner.borrow().scope_depth {
             let local = self.inner.borrow_mut().locals.pop()?.unwrap();
             processed_variables.push((locals_len - 1, local.is_captured));
 
             locals_len -= 1;
-            current_depth = self.inner.borrow().locals.at(locals_len - 1).depth;
+            if locals_len > 0 {
+                current_depth = self.inner.borrow().locals.at(locals_len - 1).depth;
+            } else {
+                break;
+            }
         }
 
         processed_variables.reverse();
@@ -231,7 +240,14 @@ impl VariablesRef {
     pub fn add_local(&mut self, name: Identifier) -> Result<usize> {
         let scope_depth = self.inner.borrow().scope_depth;
         self.inner.borrow_mut().locals.add(name, scope_depth)?;
-        Ok(self.inner.borrow().locals.last_address())
+
+        if let Some(addr) = self.inner.borrow().locals.last_address() {
+            Ok(addr)
+        } else {
+            Err(Error::CompilerBug(String::from(
+                "Can't find address of added local",
+            )))
+        }
     }
 
     #[inline]
@@ -255,7 +271,7 @@ mod tests {
         top_level.add_local(Identifier::synthetic("x")).unwrap();
         let local_address = top_level.resolve_local(&Identifier::synthetic("x"));
 
-        assert_eq!(local_address, Some(1));
+        assert_eq!(local_address, Some(0));
         assert_eq!(
             top_level.resolve_local(&Identifier::synthetic("not_there")),
             None
@@ -318,7 +334,7 @@ mod tests {
 
         assert_eq!(
             processed,
-            vec![(1, false), (2, true), (3, false), (4, false)]
+            vec![(0, false), (1, true), (2, false), (3, false)]
         )
     }
 }

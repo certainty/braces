@@ -235,7 +235,7 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn frame_slot_address_to_stack_index(&self, slot_address: AddressType) -> usize {
-        self.active_frame().stack_base + (slot_address as usize)
+        self.active_frame().stack_base + (slot_address as usize) + 1
     }
 
     #[inline]
