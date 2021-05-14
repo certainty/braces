@@ -5,8 +5,8 @@ pub mod global;
 pub mod instance;
 pub mod scheme;
 pub mod stack;
+pub mod stack_trace;
 pub mod value;
-
 use self::value::error;
 use self::value::procedure::foreign;
 use crate::compiler;
@@ -26,7 +26,7 @@ pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
     #[error("RuntimeError at {1}: {0}")]
-    RuntimeError(error::RuntimeError, usize),
+    RuntimeError(error::RuntimeError, usize, stack_trace::StackTrace),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
 }

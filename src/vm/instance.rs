@@ -44,6 +44,7 @@ use super::debug;
 use super::disassembler::Disassembler;
 use super::global::*;
 use super::stack::Stack;
+use super::stack_trace::StackTrace;
 use super::value;
 use super::value::closure::Closure;
 use super::value::error;
@@ -59,7 +60,7 @@ use std::rc::Rc;
 type Result<T> = std::result::Result<T, Error>;
 
 type ValueStack = Stack<Value>;
-type CallStack = Stack<CallFrame>;
+pub type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
     // the value factory which can be shared between individual instance runs
@@ -470,6 +471,18 @@ impl<'a> Instance<'a> {
         }
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    // Creates an up-value from the value add the slot-address provided by `addr`.
+    //
+    // This adds the up-value to the currently open ones. They will be closed as soon
+    // as the local variables they capture get out of scope.
+    //
+    // If the value is a local it is captured.
+    // Otherwise it is already an up-value in the active closure and we can add it from there.
+    //
+    // ## Stack effect
+    // None
     fn create_up_value(&mut self, addr: AddressType, is_local: bool) -> Result<()> {
         if is_local {
             // capture local as new up-value
@@ -483,6 +496,12 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
+    // Up values are indexed by absolute stack address.
+    // This function captures the variable at `addr`
+    // and adds it to the currently open up-values.
+    //
+    // ## Stack effect
+    // None
     fn capture_up_value(&mut self, addr: AddressType) -> Result<()> {
         let stack_idx = self.frame_slot_address_to_stack_index(addr);
 
@@ -495,6 +514,11 @@ impl<'a> Instance<'a> {
         }
     }
 
+    // Close currently open up-values
+    //
+    // This removes the up-value resulted from `addr` from the open-up-values.
+    // This happens when the variable that is associated with `addr` goes
+    // out of scope.
     #[inline]
     fn close_up_value(&mut self, addr: AddressType) -> Result<()> {
         let stack_idx = self.frame_slot_address_to_stack_index(addr);
@@ -503,6 +527,7 @@ impl<'a> Instance<'a> {
     }
 
     ///////////////////////////////////////////////////////
+    //
     // Apply procedures and closures
     //
     ///////////////////////////////////////////////////////
@@ -783,6 +808,7 @@ impl<'a> Instance<'a> {
             self.active_frame()
                 .line_number_for_current_instruction()
                 .unwrap_or(0),
+            StackTrace::from(&self.call_stack),
         ));
         result
     }

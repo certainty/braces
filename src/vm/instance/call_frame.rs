@@ -29,6 +29,7 @@ impl CallFrame {
         self.closure.code()
     }
 
+    // TODO: fixme
     #[inline]
     pub fn line_number_for_current_instruction(&self) -> Option<LineNumber> {
         self.closure.code().find_line(self.ip).map(|e| e.2)

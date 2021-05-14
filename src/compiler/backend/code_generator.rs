@@ -267,6 +267,20 @@ impl CodeGenerator {
         Ok(())
     }
 
+    // Emit instructions to call a procedure
+    //
+    // First we emit the instruction for the operator and the for all the operands.
+    // Finally we emit the `call` instruction with the number of operands that have been applied.
+    //
+    // The following code: `(foo 'bar 'baz)` might results in something like:
+    //
+    // Const(0)
+    // GetGlobal(0)
+    // Const(1)
+    // Const(2)
+    // Call(2)
+    //
+    //
     fn emit_apply(&mut self, application: &ApplicationExpression) -> Result<()> {
         self.emit_instructions(&application.operator)?;
         for operand in &application.operands {
@@ -280,6 +294,12 @@ impl CodeGenerator {
         Ok(())
     }
 
+    // Emit the instructions for a sequence of expressions
+    //
+    // `(begin )` introduces a new scope and thus this function
+    // emits the instructions that are required to clean-up when
+    // the scope is left again.
+    //
     fn emit_begin(&mut self, expr: &BeginExpression) -> Result<()> {
         self.begin_scope();
         self.emit_instructions(&expr.first)?;
