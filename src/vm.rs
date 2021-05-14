@@ -80,7 +80,7 @@ impl VM {
         self.values.absorb(unit.values);
 
         Instance::interprete(
-            unit.closure.procedure().clone(),
+            unit.closure,
             self.stack_size,
             &mut self.toplevel,
             &mut self.values,

@@ -44,14 +44,13 @@ pub struct Instance<'a> {
 // Likely candidates for optimizations are the stack(s)
 impl<'a> Instance<'a> {
     pub fn new(
-        proc: procedure::native::Procedure,
+        initial_closure: value::closure::Closure,
         call_stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Self {
         let mut stack = ValueStack::new(call_stack_size * 255);
         let mut call_stack = CallStack::new(call_stack_size);
-        let initial_closure: Closure = Closure::from(proc);
 
         // the first value on the stack is the initial procedure
         stack.push(Value::Closure(initial_closure.clone()));
@@ -72,12 +71,12 @@ impl<'a> Instance<'a> {
     }
 
     pub fn interprete(
-        proc: procedure::native::Procedure,
+        initial_closure: value::closure::Closure,
         stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Result<Value> {
-        let mut instance = Self::new(proc, stack_size, toplevel, values);
+        let mut instance = Self::new(initial_closure, stack_size, toplevel, values);
         instance.run()
     }
 
