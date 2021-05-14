@@ -218,7 +218,10 @@ impl VariablesRef {
             // to emit the correct instruction to close it, later.
             //
             // Finally we track the up-value in the current scope (in the up-values buffer)
-            self.inner.borrow_mut().locals.mark_as_captured(local_addr);
+            self.inner
+                .borrow_mut()
+                .locals
+                .mark_as_captured(local_addr)?;
             Ok(Some(self.add_up_value(local_addr, true)?))
         } else {
             // It's not a local in this scope, so we check if it is an up-value
@@ -257,7 +260,7 @@ impl VariablesRef {
 
     #[inline]
     pub fn mark_local_as_captured(&mut self, address: usize) -> Result<()> {
-        Ok(self.inner.borrow_mut().locals.mark_as_captured(address))
+        self.inner.borrow_mut().locals.mark_as_captured(address)
     }
 }
 

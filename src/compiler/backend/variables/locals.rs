@@ -44,9 +44,17 @@ impl Locals {
         &self.locals[idx]
     }
 
-    pub fn mark_as_captured(&mut self, idx: usize) {
+    pub fn mark_as_captured(&mut self, idx: usize) -> Result<()> {
+        if idx >= self.len() {
+            return Err(Error::CompilerBug(String::from(
+                "Local index out of ranged",
+            )));
+        }
+
         let existing = self.locals[idx].clone();
         self.locals[idx] = Local::capture(existing);
+
+        Ok(())
     }
 
     // Add a local to the specified scope_depth
@@ -89,6 +97,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn mark_as_captured_marks_as_captured() {
+        let mut locals = Locals::new(10);
+        locals.add(Identifier::synthetic("foo"), 1).unwrap();
+
+        assert!(
+            !locals.at(0).is_captured,
+            "Expected local not to be captured"
+        );
+
+        locals.mark_as_captured(0).unwrap();
+
+        assert!(locals.at(0).is_captured, "Expected local to be captured");
+    }
+
+    #[test]
+    fn mark_as_captured_detects_compiler_bug() {
+        let mut locals = Locals::new(10);
+        assert!(locals.mark_as_captured(1).is_err(), "Expected error")
+    }
+
+    #[test]
     fn last_address() {
         let mut locals = Locals::new(10);
 
@@ -100,21 +129,29 @@ mod tests {
     }
 
     #[test]
-    fn add_locals() {
+    fn add_locals_adds_upcaptured() {
         let mut locals = Locals::new(10);
 
         locals.add(Identifier::synthetic("foo"), 1).unwrap();
         locals.add(Identifier::synthetic("bar"), 1).unwrap();
+
+        assert!(
+            !locals.at(0).is_captured,
+            "Expected local not to be captured"
+        );
     }
 
     #[test]
-    fn resolve_local_finds_locals() {
+    fn resolve_local_finds_first_matching_locals() {
         let mut locals = Locals::new(10);
 
         locals.add(Identifier::synthetic("foo"), 1).unwrap();
         locals.add(Identifier::synthetic("bar"), 1).unwrap();
         locals.add(Identifier::synthetic("barz"), 1).unwrap();
+        locals.add(Identifier::synthetic("bar"), 1).unwrap();
 
-        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0))
+        assert_eq!(locals.resolve(&Identifier::synthetic("foo")), Some(0));
+        assert_eq!(locals.resolve(&Identifier::synthetic("bar")), Some(3));
+        assert_eq!(locals.resolve(&Identifier::synthetic("nope")), None);
     }
 }
