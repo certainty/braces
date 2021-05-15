@@ -9,14 +9,17 @@ pub mod stack_trace;
 pub mod value;
 use self::value::error;
 use self::value::procedure::foreign;
+use self::value::procedure::native;
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
+use crate::vm::disassembler::Disassembler;
 use global::TopLevel;
 use instance::Instance;
 use scheme::core;
 use scheme::writer::Writer;
+use std::io::stdout;
 use std::path::PathBuf;
 use thiserror::Error;
 use value::Value;
@@ -37,7 +40,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct VM {
     stack_size: usize,
     pub values: value::Factory,
-    toplevel: TopLevel,
+    pub toplevel: TopLevel,
     writer: Writer,
 }
 
@@ -73,6 +76,13 @@ impl VM {
         let name = self.values.sym(proc.name.clone());
         let proc_value = self.values.foreign_procedure(proc);
         self.toplevel.set(name, proc_value);
+        Ok(())
+    }
+
+    pub fn disassemble(&self, proc: &native::Procedure) -> Result<()> {
+        let mut dissassembler = Disassembler::new(stdout());
+
+        dissassembler.disassemble(&proc.chunk, &proc.name.clone().unwrap_or(String::from("")));
         Ok(())
     }
 

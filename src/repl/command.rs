@@ -1,3 +1,5 @@
+use crate::vm::value::procedure::Procedure;
+use crate::vm::value::Value;
 use crate::vm::VM;
 use rustc_hash::FxHashMap;
 
@@ -100,14 +102,30 @@ fn handle_help(_vm: &mut VM, _args: Vec<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn handle_disass(_vm: &mut VM, _args: Vec<String>) -> anyhow::Result<()> {
-    println!("You called for disass");
-    Ok(())
+fn handle_disass(vm: &mut VM, args: Vec<String>) -> anyhow::Result<()> {
+    match &args[..] {
+        [ident] => match vm.toplevel.get(&vm.values.sym(ident)) {
+            Some(Value::Closure(closure)) => match vm.disassemble(closure.procedure()) {
+                Err(e) => Err(anyhow!("{}", e)),
+                _ => Ok(()),
+            },
+            Some(Value::Procedure(Procedure::Native(proc))) => match vm.disassemble(&(*proc)) {
+                Err(e) => Err(anyhow!("{}", e)),
+                _ => Ok(()),
+            },
+            _ => {
+                println!("Can't disassemble non-procedure");
+                Ok(())
+            }
+        },
+        _ => Err(anyhow!("Invalid arguments")),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vm::VM;
 
     #[test]
     fn parse_disass_command() {
