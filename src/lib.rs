@@ -6,6 +6,9 @@ extern crate nom_locate;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate anyhow;
+
 pub mod cmd;
 pub mod compiler;
 pub mod repl;

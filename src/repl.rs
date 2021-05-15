@@ -1,6 +1,7 @@
 pub mod command;
 use crate::braces_config_directory;
 use crate::compiler::error::UserMessage;
+use crate::repl::command::CommandRegistry;
 use crate::vm;
 use crate::vm::value::Value;
 use crate::vm::VM;
@@ -18,6 +19,7 @@ use std::result::Result::Err;
 
 pub struct Repl {
     vm: VM,
+    commands: CommandRegistry,
     editor: Editor<ReplHelper>,
 }
 
@@ -74,18 +76,18 @@ impl Validator for ReplHelper {
     }
 }
 
-enum ReplInput {
-    Command(command::Command),
-    Scheme(String),
-}
-
 impl Repl {
     pub fn new(vm: VM) -> anyhow::Result<Self> {
         Self::create_directories()?;
 
         let editor = Editor::<ReplHelper>::with_config(Self::default_config());
+        let commands = CommandRegistry::default();
 
-        Ok(Self { vm, editor })
+        Ok(Self {
+            vm,
+            editor,
+            commands,
+        })
     }
 
     // main read-eval-print loop
@@ -95,9 +97,9 @@ impl Repl {
         self.editor.load_history(&Self::history_path())?;
 
         loop {
-            let result = self.read_input();
+            let line = self.read_line();
 
-            match result {
+            match line {
                 Ok(input) => self.handle_input(&input)?,
                 Err(err) => match err.downcast_ref() {
                     Some(ReadlineError::Interrupted) => {
@@ -120,22 +122,17 @@ impl Repl {
         Ok(())
     }
 
-    fn read_input(&mut self) -> anyhow::Result<ReplInput> {
+    fn read_line(&mut self) -> anyhow::Result<String> {
         let prompt = self.prompt();
         let line = self.editor.readline(&prompt)?;
-
-        if let Some(cmd) = command::Command::parse(&line) {
-            Ok(ReplInput::Command(cmd))
-        } else {
-            Ok(ReplInput::Scheme(line))
-        }
+        Ok(line)
     }
 
-    fn handle_input(&mut self, input: &ReplInput) -> anyhow::Result<()> {
-        match input {
-            ReplInput::Command(cmd) => self.handle_command(cmd),
-            ReplInput::Scheme(source) => self.eval(source),
+    fn handle_input(&mut self, input: &String) -> anyhow::Result<()> {
+        if !self.commands.dispatch(&input, &mut self.vm)? {
+            self.eval(input)?
         }
+        Ok(())
     }
 
     fn eval(&mut self, source: &String) -> anyhow::Result<()> {
@@ -148,10 +145,6 @@ impl Repl {
             }
             Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
         }
-        Ok(())
-    }
-
-    fn handle_command(&mut self, cmd: &command::Command) -> anyhow::Result<()> {
         Ok(())
     }
 
