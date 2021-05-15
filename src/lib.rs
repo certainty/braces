@@ -1,10 +1,8 @@
 extern crate im;
 extern crate thiserror;
 
-extern crate nom;
-extern crate nom_locate;
-#[macro_use]
 extern crate lazy_static;
+extern crate nom;
 
 #[macro_use]
 extern crate anyhow;
@@ -24,6 +22,8 @@ extern crate quickcheck;
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
+
+pub const BRACES_VERSION: &str = "0.0.1";
 
 use directories::BaseDirs;
 

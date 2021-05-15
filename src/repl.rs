@@ -5,7 +5,7 @@ use crate::repl::command::CommandRegistry;
 use crate::vm;
 use crate::vm::value::Value;
 use crate::vm::VM;
-use anyhow::Result;
+use crate::BRACES_VERSION;
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
@@ -95,6 +95,7 @@ impl Repl {
         let helper = ReplHelper::new();
         self.editor.set_helper(Some(helper));
         self.editor.load_history(&Self::history_path())?;
+        self.banner()?;
 
         loop {
             let line = self.read_line();
@@ -119,6 +120,13 @@ impl Repl {
         }
 
         self.editor.save_history(&Self::history_path())?;
+        Ok(())
+    }
+
+    fn banner(&self) -> anyhow::Result<()> {
+        println!("BRACES - the tiny scheme");
+        println!("Version: {}\n", BRACES_VERSION);
+        println!("Type :help for help.");
         Ok(())
     }
 
