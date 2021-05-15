@@ -13,6 +13,7 @@ use rustyline::validate::ValidationContext;
 use rustyline::validate::ValidationResult;
 use rustyline::validate::Validator;
 use rustyline::{Editor, Helper};
+use std::borrow::Cow;
 use std::result::Result::Err;
 
 pub struct Repl {
@@ -24,6 +25,7 @@ pub struct ReplHelper {
     history_hinter: rustyline::hint::HistoryHinter,
     filename_completer: rustyline::completion::FilenameCompleter,
     bracket_validator: rustyline::validate::MatchingBracketValidator,
+    bracket_highlighter: rustyline::highlight::MatchingBracketHighlighter,
 }
 
 impl ReplHelper {
@@ -32,11 +34,13 @@ impl ReplHelper {
             history_hinter: rustyline::hint::HistoryHinter {},
             filename_completer: rustyline::completion::FilenameCompleter::default(),
             bracket_validator: rustyline::validate::MatchingBracketValidator::new(),
+            bracket_highlighter: rustyline::highlight::MatchingBracketHighlighter::new(),
         }
     }
 }
 
 impl Helper for ReplHelper {}
+
 impl Hinter for ReplHelper {
     type Hint = String;
 
@@ -58,7 +62,11 @@ impl Completer for ReplHelper {
     }
 }
 
-impl Highlighter for ReplHelper {}
+impl Highlighter for ReplHelper {
+    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
+        self.bracket_highlighter.highlight(line, pos)
+    }
+}
 
 impl Validator for ReplHelper {
     fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
