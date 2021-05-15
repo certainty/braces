@@ -23,10 +23,28 @@
 - [x] procedure call
 - [x] assignment
 
+### Repl
+
+- [ ] command support
+- [ ] bracket matching
+- [ ] completion of bound identifiers
+
+### TCO
+- [ ] identify tail calls
+- [ ] optimise tail calls
+
+### Continuations
+- [ ] figure out how to implement them
+
+### Language features
+- [ ] fully fledged define for procedures
+- [ ] more list procedures
+
+
 ### Closures
-- [ ] close up values `(define test ((let x #t)) (let ((closure (lambda () (set! x (not x))))) (set! x (not x)) closure))`
-- [ ] make mutual reference of two procedures work with closures
-- [ ] make sure we don't create a memory leak
+- [x] close up values `(define test ((let x #t)) (let ((closure (lambda () (set! x (not x))))) (set! x (not x)) closure))`
+- [x] make mutual reference of two procedures work with closures
+- [x] make sure we don't create a memory leak
 
 
 ## Bugs
