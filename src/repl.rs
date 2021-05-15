@@ -9,27 +9,35 @@ use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
+use rustyline::history;
 use rustyline::validate::Validator;
 use rustyline::{Editor, Helper};
 use std::result::Result::Err;
 
 pub struct Repl {
     vm: VM,
-    helper: ReplHelper,
     editor: Editor<ReplHelper>,
 }
 
-pub struct ReplHelper {}
+pub struct ReplHelper {
+    history_hinter: rustyline::hint::HistoryHinter,
+}
 
 impl ReplHelper {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            history_hinter: rustyline::hint::HistoryHinter {},
+        }
     }
 }
 
 impl Helper for ReplHelper {}
 impl Hinter for ReplHelper {
     type Hint = String;
+
+    fn hint(&self, line: &str, pos: usize, ctx: &rustyline::Context) -> Option<Self::Hint> {
+        self.history_hinter.hint(line, pos, ctx)
+    }
 }
 
 impl Completer for ReplHelper {
@@ -49,13 +57,14 @@ impl Repl {
         Self::create_directories()?;
 
         let editor = Editor::<ReplHelper>::with_config(Self::default_config());
-        let helper = ReplHelper::new();
 
-        Ok(Self { vm, editor, helper })
+        Ok(Self { vm, editor })
     }
 
     // main read-eval-print loop
     pub fn run_loop(&mut self) -> anyhow::Result<()> {
+        let helper = ReplHelper::new();
+        self.editor.set_helper(Some(helper));
         self.editor.load_history(&Self::history_path())?;
 
         loop {
@@ -79,6 +88,7 @@ impl Repl {
                 },
             }
         }
+
         self.editor.save_history(&Self::history_path())?;
         Ok(())
     }
@@ -125,7 +135,14 @@ impl Repl {
 
     fn default_config() -> rustyline::config::Config {
         let config_builder = rustyline::config::Config::builder();
-        config_builder.build()
+
+        config_builder
+            .auto_add_history(true)
+            .history_ignore_dups(true)
+            .history_ignore_space(false)
+            .max_history_size(500)
+            .completion_prompt_limit(100)
+            .build()
     }
 
     fn history_path() -> std::path::PathBuf {
@@ -135,7 +152,11 @@ impl Repl {
     #[inline]
     fn create_directories() -> anyhow::Result<()> {
         std::fs::create_dir_all(Self::config_dir())?;
-        std::fs::File::create(Self::history_path())?;
+
+        if !Self::history_path().exists() {
+            std::fs::File::create(Self::history_path())?;
+        }
+
         Ok(())
     }
 
