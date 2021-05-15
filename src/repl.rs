@@ -5,11 +5,10 @@ use crate::vm;
 use crate::vm::value::Value;
 use crate::vm::VM;
 use anyhow::Result;
-use rustyline::completion::Completer;
+use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
-use rustyline::history;
 use rustyline::validate::Validator;
 use rustyline::{Editor, Helper};
 use std::result::Result::Err;
@@ -21,12 +20,14 @@ pub struct Repl {
 
 pub struct ReplHelper {
     history_hinter: rustyline::hint::HistoryHinter,
+    filename_completer: rustyline::completion::FilenameCompleter,
 }
 
 impl ReplHelper {
     pub fn new() -> Self {
         Self {
             history_hinter: rustyline::hint::HistoryHinter {},
+            filename_completer: rustyline::completion::FilenameCompleter::default(),
         }
     }
 }
@@ -41,7 +42,16 @@ impl Hinter for ReplHelper {
 }
 
 impl Completer for ReplHelper {
-    type Candidate = String;
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &rustyline::Context,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        self.filename_completer.complete(line, pos, ctx)
+    }
 }
 
 impl Highlighter for ReplHelper {}
