@@ -9,6 +9,8 @@ use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
+use rustyline::validate::ValidationContext;
+use rustyline::validate::ValidationResult;
 use rustyline::validate::Validator;
 use rustyline::{Editor, Helper};
 use std::result::Result::Err;
@@ -21,6 +23,7 @@ pub struct Repl {
 pub struct ReplHelper {
     history_hinter: rustyline::hint::HistoryHinter,
     filename_completer: rustyline::completion::FilenameCompleter,
+    bracket_validator: rustyline::validate::MatchingBracketValidator,
 }
 
 impl ReplHelper {
@@ -28,6 +31,7 @@ impl ReplHelper {
         Self {
             history_hinter: rustyline::hint::HistoryHinter {},
             filename_completer: rustyline::completion::FilenameCompleter::default(),
+            bracket_validator: rustyline::validate::MatchingBracketValidator::new(),
         }
     }
 }
@@ -55,7 +59,12 @@ impl Completer for ReplHelper {
 }
 
 impl Highlighter for ReplHelper {}
-impl Validator for ReplHelper {}
+
+impl Validator for ReplHelper {
+    fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
+        self.bracket_validator.validate(ctx)
+    }
+}
 
 enum ReplInput {
     Command(command::Command),
