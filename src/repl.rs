@@ -1,7 +1,7 @@
 pub mod command;
 use crate::braces_config_directory;
 use crate::compiler::error::UserMessage;
-use crate::repl::command::CommandRegistry;
+use crate::repl::command::Commands;
 use crate::vm;
 use crate::vm::value::Value;
 use crate::vm::VM;
@@ -19,7 +19,7 @@ use std::result::Result::Err;
 
 pub struct Repl {
     vm: VM,
-    commands: CommandRegistry,
+    commands: Commands,
     editor: Editor<ReplHelper>,
 }
 
@@ -81,7 +81,7 @@ impl Repl {
         Self::create_directories()?;
 
         let editor = Editor::<ReplHelper>::with_config(Self::default_config());
-        let commands = CommandRegistry::default();
+        let commands = Commands::new();
 
         Ok(Self {
             vm,
@@ -101,7 +101,12 @@ impl Repl {
             let line = self.read_line();
 
             match line {
-                Ok(input) => self.handle_input(&input)?,
+                Ok(input) => match self.handle_input(&input) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        eprintln!("{}", e);
+                    }
+                },
                 Err(err) => match err.downcast_ref() {
                     Some(ReadlineError::Interrupted) => {
                         println!("CTRL-C");
