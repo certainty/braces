@@ -3,6 +3,15 @@
 ![Build Status](https://https://github.com/certainty/braces/blob/switch-to-actions/.github/workflows/rust.yml/badge.svg?branch=main)
 
 > Brace for impact
+> 
+
+## Usage
+
+Start the REPL and play around with it
+
+```
+make repl 
+```
 
 ## TODO
 
