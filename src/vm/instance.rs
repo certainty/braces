@@ -544,7 +544,7 @@ impl<'a> Instance<'a> {
                 self.apply_foreign(p.clone(), args)?
             }
             other => {
-                return self.runtime_error(error::non_callable(other));
+                return self.runtime_error(error::non_callable(other), None);
             }
         };
         Ok(())
@@ -614,7 +614,7 @@ impl<'a> Instance<'a> {
                 self.push(v)?;
                 Ok(())
             }
-            Err(e) => self.runtime_error(e),
+            Err(e) => self.runtime_error(e, Some(proc.name.clone())),
         }
     }
 
@@ -694,7 +694,7 @@ impl<'a> Instance<'a> {
             Arity::Exactly(n) if arg_count == *n => Ok(()),
             Arity::AtLeast(n) if arg_count >= *n => Ok(()),
             Arity::Many => Ok(()),
-            other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count)),
+            other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count), None),
         }
     }
 
@@ -723,7 +723,7 @@ impl<'a> Instance<'a> {
         if let Some(value) = self.toplevel.get_owned(&id) {
             self.push(value)?;
         } else {
-            self.runtime_error(error::undefined_variable(id))?;
+            self.runtime_error(error::undefined_variable(id), None)?;
         }
         Ok(())
     }
@@ -733,7 +733,7 @@ impl<'a> Instance<'a> {
         let id = self.read_identifier(addr)?;
 
         if !self.toplevel.get(&id).is_some() {
-            return self.runtime_error(error::undefined_variable(id.clone()));
+            return self.runtime_error(error::undefined_variable(id.clone()), None);
         } else {
             self.toplevel.set(id.clone(), v.clone());
             self.push(self.values.unspecified())?;
@@ -797,13 +797,14 @@ impl<'a> Instance<'a> {
     }
 
     // TODO: add a representation for stack trace and add it to the error
-    fn runtime_error<T>(&self, e: error::RuntimeError) -> Result<T> {
+    fn runtime_error<T>(&self, e: error::RuntimeError, context: Option<String>) -> Result<T> {
         let result = Err(Error::RuntimeError(
             e,
             self.active_frame()
                 .line_number_for_current_instruction()
                 .unwrap_or(0),
             StackTrace::from(&self.call_stack),
+            context,
         ));
         result
     }
