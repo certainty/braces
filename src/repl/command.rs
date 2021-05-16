@@ -1,3 +1,4 @@
+use crate::repl::string_completer::StringCompleter;
 use crate::vm::value::procedure::Procedure;
 use crate::vm::value::Value;
 use crate::vm::Setting;
@@ -100,43 +101,19 @@ impl Commands {
 }
 
 pub struct CommandCompleter {
-    commands: Vec<String>,
+    implementation: StringCompleter,
 }
 
 impl CommandCompleter {
     pub fn new() -> Self {
         Self {
-            commands: vec![
+            implementation: StringCompleter::from(vec![
                 String::from(":set"),
                 String::from(":settings"),
                 String::from(":help"),
                 String::from(":disass"),
-            ],
+            ]),
         }
-    }
-
-    fn complete_args(&self, command: &str, args: &[&str]) -> rustyline::Result<(usize, Vec<Pair>)> {
-        todo!()
-    }
-
-    fn complete_command(&self, pos: usize, command: &str) -> rustyline::Result<(usize, Vec<Pair>)> {
-        let mut all_results: Vec<Pair> = self
-            .commands
-            .iter()
-            .filter_map(|cmd| {
-                if cmd.starts_with(command) {
-                    Some(Pair {
-                        display: String::from(command),
-                        replacement: cmd.clone(),
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        all_results.sort_by(|a, b| a.display.cmp(&b.display));
-        Ok((0, all_results))
     }
 }
 
@@ -147,14 +124,13 @@ impl Completer for CommandCompleter {
         &self,
         line: &str,
         pos: usize,
-        _ctx: &Context<'_>,
+        ctx: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
         let trimmed = &line[..pos].trim();
         if line.starts_with(':') {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
             match &parts[..] {
-                [cmd, args @ ..] if args.len() > 0 => self.complete_args(cmd, args),
-                [cmd, ..] => self.complete_command(pos, cmd),
+                [cmd, ..] => self.implementation.complete(cmd, pos, ctx),
                 [] => Ok((pos, vec![])),
             }
         } else {

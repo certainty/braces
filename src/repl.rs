@@ -1,4 +1,5 @@
 pub mod command;
+pub mod string_completer;
 use crate::braces_config_directory;
 use crate::compiler::error::UserMessage;
 use crate::repl::command::CommandCompleter;
