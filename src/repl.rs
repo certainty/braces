@@ -1,6 +1,7 @@
 pub mod command;
 use crate::braces_config_directory;
 use crate::compiler::error::UserMessage;
+use crate::repl::command::CommandCompleter;
 use crate::repl::command::Commands;
 use crate::vm;
 use crate::vm::value::Value;
@@ -24,6 +25,7 @@ pub struct Repl {
 }
 
 pub struct ReplHelper {
+    command_completer: CommandCompleter,
     filename_completer: rustyline::completion::FilenameCompleter,
     bracket_validator: rustyline::validate::MatchingBracketValidator,
     bracket_highlighter: rustyline::highlight::MatchingBracketHighlighter,
@@ -32,6 +34,7 @@ pub struct ReplHelper {
 impl ReplHelper {
     pub fn new() -> Self {
         Self {
+            command_completer: CommandCompleter::new(),
             filename_completer: rustyline::completion::FilenameCompleter::default(),
             bracket_validator: rustyline::validate::MatchingBracketValidator::new(),
             bracket_highlighter: rustyline::highlight::MatchingBracketHighlighter::new(),
@@ -58,6 +61,11 @@ impl Completer for ReplHelper {
         pos: usize,
         ctx: &rustyline::Context,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        let (start, matches) = self.command_completer.complete(line, pos, ctx)?;
+
+        if matches.len() > 0 {
+            return Ok((start, matches));
+        }
         self.filename_completer.complete(line, pos, ctx)
     }
 }
