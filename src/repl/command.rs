@@ -2,6 +2,7 @@ use crate::vm::value::procedure::Procedure;
 use crate::vm::value::Value;
 use crate::vm::Setting;
 use crate::vm::VM;
+
 pub struct Commands;
 
 impl Commands {
@@ -12,15 +13,18 @@ impl Commands {
     pub fn dispatch(&self, input: &str, vm: &mut VM) -> anyhow::Result<bool> {
         let parts: Vec<&str> = input.trim().split_whitespace().collect();
 
-        match &parts[..] {
-            [":help"] => self.handle_help()?,
-            [":set", argument] => self.handle_set(argument, vm)?,
-            [":settings"] => self.handle_settings(vm)?,
-            [":disass", binding] => self.handle_disass(binding, vm)?,
-            _ => return Ok(false),
+        if let Some(true) = parts.first().map(|e| e.starts_with(':')) {
+            match &parts[..] {
+                [":help"] => self.handle_help()?,
+                [":set", argument] => self.handle_set(argument, vm)?,
+                [":settings"] => self.handle_settings(vm)?,
+                [":disass", binding] => self.handle_disass(binding, vm)?,
+                _ => return Err(anyhow!("Invalid command")),
+            }
+            Ok(true)
+        } else {
+            Ok(false)
         }
-
-        Ok(true)
     }
 
     fn handle_help(&self) -> anyhow::Result<()> {

@@ -24,7 +24,6 @@ pub struct Repl {
 }
 
 pub struct ReplHelper {
-    history_hinter: rustyline::hint::HistoryHinter,
     filename_completer: rustyline::completion::FilenameCompleter,
     bracket_validator: rustyline::validate::MatchingBracketValidator,
     bracket_highlighter: rustyline::highlight::MatchingBracketHighlighter,
@@ -33,7 +32,6 @@ pub struct ReplHelper {
 impl ReplHelper {
     pub fn new() -> Self {
         Self {
-            history_hinter: rustyline::hint::HistoryHinter {},
             filename_completer: rustyline::completion::FilenameCompleter::default(),
             bracket_validator: rustyline::validate::MatchingBracketValidator::new(),
             bracket_highlighter: rustyline::highlight::MatchingBracketHighlighter::new(),
@@ -46,8 +44,8 @@ impl Helper for ReplHelper {}
 impl Hinter for ReplHelper {
     type Hint = String;
 
-    fn hint(&self, line: &str, pos: usize, ctx: &rustyline::Context) -> Option<Self::Hint> {
-        self.history_hinter.hint(line, pos, ctx)
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &rustyline::Context) -> Option<Self::Hint> {
+        None
     }
 }
 
