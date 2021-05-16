@@ -35,6 +35,10 @@ impl Sexp {
         Sexp::String(val.into())
     }
 
+    pub fn integer(val: i64) -> Self {
+        Sexp::Number(Number::FixNum(val))
+    }
+
     pub fn list<I>(elements: I) -> Self
     where
         I: IntoIterator,

@@ -65,6 +65,7 @@ fn parse_simple_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     context(
         "simple datum",
         alt((
+            context("number", number::parse),
             context("character", character::parse),
             context("boolean", boolean::parse),
             context("symbol", symbol::parse),
