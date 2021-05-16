@@ -95,24 +95,3 @@ impl Commands {
         println!("{:<25} {}", usage, description);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::vm::VM;
-
-    #[test]
-    fn parse_disass_command() {
-        let mut vm = vm::VM::default();
-        let cmd = Command::new("test", "test", 0, test_handler);
-        let mut commands = CommandRegistry::new();
-
-        commands.register(cmd);
-
-        assert_eq!(commands.dispatch("  :test", &mut vm).unwrap(), true);
-    }
-
-    fn test_handler(vm: &mut VM, args: Vec<String>) -> anyhow::Result<()> {
-        Ok(())
-    }
-}

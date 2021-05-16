@@ -13,7 +13,7 @@ pub struct Opts {
     input: String,
 }
 
-pub fn execute(opts: &Opts) {
+pub fn execute(opts: &Opts) -> anyhow::Result<()> {
     let mut vm = VM::default();
 
     match vm.run_file(std::path::PathBuf::from(opts.input.clone())) {
@@ -24,4 +24,5 @@ pub fn execute(opts: &Opts) {
         }
         Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
     }
+    Ok(())
 }

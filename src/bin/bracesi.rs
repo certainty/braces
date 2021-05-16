@@ -23,9 +23,17 @@ fn main() {
     pretty_env_logger::init();
     let opts: Opts = Opts::parse();
 
-    match opts.subcmd {
+    let result = match opts.subcmd {
         SubCommand::Repl(opts) => repl::execute(&opts),
         SubCommand::Compile(opts) => compile::execute(&opts),
         SubCommand::Run(opts) => run::execute(&opts),
+    };
+
+    match result {
+        Ok(()) => std::process::exit(0),
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1)
+        }
     }
 }

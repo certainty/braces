@@ -6,9 +6,9 @@ use clap::Clap;
 #[clap(version = "0.1", author = "David K.", about = "Start the REPL")]
 pub struct Opts {}
 
-pub fn execute(_opts: &Opts) {
+pub fn execute(_opts: &Opts) -> anyhow::Result<()> {
     let vm = VM::default();
     let mut repl = repl::Repl::new(vm).unwrap();
 
-    repl.run_loop().unwrap();
+    repl.run_loop()
 }
