@@ -1,4 +1,5 @@
 mod abbreviation;
+mod boolean;
 mod character;
 pub mod datum;
 pub mod error;
@@ -14,13 +15,10 @@ use datum::Datum;
 use datum::Sexp;
 use error::ReadError;
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag, take_while_m_n};
-use nom::character::complete::{anychar, char, line_ending, one_of};
-use nom::combinator::{map, map_opt, map_res, value, verify};
-use nom::error::{context, ErrorKind, ParseError, VerboseError};
-use nom::multi::many_till;
-use nom::multi::{fold_many0, many0, many1};
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::combinator::value;
+use nom::error::{context, VerboseError};
+use nom::multi::many1;
+use nom::sequence::preceded;
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
 
@@ -68,7 +66,7 @@ fn parse_simple_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
         "simple datum",
         alt((
             context("character", character::parse),
-            context("boolean", parse_boolean),
+            context("boolean", boolean::parse),
             context("symbol", symbol::parse),
             context("string", string::parse),
         )),
@@ -119,37 +117,10 @@ where
     value((), parser)
 }
 
-/// Boolean parser
-///
-/// Ref: r7rs 7.1.1
-///
-/// ```grammar
-/// <BOOLEAN> -> #t | #f | #true | #false
-/// ```
-fn parse_boolean<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
-    let bool_literal = alt((
-        value(true, tag("#true")),
-        value(false, tag("#false")),
-        value(true, tag("#t")),
-        value(false, tag("#f")),
-    ));
-
-    map_datum(bool_literal, Sexp::boolean)(input)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::compiler::source::StringSource;
-
-    #[test]
-    fn test_read_boolean_literal() {
-        assert_parse_as("#t", Sexp::boolean(true));
-        assert_parse_as("#true", Sexp::boolean(true));
-
-        assert_parse_as("#f", Sexp::boolean(false));
-        assert_parse_as("#false", Sexp::boolean(false));
-    }
 
     pub fn assert_parse_as(inp: &str, expected: Sexp) {
         let datum = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
