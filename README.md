@@ -25,9 +25,9 @@
 
 ### Repl
 
-- [ ] command support
-- [ ] bracket matching
-- [ ] completion of bound identifiers
+- [x] command support
+- [x] bracket matching
+- [x] completion of bound identifiers
 
 ### TCO
 - [ ] identify tail calls
