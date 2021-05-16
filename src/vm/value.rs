@@ -9,7 +9,7 @@ pub mod procedure;
 pub mod string;
 pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
-use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::parser::sexp::datum::{self, Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -63,6 +63,7 @@ pub enum Value {
     Bool(bool),
     Symbol(Symbol),
     Char(char),
+    Number(number::Number),
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
@@ -175,6 +176,10 @@ impl Factory {
         Value::Char(c)
     }
 
+    pub fn fixnum(&self, v: i64) -> Value {
+        Value::Number(number::Number::FixNum(v))
+    }
+
     pub fn sym<T: Into<std::string::String>>(&mut self, v: T) -> Symbol {
         let k = self.symbols.get_or_intern(v.into());
         Symbol(k)
@@ -225,6 +230,7 @@ impl Factory {
                 self.proper_list(elements)
             }
             Sexp::Char(c) => self.character(*c),
+            Sexp::Number(datum::Number::FixNum(v)) => self.fixnum(*v),
             _ => todo!(),
         }
     }

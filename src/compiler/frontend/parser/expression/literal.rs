@@ -27,6 +27,7 @@ pub fn parse_literal(datum: &Datum) -> ParseResult<LiteralExpression> {
         Sexp::Bool(_) => ParseResult::accept(build(datum.clone())),
         Sexp::Char(_) => ParseResult::accept(build(datum.clone())),
         Sexp::String(_) => ParseResult::accept(build(datum.clone())),
+        Sexp::Number(_) => ParseResult::accept(build(datum.clone())),
         _ => ParseResult::ignore("Expected literal", datum.source_location().clone()),
     }
 }
@@ -57,6 +58,11 @@ mod tests {
         assert_parse_as(
             "\"foo\"",
             Expression::constant(make_datum(Sexp::string("foo"), 1, 1)),
+        );
+
+        assert_parse_as(
+            "123",
+            Expression::constant(make_datum(Sexp::integer(123), 1, 1)),
         );
     }
 }

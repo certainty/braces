@@ -1,4 +1,5 @@
 use crate::compiler::frontend::parser::sexp;
+use crate::vm::value::number::Number;
 use crate::vm::value::procedure;
 use crate::vm::value::{Factory, Value};
 use std::collections::HashSet;
@@ -34,6 +35,7 @@ impl Writer {
             Value::Bool(false) => "#f".to_string(),
             Value::Symbol(s) => self.write_symbol(s.as_str(), quote),
             Value::Char(c) => self.write_char(*c),
+            Value::Number(num) => self.write_number(num),
             Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
             Value::Closure(closure) => {
@@ -49,6 +51,12 @@ impl Writer {
                 format!("'({})", body.join(" "))
             }
             Value::Unspecified => "#<unspecified>".to_string(),
+        }
+    }
+
+    fn write_number(&self, num: &Number) -> String {
+        match num {
+            Number::FixNum(v) => format!("{}", v),
         }
     }
 
