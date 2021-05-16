@@ -16,3 +16,4 @@ Cargo.lock
 history.txt
 r7rs.pdf
 .DS_*
+.#*

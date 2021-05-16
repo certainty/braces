@@ -39,7 +39,6 @@ use crate::vm::byte_code::chunk::AddressType;
 use rustc_hash::FxHashMap;
 
 use super::byte_code::Instruction;
-#[cfg(feature = "debug_vm")]
 use super::debug;
 use super::disassembler::Disassembler;
 use super::global::*;
@@ -75,6 +74,8 @@ pub struct Instance<'a> {
     active_frame: *mut CallFrame,
     // open up-values are indexed by absolute stack address
     open_up_values: FxHashMap<AddressType, RefValue>,
+    // enable cycle debugging
+    debug_mode: bool,
 }
 
 // TODO: Optimize for performance
@@ -85,6 +86,7 @@ impl<'a> Instance<'a> {
         call_stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        debug_mode: bool,
     ) -> Self {
         let mut stack = ValueStack::new(call_stack_size * 255);
         let mut call_stack = CallStack::new(call_stack_size);
@@ -104,6 +106,7 @@ impl<'a> Instance<'a> {
             toplevel,
             active_frame,
             open_up_values: FxHashMap::default(),
+            debug_mode,
         }
     }
 
@@ -112,17 +115,16 @@ impl<'a> Instance<'a> {
         stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        debug_mode: bool,
     ) -> Result<Value> {
-        let mut instance = Self::new(initial_closure, stack_size, toplevel, values);
+        let mut instance = Self::new(initial_closure, stack_size, toplevel, values, debug_mode);
         instance.run()
     }
 
     fn run(&mut self) -> Result<Value> {
-        #[cfg(feature = "debug_vm")]
         self.disassemble_frame();
 
         loop {
-            #[cfg(feature = "debug_vm")]
             self.debug_cycle();
 
             match self.next_instruction() {
@@ -439,11 +441,7 @@ impl<'a> Instance<'a> {
         self.push(value.clone())?;
 
         if remaining <= 0 {
-            #[cfg(feature = "debug_vm")]
-            println!(
-                "{}",
-                debug::stack::pretty_print(&self.stack, self.active_frame().stack_base)
-            );
+            self.debug_stack();
             Ok(Some(value))
         } else {
             Ok(None)
@@ -564,7 +562,6 @@ impl<'a> Instance<'a> {
         self.check_arity(&closure.procedure().arity, arg_count)?;
         let arg_count = self.bind_arguments(&closure.procedure().arity, arg_count)?;
         self.push_frame(closure, arg_count)?;
-        #[cfg(feature = "debug_vm")]
         self.disassemble_frame();
         Ok(())
     }
@@ -586,7 +583,6 @@ impl<'a> Instance<'a> {
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();
         self.push_frame(closure, arg_count)?;
-        #[cfg(feature = "debug_vm")]
         self.disassemble_frame();
         Ok(())
     }
@@ -814,8 +810,11 @@ impl<'a> Instance<'a> {
     }
 
     // Debug the VM
-    #[cfg(feature = "debug_vm")]
     fn debug_cycle(&mut self) {
+        if !self.debug_mode {
+            return;
+        }
+
         let mut disassembler = Disassembler::new(std::io::stdout());
         let chunk = self.active_frame().code();
 
@@ -826,7 +825,22 @@ impl<'a> Instance<'a> {
         disassembler.disassemble_instruction(chunk, self.active_frame().ip);
     }
 
+    fn debug_stack(&mut self) {
+        if !self.debug_mode {
+            return;
+        }
+
+        println!(
+            "{}",
+            debug::stack::pretty_print(&self.stack, self.active_frame().stack_base)
+        );
+    }
+
     fn disassemble_frame(&mut self) {
+        if !self.debug_mode {
+            return;
+        }
+
         let mut disassembler = Disassembler::new(std::io::stdout());
         let chunk = self.active_frame().code();
         println!("\n");

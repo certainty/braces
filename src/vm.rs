@@ -9,14 +9,18 @@ pub mod stack_trace;
 pub mod value;
 use self::value::error;
 use self::value::procedure::foreign;
+use self::value::procedure::native;
 use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
+use crate::vm::disassembler::Disassembler;
 use global::TopLevel;
 use instance::Instance;
+use rustc_hash::FxHashMap;
 use scheme::core;
 use scheme::writer::Writer;
+use std::io::stdout;
 use std::path::PathBuf;
 use thiserror::Error;
 use value::Value;
@@ -37,8 +41,69 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct VM {
     stack_size: usize,
     pub values: value::Factory,
-    toplevel: TopLevel,
+    pub toplevel: TopLevel,
     writer: Writer,
+    pub settings: Settings,
+}
+
+#[derive(Debug)]
+pub struct Settings {
+    inner: FxHashMap<Setting, bool>,
+}
+
+impl Settings {
+    pub fn new() -> Self {
+        Self {
+            inner: FxHashMap::default(),
+        }
+    }
+
+    pub fn enable(&mut self, setting: Setting) {
+        self.inner.insert(setting, true);
+    }
+
+    pub fn disable(&mut self, setting: Setting) {
+        self.inner.insert(setting, false);
+    }
+
+    pub fn is_enabled(&self, setting: &Setting) -> bool {
+        match self.inner.get(setting) {
+            Some(v) => *v,
+            _ => false,
+        }
+    }
+
+    pub fn as_vec(&self) -> Vec<(Setting, bool)> {
+        self.inner
+            .iter()
+            .map(|p| (p.0.clone(), *p.1))
+            .collect::<Vec<_>>()
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Settings {
+        let mut settings = Settings::new();
+
+        settings.disable(Setting::Debug);
+
+        settings
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum Setting {
+    Debug,
+}
+
+impl std::fmt::Display for Setting {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let name = match self {
+            Setting::Debug => "debug",
+        };
+
+        fmt.write_str(name)
+    }
 }
 
 impl VM {
@@ -48,7 +113,12 @@ impl VM {
             values: value::Factory::default(),
             toplevel: TopLevel::new(),
             writer: Writer::new(),
+            settings: Settings::default(),
         }
+    }
+
+    pub fn binding_names(&self) -> Vec<String> {
+        self.toplevel.binding_names()
     }
 
     pub fn write(&self, value: &Value) -> String {
@@ -76,7 +146,15 @@ impl VM {
         Ok(())
     }
 
+    pub fn disassemble(&self, proc: &native::Procedure) -> Result<()> {
+        let mut dissassembler = Disassembler::new(stdout());
+
+        dissassembler.disassemble(&proc.chunk, &proc.name.clone().unwrap_or(String::from("")));
+        Ok(())
+    }
+
     fn interprete(&mut self, unit: CompilationUnit) -> Result<Value> {
+        let debug_mode = self.settings.is_enabled(&Setting::Debug);
         self.values.absorb(unit.values);
 
         Instance::interprete(
@@ -84,6 +162,7 @@ impl VM {
             self.stack_size,
             &mut self.toplevel,
             &mut self.values,
+            debug_mode,
         )
     }
 }
