@@ -117,6 +117,10 @@ impl VM {
         }
     }
 
+    pub fn binding_names(&self) -> Vec<String> {
+        self.toplevel.binding_names()
+    }
+
     pub fn write(&self, value: &Value) -> String {
         self.writer.write(value, &self.values).to_string()
     }

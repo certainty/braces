@@ -4,6 +4,7 @@ use crate::braces_config_directory;
 use crate::compiler::error::UserMessage;
 use crate::repl::command::CommandCompleter;
 use crate::repl::command::Commands;
+use crate::repl::string_completer::StringCompleter;
 use crate::vm;
 use crate::vm::value::Value;
 use crate::vm::VM;
@@ -26,6 +27,7 @@ pub struct Repl {
 }
 
 pub struct ReplHelper {
+    bindings_completer: StringCompleter,
     command_completer: CommandCompleter,
     filename_completer: rustyline::completion::FilenameCompleter,
     bracket_validator: rustyline::validate::MatchingBracketValidator,
@@ -33,13 +35,18 @@ pub struct ReplHelper {
 }
 
 impl ReplHelper {
-    pub fn new() -> Self {
+    pub fn new(vm: &VM) -> Self {
         Self {
+            bindings_completer: StringCompleter::from(vm.binding_names()),
             command_completer: CommandCompleter::new(),
             filename_completer: rustyline::completion::FilenameCompleter::default(),
             bracket_validator: rustyline::validate::MatchingBracketValidator::new(),
             bracket_highlighter: rustyline::highlight::MatchingBracketHighlighter::new(),
         }
+    }
+
+    pub fn update_bindings(&mut self, vm: &VM) {
+        self.bindings_completer = StringCompleter::from(vm.binding_names());
     }
 }
 
@@ -67,6 +74,12 @@ impl Completer for ReplHelper {
         if matches.len() > 0 {
             return Ok((start, matches));
         }
+
+        let (start, matches) = self.bindings_completer.complete(line, pos, ctx)?;
+        if matches.len() > 0 {
+            return Ok((start, matches));
+        }
+
         self.filename_completer.complete(line, pos, ctx)
     }
 }
@@ -99,12 +112,13 @@ impl Repl {
 
     // main read-eval-print loop
     pub fn run_loop(&mut self) -> anyhow::Result<()> {
-        let helper = ReplHelper::new();
-        self.editor.set_helper(Some(helper));
         self.editor.load_history(&Self::history_path())?;
         self.banner()?;
 
         loop {
+            let helper = ReplHelper::new(&self.vm);
+            self.editor.set_helper(Some(helper));
+
             let line = self.read_line();
 
             match line {

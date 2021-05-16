@@ -14,6 +14,13 @@ impl TopLevel {
         }
     }
 
+    pub fn binding_names(&self) -> Vec<String> {
+        self.bindings
+            .keys()
+            .map(|k| String::from(k.as_str()))
+            .collect()
+    }
+
     pub fn set(&mut self, k: Symbol, v: Value) {
         self.bindings.insert(k, v);
     }
