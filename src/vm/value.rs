@@ -4,6 +4,7 @@ pub mod closure;
 pub mod equality;
 pub mod error;
 pub mod list;
+pub mod number;
 pub mod procedure;
 pub mod string;
 pub mod symbol;

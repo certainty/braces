@@ -1,11 +1,17 @@
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Number {
+    FixNum(i64),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Sexp {
     Bool(bool),
     Symbol(String),
     String(String),
     Char(char),
+    Number(Number),
     List(Vec<Datum>),
     ImproperList(Vec<Datum>, Box<Datum>),
     Vector(Vec<Datum>),

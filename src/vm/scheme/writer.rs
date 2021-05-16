@@ -16,8 +16,9 @@ pub struct Writer {
 
 impl Writer {
     pub fn new() -> Self {
-        let special_initial: HashSet<char> =
-            String::from(sexp::SYMBOL_SPECIAL_INITIAL).chars().collect();
+        let special_initial: HashSet<char> = String::from(sexp::symbol::SYMBOL_SPECIAL_INITIAL)
+            .chars()
+            .collect();
         Writer {
             symbol_special_initial: special_initial,
         }
