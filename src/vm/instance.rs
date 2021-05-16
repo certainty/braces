@@ -208,6 +208,7 @@ impl<'a> Instance<'a> {
             result.push(self.pop())
         }
 
+        result.reverse();
         result
     }
 
@@ -674,15 +675,13 @@ impl<'a> Instance<'a> {
             Arity::AtLeast(n) => {
                 // stuff the last values into a new local
                 let rest_count = arg_count - n;
-                let mut rest_values = self.pop_n(rest_count);
-                rest_values.reverse();
+                let rest_values = self.pop_n(rest_count);
                 let rest_list = self.values.proper_list(rest_values);
                 self.push(rest_list)?;
                 Ok(n + 1)
             }
             Arity::Many => {
-                let mut rest_values = self.pop_n(arg_count);
-                rest_values.reverse();
+                let rest_values = self.pop_n(arg_count);
                 let rest_list = self.values.proper_list(rest_values);
                 self.push(rest_list)?;
                 Ok(1)

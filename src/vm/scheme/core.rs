@@ -25,6 +25,10 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
     register_core!(vm, "fx+", fx_plus, Arity::Exactly(2));
     register_core!(vm, "fx-", fx_minus, Arity::Exactly(2));
+    register_core!(vm, "<", fx_lt, Arity::Exactly(2));
+    register_core!(vm, "<=", fx_lt_eq, Arity::Exactly(2));
+    register_core!(vm, ">", fx_gt, Arity::Exactly(2));
+    register_core!(vm, ">=", fx_gt_eq, Arity::Exactly(2));
 
     register_core!(vm, "inspect", inspect, Arity::Exactly(1));
 }
@@ -117,6 +121,47 @@ pub fn fx_minus(args: Vec<Value>) -> FunctionResult<Value> {
             Value::Number(number::Number::FixNum(lhs)),
             Value::Number(number::Number::FixNum(rhs)),
         ) => Ok(Value::Number(number::Number::FixNum(lhs - rhs))),
+        _ => Err(error::argument_error("Expected exactly two fixnums")),
+    }
+}
+
+pub fn fx_lt(args: Vec<Value>) -> FunctionResult<Value> {
+    println!("args: {:?}", args);
+    match binary_procedure(&args)? {
+        (
+            Value::Number(number::Number::FixNum(lhs)),
+            Value::Number(number::Number::FixNum(rhs)),
+        ) => Ok(Value::Bool(lhs < rhs)),
+        _ => Err(error::argument_error("Expected exactly two fixnums")),
+    }
+}
+
+pub fn fx_lt_eq(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (
+            Value::Number(number::Number::FixNum(lhs)),
+            Value::Number(number::Number::FixNum(rhs)),
+        ) => Ok(Value::Bool(lhs <= rhs)),
+        _ => Err(error::argument_error("Expected exactly two fixnums")),
+    }
+}
+
+pub fn fx_gt(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (
+            Value::Number(number::Number::FixNum(lhs)),
+            Value::Number(number::Number::FixNum(rhs)),
+        ) => Ok(Value::Bool(lhs > rhs)),
+        _ => Err(error::argument_error("Expected exactly two fixnums")),
+    }
+}
+
+pub fn fx_gt_eq(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (
+            Value::Number(number::Number::FixNum(lhs)),
+            Value::Number(number::Number::FixNum(rhs)),
+        ) => Ok(Value::Bool(lhs >= rhs)),
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }
 }
