@@ -207,8 +207,8 @@ impl<'a> Instance<'a> {
         for _ in 0..n {
             result.push(self.pop())
         }
-
         result.reverse();
+
         result
     }
 
@@ -580,6 +580,7 @@ impl<'a> Instance<'a> {
         proc: Rc<procedure::native::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
+        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
         self.check_arity(&proc.arity, arg_count)?;
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();
@@ -614,7 +615,10 @@ impl<'a> Instance<'a> {
                 self.push(v)?;
                 Ok(())
             }
-            Err(e) => self.runtime_error(e, Some(proc.name.clone())),
+            Err(e) => {
+                println!("Error in foreign function: {}", proc.name.clone());
+                self.runtime_error(e, Some(proc.name.clone()))
+            }
         }
     }
 
