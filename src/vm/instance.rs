@@ -610,6 +610,8 @@ impl<'a> Instance<'a> {
     ) -> Result<()> {
         self.check_arity(&proc.arity, arg_count)?;
         let arguments = self.pop_n(arg_count).iter().cloned().collect();
+        // also pop the procedure itself
+        self.pop();
         match proc.call(arguments) {
             Ok(v) => {
                 self.push(v)?;
