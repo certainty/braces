@@ -11,6 +11,7 @@ pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::parser::sexp::datum::{self, Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
+use num::BigInt;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::convert::Into;
@@ -176,8 +177,8 @@ impl Factory {
         Value::Char(c)
     }
 
-    pub fn fixnum(&self, v: i64) -> Value {
-        Value::Number(number::Number::FixNum(v))
+    pub fn integer(&self, v: BigInt) -> Value {
+        Value::Number(number::Number::Integer(v))
     }
 
     pub fn sym<T: Into<std::string::String>>(&mut self, v: T) -> Symbol {
@@ -230,7 +231,7 @@ impl Factory {
                 self.proper_list(elements)
             }
             Sexp::Char(c) => self.character(*c),
-            Sexp::Number(datum::Number::FixNum(v)) => self.fixnum(*v),
+            Sexp::Number(datum::Number::Integer(v)) => self.integer(v.clone()),
             _ => todo!(),
         }
     }

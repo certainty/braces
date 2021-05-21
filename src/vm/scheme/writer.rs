@@ -57,6 +57,7 @@ impl Writer {
     fn write_number(&self, num: &Number) -> String {
         match num {
             Number::FixNum(v) => format!("{}", v),
+            Number::Integer(n) => format!("{}", n),
         }
     }
 

@@ -7,6 +7,7 @@ use nom::character::complete::{char, digit1};
 use nom::combinator::{map, map_res, opt, value};
 use nom::multi::many1;
 use nom::sequence::tuple;
+use num::BigInt;
 
 use super::Input;
 use super::ParseResult;
@@ -30,7 +31,7 @@ pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 fn parse_integer<'a>(
     prefix: &Prefix,
     sign: Option<Sign>,
-) -> impl FnMut(Input<'a>) -> ParseResult<'a, i64> {
+) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
     let number_parser = if prefix.radix == 2 {
         parse_integer_2
     } else {
@@ -46,18 +47,24 @@ fn parse_integer<'a>(
     })
 }
 
-fn parse_integer_10<'a>(input: Input<'a>) -> ParseResult<'a, i64> {
+fn parse_integer_10<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
     map_res(digit1, move |d: Input<'a>| {
-        i64::from_str_radix(d.fragment(), 10)
+        match BigInt::parse_bytes(d.fragment().as_bytes(), 10) {
+            None => Err(anyhow!("Can't parse integer with base 10")),
+            Some(v) => Ok(v),
+        }
     })(input)
 }
 
-fn parse_integer_2<'a>(input: Input<'a>) -> ParseResult<'a, i64> {
+fn parse_integer_2<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
     let binary_digits = many1(alt((char('0'), char('1'))));
 
     map_res(binary_digits, move |digits| {
         let s: String = digits.into_iter().collect();
-        i64::from_str_radix(&s, 2)
+        match BigInt::parse_bytes(s.as_bytes(), 2) {
+            None => Err(anyhow!("Can't parse integer with base 2")),
+            Some(v) => Ok(v),
+        }
     })(input)
 }
 
@@ -121,17 +128,17 @@ mod tests {
 
     #[test]
     fn parse_integer_10() {
-        assert_parse_as("0", Sexp::integer(0));
-        assert_parse_as("10", Sexp::integer(10));
-        assert_parse_as("#d10", Sexp::integer(10));
-        assert_parse_as("#e#d10", Sexp::integer(10));
-        assert_parse_as("23434", Sexp::integer(23434));
-        assert_parse_as("-23434", Sexp::integer(-23434));
+        assert_parse_as("0", Sexp::integer(BigInt::from(0)));
+        assert_parse_as("10", Sexp::integer(BigInt::from(10)));
+        assert_parse_as("#d10", Sexp::integer(BigInt::from(10)));
+        assert_parse_as("#e#d10", Sexp::integer(BigInt::from(10)));
+        assert_parse_as("23434", Sexp::integer(BigInt::from(23434)));
+        assert_parse_as("-23434", Sexp::integer(BigInt::from(-23434)));
     }
 
     #[test]
     fn parse_integer_2() {
-        assert_parse_as("#b0", Sexp::integer(0));
-        assert_parse_as("#b01011", Sexp::integer(11));
+        assert_parse_as("#b0", Sexp::integer(BigInt::from(0)));
+        assert_parse_as("#b01011", Sexp::integer(BigInt::from(11)));
     }
 }
