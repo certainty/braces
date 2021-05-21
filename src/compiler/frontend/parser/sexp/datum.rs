@@ -1,8 +1,10 @@
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use num::BigInt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Number {
     FixNum(i64),
+    Integer(BigInt),
 }
 
 #[derive(Debug, PartialEq, Clone)]

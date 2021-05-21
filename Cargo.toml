@@ -36,7 +36,8 @@ anyhow = "1.0"
 lazy_static = "1.4"
 
 # values
-im = "15.0"
+im-rc = "15.0"
+num = "0.4"
 
 # compiler / interpreter
 clap = "3.0.0-beta.2"
