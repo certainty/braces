@@ -26,28 +26,25 @@ pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let (s, pref) = parse_prefix(input)?;
     let (s, sign) = parse_sign(s)?;
 
-    map_datum(parse_integer(&pref, sign), Sexp::integer)(s)
+    map_datum(
+        parse_integer(pref, sign.unwrap_or(Sign::Plus)),
+        Sexp::integer,
+    )(s)
 }
 
 fn parse_integer<'a>(
-    prefix: &Prefix,
-    sign: Option<Sign>,
+    prefix: Prefix,
+    sign: Sign,
 ) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
-    let number_parser = if prefix.radix == 2 {
-        parse_integer_2
-    } else if prefix.radix == 8 {
-        parse_integer_8
-    } else {
-        parse_integer_10
-    };
-
-    map(number_parser, move |n| {
-        if sign == Some(Sign::Minus) {
-            n * -1
+    move |input: Input<'a>| {
+        let (s, n) = if prefix.radix == 10 {
+            parse_integer_10(input)?
         } else {
-            n
-        }
-    })
+            parse_integer_with(prefix.radix)(input)?
+        };
+
+        Ok((s, sign.apply(n)))
+    }
 }
 
 fn parse_integer_10<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
@@ -57,6 +54,27 @@ fn parse_integer_10<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
             Some(v) => Ok(v),
         }
     })(input)
+}
+
+fn parse_integer_with<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
+    map_res(digit_parser(radix), move |digits| {
+        let s: String = digits.into_iter().collect();
+        match BigInt::parse_bytes(s.as_bytes(), radix as u32) {
+            None => Err(anyhow!("Can't parse integer with base {}", radix)),
+            Some(v) => Ok(v),
+        }
+    })
+}
+
+fn digit_parser<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, Vec<char>> {
+    let digits = match radix {
+        2 => "01",
+        8 => "01234567",
+        16 => "012345679abcdef",
+        _ => "0123456789",
+    };
+
+    many1(one_of(digits))
 }
 
 fn parse_integer_2<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
@@ -98,6 +116,15 @@ pub enum Exactness {
 pub enum Sign {
     Plus,
     Minus,
+}
+
+impl Sign {
+    pub fn apply(&self, v: BigInt) -> BigInt {
+        match self {
+            Self::Plus => v,
+            Self::Minus => v * -1,
+        }
+    }
 }
 
 fn parse_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Prefix> {
