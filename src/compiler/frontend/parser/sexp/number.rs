@@ -3,6 +3,7 @@ use super::datum::Sexp;
 use super::map_datum;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
+use nom::character::complete::one_of;
 use nom::character::complete::{char, digit1};
 use nom::combinator::{map, map_res, opt, value};
 use nom::multi::many1;
@@ -34,6 +35,8 @@ fn parse_integer<'a>(
 ) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
     let number_parser = if prefix.radix == 2 {
         parse_integer_2
+    } else if prefix.radix == 8 {
+        parse_integer_8
     } else {
         parse_integer_10
     };
@@ -57,12 +60,24 @@ fn parse_integer_10<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
 }
 
 fn parse_integer_2<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
-    let binary_digits = many1(alt((char('0'), char('1'))));
+    let binary_digits = many1(one_of("01"));
 
     map_res(binary_digits, move |digits| {
         let s: String = digits.into_iter().collect();
         match BigInt::parse_bytes(s.as_bytes(), 2) {
             None => Err(anyhow!("Can't parse integer with base 2")),
+            Some(v) => Ok(v),
+        }
+    })(input)
+}
+
+fn parse_integer_8<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
+    let binary_digits = many1(one_of("01234567"));
+
+    map_res(binary_digits, move |digits| {
+        let s: String = digits.into_iter().collect();
+        match BigInt::parse_bytes(s.as_bytes(), 8) {
+            None => Err(anyhow!("Can't parse integer with base 8")),
             Some(v) => Ok(v),
         }
     })(input)
@@ -140,5 +155,13 @@ mod tests {
     fn parse_integer_2() {
         assert_parse_as("#b0", Sexp::integer(BigInt::from(0)));
         assert_parse_as("#b01011", Sexp::integer(BigInt::from(11)));
+    }
+
+    #[test]
+    fn parse_integer_8() {
+        assert_parse_as("#o777", Sexp::integer(BigInt::from(511)));
+        assert_parse_as("#o0775", Sexp::integer(BigInt::from(509)));
+
+        assert_parse_error("#o8989")
     }
 }

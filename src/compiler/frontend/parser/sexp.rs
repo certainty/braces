@@ -136,6 +136,13 @@ mod tests {
         assert!(parsed.is_ok(), "expected to parse successfully")
     }
 
+    pub fn assert_parse_error(inp: &str) {
+        let mut source = StringSource::new(inp, "datum-parser-test");
+        let parsed = parse(&mut source);
+
+        assert!(parsed.is_err(), "expected  parse error")
+    }
+
     pub fn location(line: usize, col: usize) -> SourceLocation {
         SourceType::Buffer("datum-parser-test".to_string()).location(line, col)
     }
