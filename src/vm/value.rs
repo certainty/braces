@@ -238,6 +238,10 @@ impl Factory {
             Sexp::Number(datum::Number::Real(datum::RealNumber::Flonum(v))) => {
                 Value::Number(number::Number::Real(number::RealNumber::Flonum(v.clone())))
             }
+            Sexp::Number(datum::Number::Real(datum::RealNumber::Rational(v))) => Value::Number(
+                number::Number::Real(number::RealNumber::Rational(v.clone())),
+            ),
+
             _ => todo!(),
         }
     }

@@ -58,6 +58,7 @@ impl Writer {
         match num {
             Number::Real(RealNumber::Fixnum(v)) => format!("{}", v),
             Number::Real(RealNumber::Flonum(v)) => format!("{}", v),
+            Number::Real(RealNumber::Rational(v)) => format!("{}", v),
         }
     }
 

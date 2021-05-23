@@ -12,7 +12,7 @@ pub enum Number {
 pub enum RealNumber {
     Fixnum(BigInt),
     Flonum(f64),
-    //    Rational(BigRational),
+    Rational(BigRational),
 }
 
 impl<I: Into<BigInt>> From<I> for RealNumber {
