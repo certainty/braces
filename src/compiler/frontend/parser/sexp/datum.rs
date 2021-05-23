@@ -37,11 +37,11 @@ pub enum RealNumber {
 }
 
 impl RealNumber {
-    pub fn sign(self, s: &Sign) -> Self {
+    pub fn sign(&self, s: &Sign) -> Self {
         match (self, s) {
             (Self::Fixnum(n), Sign::Minus) => Self::Fixnum(n * -1),
             (Self::Flonum(n), Sign::Minus) => Self::Flonum(n * -1.0),
-            _ => self,
+            _ => self.clone(),
         }
     }
 }
@@ -74,6 +74,14 @@ impl Sexp {
 
     pub fn string(val: impl Into<String>) -> Self {
         Sexp::String(val.into())
+    }
+
+    pub fn fixnum(val: BigInt) -> Self {
+        Self::real(RealNumber::Fixnum(val))
+    }
+
+    pub fn flonum(val: f64) -> Self {
+        Self::real(RealNumber::Flonum(val))
     }
 
     pub fn real(val: RealNumber) -> Self {

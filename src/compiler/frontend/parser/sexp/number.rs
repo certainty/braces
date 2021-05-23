@@ -64,7 +64,7 @@ fn parse_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNum
 }
 
 fn parse_signed_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    let ureal = alt((parse_uinteger(radix), parse_decimal(radix)));
+    let ureal = alt((parse_decimal, parse_uinteger(radix)));
     let signed_ureal = tuple((parse_sign, ureal));
 
     map(signed_ureal, |result: (Sign, RealNumber)| {
@@ -89,34 +89,48 @@ fn parse_uinteger<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, Rea
     parse_digits(radix)
 }
 
+fn _parse_u64<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, u64> {
+    map(many1(_parse_digits(radix)), move |num| {
+        let nums: String = num.into_iter().collect();
+        nums.parse::<u64>().expect("Parsing u64 can't fail")
+    })
+}
+
 // decimal ->
 //   <uniteger 10> <suffix> |
 //   . <digit 10>+ <suffix> |
 //   <digit 10>+ . <digit 10>* suffix
-fn parse_decimal<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    // TODO: put into own parsers that ma the result correctly
-    let uint_suffix = tuple((parse_uinteger(10), parse_suffix));
-    let dot_digits = tuple((char('.'), many1(_parse_digits(10)), parse_suffix));
-    let digit_dot_digits = tuple((
-        many1(_parse_digits(10)),
+
+fn parse_decimal<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
+    let (s, (pref, _, decimal_places, exp)) = tuple((
+        opt(_parse_u64(10)),
         char('.'),
-        many0(_parse_digits(10)),
+        opt(_parse_u64(10)),
         parse_suffix,
-    ));
+    ))(input)?;
+
+    let pref = pref.unwrap_or(0);
+    let decimal_p = decimal_places.unwrap_or(0);
+    let decimal = format!("{}.{}", pref, decimal_p)
+        .parse::<f64>()
+        .expect("Parse f64 can't fail");
+
+    Ok((s, RealNumber::Flonum(apply_exponent(decimal, exp))))
 }
 
-fn parse_decimal_no_dot<'a>(input: Input<'a>) -> ParseResult<'a, f64> {
-    let (pref, suff) = tuple((parse_uinteger(10), parse_suffix))(input)?;
-    //let number = f64::from_str(format!("{}e{}", pref, suff))
+fn apply_exponent(num: f64, exp: Option<i32>) -> f64 {
+    match exp {
+        Some(e) => (num as f64) * (f64::powi(10.0, e) as f64),
+        _ => (num as f64),
+    }
 }
 
 fn parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    map_res(many1(_parse_digits(radix)), move |digits| {
-        let s: String = digits.into_iter().collect();
-        match BigInt::parse_bytes(s.as_bytes(), radix as u32) {
-            None => Err(anyhow!("Can't parse integer with base {}", radix)),
-            Some(v) => Ok(RealNumber::Fixnum(v)),
-        }
+    map(many1(_parse_digits(radix)), move |digits| {
+        let digits: String = digits.into_iter().collect();
+        let num = BigInt::parse_bytes(digits.as_bytes(), radix as u32)
+            .expect("BigInt parse digits can't fail");
+        RealNumber::Fixnum(num)
     })
 }
 
@@ -131,13 +145,13 @@ fn _parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, char
     one_of(digits)
 }
 // returns the exponent if present
-fn parse_suffix<'a>(input: Input<'a>) -> ParseResult<'a, Option<i64>> {
+fn parse_suffix<'a>(input: Input<'a>) -> ParseResult<'a, Option<i32>> {
     let (s, result) = opt(tuple((char('e'), parse_sign, many1(_parse_digits(10)))))(input)?;
 
     match result {
         Some((_, sign, digits)) => {
-            let s: String = digits.into_iter().collect();
-            let exp = s.parse::<i64>().or(Err(anyhow!("Can't parse number")))?;
+            let number: String = digits.into_iter().collect();
+            let exp = number.parse::<i32>().expect("parse digit's can't fail");
             let signed_exp = match sign {
                 Sign::Minus => exp * -1,
                 _ => exp,
@@ -198,25 +212,32 @@ mod tests {
 
     #[test]
     fn parse_integer_10() {
-        assert_parse_as("0", Sexp::integer(BigInt::from(0)));
-        assert_parse_as("10", Sexp::integer(BigInt::from(10)));
-        assert_parse_as("#d10", Sexp::integer(BigInt::from(10)));
-        assert_parse_as("#e#d10", Sexp::integer(BigInt::from(10)));
-        assert_parse_as("23434", Sexp::integer(BigInt::from(23434)));
-        assert_parse_as("-23434", Sexp::integer(BigInt::from(-23434)));
+        assert_parse_as("0", Sexp::fixnum(BigInt::from(0)));
+        assert_parse_as("10", Sexp::fixnum(BigInt::from(10)));
+        assert_parse_as("#d10", Sexp::fixnum(BigInt::from(10)));
+        assert_parse_as("#e#d10", Sexp::fixnum(BigInt::from(10)));
+        assert_parse_as("23434", Sexp::fixnum(BigInt::from(23434)));
+        assert_parse_as("-23434", Sexp::fixnum(BigInt::from(-23434)));
     }
 
     #[test]
     fn parse_integer_2() {
-        assert_parse_as("#b0", Sexp::integer(BigInt::from(0)));
-        assert_parse_as("#b01011", Sexp::integer(BigInt::from(11)));
+        assert_parse_as("#b0", Sexp::fixnum(BigInt::from(0)));
+        assert_parse_as("#b01011", Sexp::fixnum(BigInt::from(11)));
     }
 
     #[test]
     fn parse_integer_8() {
-        assert_parse_as("#o777", Sexp::integer(BigInt::from(511)));
-        assert_parse_as("#o0775", Sexp::integer(BigInt::from(509)));
+        assert_parse_as("#o777", Sexp::fixnum(BigInt::from(511)));
+        assert_parse_as("#o0775", Sexp::fixnum(BigInt::from(509)));
 
-        assert_parse_error("#o8989")
+        //assert_parse_error("#o8989")
+    }
+
+    #[test]
+    fn parse_decimal_short() {
+        assert_parse_as(".3", Sexp::flonum(0.3));
+        assert_parse_as(".3e1", Sexp::flonum(3.0));
+        assert_parse_ok(".3e-1")
     }
 }
