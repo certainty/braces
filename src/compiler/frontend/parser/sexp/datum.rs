@@ -1,9 +1,49 @@
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use num::BigInt;
 
+#[derive(Clone)]
+pub enum Exactness {
+    Inexact,
+    Exact,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Sign {
+    Plus,
+    Minus,
+}
+
+impl Sign {
+    pub fn apply(&self, v: BigInt) -> BigInt {
+        match self {
+            Self::Plus => v,
+            Self::Minus => v * -1,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Number {
-    Integer(BigInt),
+    Real(RealNumber),
+    //Complex(num::Complex<BigInt>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum RealNumber {
+    Fixnum(BigInt),
+    Flonum(f64),
+    //Flonum(),
+    //Rational(num::BigRational),
+}
+
+impl RealNumber {
+    pub fn sign(self, s: &Sign) -> Self {
+        match (self, s) {
+            (Self::Fixnum(n), Sign::Minus) => Self::Fixnum(n * -1),
+            (Self::Flonum(n), Sign::Minus) => Self::Flonum(n * -1.0),
+            _ => self,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -36,8 +76,8 @@ impl Sexp {
         Sexp::String(val.into())
     }
 
-    pub fn integer(val: BigInt) -> Self {
-        Sexp::Number(Number::Integer(val))
+    pub fn real(val: RealNumber) -> Self {
+        Sexp::Number(Number::Real(val))
     }
 
     pub fn list<I>(elements: I) -> Self

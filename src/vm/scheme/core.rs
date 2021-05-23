@@ -108,9 +108,11 @@ pub fn bool_not(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn fx_plus(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (
-            Value::Number(number::Number::FixNum(lhs)),
-            Value::Number(number::Number::FixNum(rhs)),
-        ) => Ok(Value::Number(number::Number::FixNum(lhs + rhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
+        ) => Ok(Value::Number(number::Number::Real(
+            number::RealNumber::Fixnum(lhs + rhs),
+        ))),
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }
 }
@@ -118,9 +120,11 @@ pub fn fx_plus(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn fx_minus(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (
-            Value::Number(number::Number::FixNum(lhs)),
-            Value::Number(number::Number::FixNum(rhs)),
-        ) => Ok(Value::Number(number::Number::FixNum(lhs - rhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
+        ) => Ok(Value::Number(number::Number::Real(
+            number::RealNumber::Fixnum(lhs - rhs),
+        ))),
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }
 }
@@ -129,8 +133,8 @@ pub fn fx_lt(args: Vec<Value>) -> FunctionResult<Value> {
     println!("args: {:?}", args);
     match binary_procedure(&args)? {
         (
-            Value::Number(number::Number::FixNum(lhs)),
-            Value::Number(number::Number::FixNum(rhs)),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
         ) => Ok(Value::Bool(lhs < rhs)),
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }
@@ -139,8 +143,8 @@ pub fn fx_lt(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn fx_lt_eq(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (
-            Value::Number(number::Number::FixNum(lhs)),
-            Value::Number(number::Number::FixNum(rhs)),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
         ) => Ok(Value::Bool(lhs <= rhs)),
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }
@@ -149,8 +153,8 @@ pub fn fx_lt_eq(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn fx_gt(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (
-            Value::Number(number::Number::FixNum(lhs)),
-            Value::Number(number::Number::FixNum(rhs)),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
         ) => Ok(Value::Bool(lhs > rhs)),
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }
@@ -159,8 +163,8 @@ pub fn fx_gt(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn fx_gt_eq(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (
-            Value::Number(number::Number::FixNum(lhs)),
-            Value::Number(number::Number::FixNum(rhs)),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
+            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
         ) => Ok(Value::Bool(lhs >= rhs)),
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }

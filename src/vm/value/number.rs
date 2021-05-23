@@ -1,16 +1,47 @@
 use super::equality::SchemeEqual;
 use num::BigInt;
+use num::BigRational;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Number {
-    FixNum(i64),
-    Integer(BigInt),
+    Real(RealNumber),
+    // Complex
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum RealNumber {
+    Fixnum(BigInt),
+    Flonum(f64),
+    //    Rational(BigRational),
+}
+
+impl<I: Into<BigInt>> From<I> for RealNumber {
+    fn from(n: I) -> RealNumber {
+        RealNumber::Fixnum(n.into())
+    }
+}
+
+impl SchemeEqual<RealNumber> for RealNumber {
+    fn is_eq(&self, other: &RealNumber) -> bool {
+        match (self, other) {
+            (RealNumber::Fixnum(lhs), RealNumber::Fixnum(rhs)) => lhs == rhs,
+            _ => false,
+        }
+    }
+
+    fn is_eqv(&self, other: &RealNumber) -> bool {
+        self.is_eq(other)
+    }
+
+    fn is_equal(&self, other: &RealNumber) -> bool {
+        self.is_eq(other)
+    }
+}
+
 impl SchemeEqual<Number> for Number {
     fn is_eq(&self, other: &Number) -> bool {
         match (self, other) {
-            (Number::FixNum(lhs), Number::FixNum(rhs)) => lhs == rhs,
-            (Number::Integer(lhs), Number::Integer(rhs)) => lhs == rhs,
+            (Number::Real(lhs), Number::Real(rhs)) => lhs.is_eq(rhs),
             _ => false,
         }
     }

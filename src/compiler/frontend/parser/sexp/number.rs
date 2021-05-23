@@ -1,12 +1,13 @@
-use super::datum::Datum;
 use super::datum::Sexp;
+use super::datum::{Datum, RealNumber};
+use super::datum::{Exactness, Sign};
 use super::map_datum;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::one_of;
 use nom::character::complete::{char, digit1};
 use nom::combinator::{map, map_res, opt, value};
-use nom::multi::many1;
+use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 use num::BigInt;
 
@@ -21,52 +22,105 @@ use super::ParseResult;
 //   <num 8> |
 //   <num 10> |
 //   <num 16> |
+//
+// <num R> -> <prefix R> <complex R>
+//
+// We derive the parse slightly differently.
+// <complex R> expands into productions for reals (rational, integer, decimal)
+// which we represent as parsers (and in fact use in the complex parser). However
+// we never construct only complex numbers if the number parser succeeds.
+// Instead we create either: Complex, FixNum, Flownum or Rational
 
 pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let (s, pref) = parse_prefix(input)?;
-    let (s, sign) = parse_sign(s)?;
 
-    map_datum(
-        parse_integer(pref, sign.unwrap_or(Sign::Plus)),
-        Sexp::integer,
-    )(s)
+    map_datum(parse_real(pref.radix), Sexp::real)(s)
 }
 
-fn parse_integer<'a>(
-    prefix: Prefix,
-    sign: Sign,
-) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
-    move |input: Input<'a>| {
-        let (s, n) = if prefix.radix == 10 {
-            parse_integer_10(input)?
-        } else {
-            parse_integer_with(prefix.radix)(input)?
-        };
+//
+// <complex R> ->
+//    <real R>               |
+//    <real R> @ <real R>    |
+//    <real R> + <ureal R> i |
+//    <real R> - <ureal R> i |
+//    <real R> + i           |
+//    <real R> - i           |
+//    <real R> <infnan> i    |
+//    + <ureal R> i          |
+//    - <ureal R> i          |
+//    <infnan> i             |
+//    + i                    |
+//    - i                    |
+//
+//
 
-        Ok((s, sign.apply(n)))
-    }
+//
+// <real R>   -> <sign> <ureal R> | infnan
+// <ureal R> -> <uinteger R> | <uninteger R> / <uninteger R> | <decimal R>
+//
+//
+fn parse_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    move |input| alt((parse_signed_real(radix), parse_inf_nan))(input)
 }
 
-fn parse_integer_10<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
-    map_res(digit1, move |d: Input<'a>| {
-        match BigInt::parse_bytes(d.fragment().as_bytes(), 10) {
-            None => Err(anyhow!("Can't parse integer with base 10")),
-            Some(v) => Ok(v),
-        }
-    })(input)
+fn parse_signed_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    let ureal = alt((parse_uinteger(radix), parse_decimal(radix)));
+    let signed_ureal = tuple((parse_sign, ureal));
+
+    map(signed_ureal, |result: (Sign, RealNumber)| {
+        result.1.sign(&result.0)
+    })
 }
 
-fn parse_integer_with<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
-    map_res(digit_parser(radix), move |digits| {
+fn parse_inf_nan<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
+    alt((
+        value(RealNumber::Flonum(num::Float::nan()), tag("+nan.0")),
+        value(RealNumber::Flonum(num::Float::nan()), tag("-nan.0")),
+        value(RealNumber::Flonum(num::Float::infinity()), tag("+inf.0")),
+        value(
+            RealNumber::Flonum(num::Float::neg_infinity()),
+            tag("-inf.0"),
+        ),
+    ))(input)
+}
+
+// <uinteger R> -> <digit R>+
+fn parse_uinteger<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    parse_digits(radix)
+}
+
+// decimal ->
+//   <uniteger 10> <suffix> |
+//   . <digit 10>+ <suffix> |
+//   <digit 10>+ . <digit 10>* suffix
+fn parse_decimal<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    // TODO: put into own parsers that ma the result correctly
+    let uint_suffix = tuple((parse_uinteger(10), parse_suffix));
+    let dot_digits = tuple((char('.'), many1(_parse_digits(10)), parse_suffix));
+    let digit_dot_digits = tuple((
+        many1(_parse_digits(10)),
+        char('.'),
+        many0(_parse_digits(10)),
+        parse_suffix,
+    ));
+}
+
+fn parse_decimal_no_dot<'a>(input: Input<'a>) -> ParseResult<'a, f64> {
+    let (pref, suff) = tuple((parse_uinteger(10), parse_suffix))(input)?;
+    //let number = f64::from_str(format!("{}e{}", pref, suff))
+}
+
+fn parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    map_res(many1(_parse_digits(radix)), move |digits| {
         let s: String = digits.into_iter().collect();
         match BigInt::parse_bytes(s.as_bytes(), radix as u32) {
             None => Err(anyhow!("Can't parse integer with base {}", radix)),
-            Some(v) => Ok(v),
+            Some(v) => Ok(RealNumber::Fixnum(v)),
         }
     })
 }
 
-fn digit_parser<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, Vec<char>> {
+fn _parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, char> {
     let digits = match radix {
         2 => "01",
         8 => "01234567",
@@ -74,57 +128,29 @@ fn digit_parser<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, Vec<c
         _ => "0123456789",
     };
 
-    many1(one_of(digits))
+    one_of(digits)
 }
+// returns the exponent if present
+fn parse_suffix<'a>(input: Input<'a>) -> ParseResult<'a, Option<i64>> {
+    let (s, result) = opt(tuple((char('e'), parse_sign, many1(_parse_digits(10)))))(input)?;
 
-fn parse_integer_2<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
-    let binary_digits = many1(one_of("01"));
-
-    map_res(binary_digits, move |digits| {
-        let s: String = digits.into_iter().collect();
-        match BigInt::parse_bytes(s.as_bytes(), 2) {
-            None => Err(anyhow!("Can't parse integer with base 2")),
-            Some(v) => Ok(v),
+    match result {
+        Some((_, sign, digits)) => {
+            let s: String = digits.into_iter().collect();
+            let exp = s.parse::<i64>().or(Err(anyhow!("Can't parse number")))?;
+            let signed_exp = match sign {
+                Sign::Minus => exp * -1,
+                _ => exp,
+            };
+            Ok((s, Some(signed_exp)))
         }
-    })(input)
+        None => Ok((s, None)),
+    }
 }
 
-fn parse_integer_8<'a>(input: Input<'a>) -> ParseResult<'a, BigInt> {
-    let binary_digits = many1(one_of("01234567"));
-
-    map_res(binary_digits, move |digits| {
-        let s: String = digits.into_iter().collect();
-        match BigInt::parse_bytes(s.as_bytes(), 8) {
-            None => Err(anyhow!("Can't parse integer with base 8")),
-            Some(v) => Ok(v),
-        }
-    })(input)
-}
-
-pub struct Prefix {
+struct Prefix {
     radix: u8,
     exactness: Option<Exactness>,
-}
-
-#[derive(Clone)]
-pub enum Exactness {
-    Inexact,
-    Exact,
-}
-
-#[derive(Clone, PartialEq)]
-pub enum Sign {
-    Plus,
-    Minus,
-}
-
-impl Sign {
-    pub fn apply(&self, v: BigInt) -> BigInt {
-        match self {
-            Self::Plus => v,
-            Self::Minus => v * -1,
-        }
-    }
 }
 
 fn parse_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Prefix> {
@@ -156,11 +182,13 @@ fn parse_exactness<'a>(input: Input<'a>) -> ParseResult<'a, Option<Exactness>> {
     )))(input)
 }
 
-pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Option<Sign>> {
-    opt(alt((
+pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Sign> {
+    let (s, sign) = opt(alt((
         value(Sign::Plus, char('+')),
         value(Sign::Minus, char('-')),
-    )))(input)
+    )))(input)?;
+
+    Ok((s, sign.unwrap_or(Sign::Plus)))
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::sexp;
-use crate::vm::value::number::Number;
+use crate::vm::value::number::{Number, RealNumber};
 use crate::vm::value::procedure;
 use crate::vm::value::{Factory, Value};
 use std::collections::HashSet;
@@ -56,8 +56,8 @@ impl Writer {
 
     fn write_number(&self, num: &Number) -> String {
         match num {
-            Number::FixNum(v) => format!("{}", v),
-            Number::Integer(n) => format!("{}", n),
+            Number::Real(RealNumber::Fixnum(v)) => format!("{}", v),
+            Number::Real(RealNumber::Flonum(v)) => format!("{}", v),
         }
     }
 

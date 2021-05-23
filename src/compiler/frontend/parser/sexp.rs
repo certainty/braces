@@ -22,6 +22,8 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
 
+// See https://matklad.github.io/2018/06/06/modern-parser-generator.html for error recovery strategies
+
 // TODO: Better error reporting strategy
 // Every parser that returns a datum is a good candidate to be on a boundary
 // for better errors. We should create a meaningful error if these parser fail
