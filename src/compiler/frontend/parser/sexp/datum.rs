@@ -90,8 +90,8 @@ impl Sexp {
         Sexp::Number(Number::Real(val))
     }
 
-    pub fn rational(nom: BigInt, denom: BigInt) -> Self {
-        Self::real(RealNumber::Rational(num::BigRational::from((nom, denom))))
+    pub fn rational(numer: BigInt, denom: BigInt) -> Self {
+        Self::real(RealNumber::Rational(num::BigRational::from((numer, denom))))
     }
 
     pub fn list<I>(elements: I) -> Self

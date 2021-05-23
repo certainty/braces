@@ -2,6 +2,7 @@ use super::datum::Sexp;
 use super::datum::{Datum, RealNumber};
 use super::datum::{Exactness, Sign};
 use super::map_datum;
+use bigdecimal::BigDecimal;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::one_of;
@@ -108,7 +109,7 @@ where
 fn parse_rational<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
     map(
         tuple((parse_digits(radix), char('/'), parse_digits(radix))),
-        |(nom, _, denom)| RealNumber::Rational(num::BigRational::from((nom, denom))),
+        |(numer, _, denom)| RealNumber::Rational(num::BigRational::from((numer, denom))),
     )
 }
 
@@ -242,6 +243,7 @@ pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Sign> {
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::sexp::tests::*;
+    use num::BigRational;
 
     #[test]
     fn parse_integer_10() {
