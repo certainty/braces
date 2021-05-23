@@ -31,9 +31,11 @@ pub enum Number {
 #[derive(Debug, PartialEq, Clone)]
 pub enum RealNumber {
     Fixnum(BigInt),
+    // Should flonum be Rational as Well?
+    // Should we even support flonums here? (Rationals are flonums)
+    // and on the datum level we don't have machine sized types anyway
     Flonum(f64),
-    //Flonum(),
-    //Rational(num::BigRational),
+    Rational(num::BigRational),
 }
 
 impl RealNumber {
@@ -86,6 +88,10 @@ impl Sexp {
 
     pub fn real(val: RealNumber) -> Self {
         Sexp::Number(Number::Real(val))
+    }
+
+    pub fn rational(nom: BigInt, denom: BigInt) -> Self {
+        Self::real(RealNumber::Rational(num::BigRational::from((nom, denom))))
     }
 
     pub fn list<I>(elements: I) -> Self

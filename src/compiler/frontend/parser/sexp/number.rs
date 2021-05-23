@@ -64,7 +64,7 @@ fn parse_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNum
 }
 
 fn parse_signed_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    let ureal = alt((parse_decimal, parse_uinteger(radix)));
+    let ureal = alt((parse_decimal, parse_rational(radix), parse_uinteger(radix)));
     let signed_ureal = tuple((parse_sign, ureal));
 
     map(signed_ureal, |result: (Sign, RealNumber)| {
@@ -86,7 +86,7 @@ fn parse_inf_nan<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
 
 // <uinteger R> -> <digit R>+
 fn parse_uinteger<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    parse_digits(radix)
+    map(parse_digits(radix), RealNumber::Fixnum)
 }
 
 fn _parse_u64<'a, P>(digits: P) -> impl FnMut(Input<'a>) -> ParseResult<'a, u64>
@@ -101,6 +101,15 @@ where
             nums.parse::<u64>().expect("Parsing u64 can't fail")
         }
     })
+}
+
+// <rational R> -> <uinteger R> / <uinteger R>
+
+fn parse_rational<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    map(
+        tuple((parse_digits(radix), char('/'), parse_digits(radix))),
+        |(nom, _, denom)| RealNumber::Rational(num::BigRational::from((nom, denom))),
+    )
 }
 
 // decimal ->
@@ -150,12 +159,11 @@ fn apply_exponent(num: f64, exp: Option<i32>) -> f64 {
     }
 }
 
-fn parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+fn parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
     map(many1(_parse_digits(radix)), move |digits| {
         let digits: String = digits.into_iter().collect();
-        let num = BigInt::parse_bytes(digits.as_bytes(), radix as u32)
-            .expect("BigInt parse digits can't fail");
-        RealNumber::Fixnum(num)
+        BigInt::parse_bytes(digits.as_bytes(), radix as u32)
+            .expect("BigInt parse digits can't fail")
     })
 }
 
@@ -272,5 +280,14 @@ mod tests {
         assert_parse_as("-135.3", Sexp::flonum(-135.3));
         assert_parse_as("1.3e2", Sexp::flonum(130.0));
         assert_parse_ok("1.3e-1")
+    }
+
+    #[test]
+    fn parse_rational() {
+        assert_parse_as("3/4", Sexp::rational(BigInt::from(3), BigInt::from(4)));
+        assert_parse_as(
+            "#b111/100",
+            Sexp::rational(BigInt::from(7), BigInt::from(4)),
+        );
     }
 }
