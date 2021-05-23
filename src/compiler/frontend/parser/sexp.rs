@@ -57,8 +57,7 @@ pub fn parse_sequence<'a, T: Source>(source: &'a mut T) -> Result<Vec<Datum>> {
 }
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
-    let datum = context("datum", alt((parse_simple_datum, parse_compound_datum)));
-
+    let datum = context("datum", alt((parse_compound_datum, parse_simple_datum)));
     preceded(whitespace::parse_inter_token_space, datum)(input)
 }
 

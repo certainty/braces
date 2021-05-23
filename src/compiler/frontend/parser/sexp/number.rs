@@ -89,10 +89,17 @@ fn parse_uinteger<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, Rea
     parse_digits(radix)
 }
 
-fn _parse_u64<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, u64> {
-    map(many1(_parse_digits(radix)), move |num| {
-        let nums: String = num.into_iter().collect();
-        nums.parse::<u64>().expect("Parsing u64 can't fail")
+fn _parse_u64<'a, P>(digits: P) -> impl FnMut(Input<'a>) -> ParseResult<'a, u64>
+where
+    P: FnMut(Input<'a>) -> ParseResult<'a, Vec<char>>,
+{
+    map(digits, move |num| {
+        if num.len() == 0 {
+            0
+        } else {
+            let nums: String = num.into_iter().collect();
+            nums.parse::<u64>().expect("Parsing u64 can't fail")
+        }
     })
 }
 
@@ -102,20 +109,38 @@ fn _parse_u64<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, u64> {
 //   <digit 10>+ . <digit 10>* suffix
 
 fn parse_decimal<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
+    map(alt((parse_decimal_short, parse_decimal_full)), |num| {
+        RealNumber::Flonum(num)
+    })(input)
+}
+
+fn parse_decimal_full<'a>(input: Input<'a>) -> ParseResult<'a, f64> {
     let (s, (pref, _, decimal_places, exp)) = tuple((
-        opt(_parse_u64(10)),
+        _parse_u64(many1(_parse_digits(10))),
         char('.'),
-        opt(_parse_u64(10)),
+        _parse_u64(many0(_parse_digits(10))),
         parse_suffix,
     ))(input)?;
 
-    let pref = pref.unwrap_or(0);
-    let decimal_p = decimal_places.unwrap_or(0);
-    let decimal = format!("{}.{}", pref, decimal_p)
+    let decimal = format!("{}.{}", pref, decimal_places)
         .parse::<f64>()
         .expect("Parse f64 can't fail");
 
-    Ok((s, RealNumber::Flonum(apply_exponent(decimal, exp))))
+    Ok((s, apply_exponent(decimal, exp)))
+}
+
+fn parse_decimal_short<'a>(input: Input<'a>) -> ParseResult<'a, f64> {
+    let (s, (_, decimal_places, exp)) = tuple((
+        char('.'),
+        _parse_u64(many1(_parse_digits(10))),
+        parse_suffix,
+    ))(input)?;
+
+    let decimal = format!("0.{}", decimal_places)
+        .parse::<f64>()
+        .expect("Parse f64 can't fail");
+
+    Ok((s, apply_exponent(decimal, exp)))
 }
 
 fn apply_exponent(num: f64, exp: Option<i32>) -> f64 {
@@ -239,5 +264,13 @@ mod tests {
         assert_parse_as(".3", Sexp::flonum(0.3));
         assert_parse_as(".3e1", Sexp::flonum(3.0));
         assert_parse_ok(".3e-1")
+    }
+
+    #[test]
+    fn parse_decimal() {
+        assert_parse_as("135.3", Sexp::flonum(135.3));
+        assert_parse_as("-135.3", Sexp::flonum(-135.3));
+        assert_parse_as("1.3e2", Sexp::flonum(130.0));
+        assert_parse_ok("1.3e-1")
     }
 }
