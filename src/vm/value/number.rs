@@ -1,6 +1,9 @@
 use super::equality::SchemeEqual;
+use super::error::{self, RuntimeError};
+use num::traits::float::{Float, FloatCore};
 use num::BigInt;
 use num::BigRational;
+use std::cmp::{Ord, Ordering};
 use std::ops::Neg;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -27,6 +30,23 @@ pub trait SchemeNumber {
     fn is_infinite(&self) -> bool;
     fn is_neg_infinite(&self) -> bool;
     fn is_nan(&self) -> bool;
+}
+
+type ArithResult<T> = std::result::Result<T, RuntimeError>;
+
+pub trait SchemeNumberArith {
+    fn abs(&self) -> ArithResult<Number>;
+    fn neg(&self) -> ArithResult<Number>;
+    fn plus(&self, other: Number) -> ArithResult<Number>;
+    fn minus(&self, other: Number) -> ArithResult<Number>;
+    fn mul(&self, other: Number) -> ArithResult<Number>;
+    fn div(&self, other: Number) -> ArithResult<Number>;
+    fn modulo(&self, other: Number) -> ArithResult<Number>;
+}
+
+pub trait SchemeNumberExactness {
+    fn to_inexact(&self) -> ArithResult<Flonum>;
+    fn to_exact(&self) -> ArithResult<Number>;
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -62,25 +82,44 @@ macro_rules! with_realnum {
     };
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Flonum {
-    //    Big(BigDecimal),
-    F32(f32),
-    F64(f64),
+impl SchemeNumberExactness for RealNumber {
+    fn to_inexact(&self) -> ArithResult<Flonum> {
+        with_realnum!(self, n, n.to_inexact())
+    }
+
+    fn to_exact(&self) -> ArithResult<Number> {
+        with_realnum!(self, n, n.to_exact())
+    }
 }
 
-impl Flonum {
-    pub fn infinity() -> Self {
-        Flonum::F64(f64::INFINITY)
+impl SchemeNumberExactness for BigRational {
+    fn to_inexact(&self) -> ArithResult<Flonum> {
+        // TODO: implement this
+        Err(error::arithmetic_error(
+            "Can't create inexact value from rational",
+        ))
     }
 
-    pub fn neg_infinity() -> Self {
-        Flonum::F64(f64::NEG_INFINITY)
+    fn to_exact(&self) -> ArithResult<Rational> {
+        Ok(Number::Real(RealNumber::Rational(self.clone())))
     }
+}
 
-    pub fn nan() -> Self {
-        Flonum::F64(f64::NAN)
+impl RealNumber {
+    pub fn lt(&self, other: Self) -> bool {
+        match (self, other) {
+            (Self::Fixnum(lhs), Self::Fixnum(rhs)) => lhs.lt(rhs),
+            (Self::Fixnum(lhs), Self::Flonum(rhs)) => lhs.to_inexact().unwrap().lt(rhs),
+            (Self::Flonum(lhs), Self::Flonum(rhs)) => lhs.cmp(rhs),
+            (Self::Rational(lhs), Self::Rational(rhs)) => lhs.cmp(rhs),
+        }
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Flonum {
+    F32(f32),
+    F64(f64),
 }
 
 macro_rules! map_flonum {
@@ -101,6 +140,41 @@ macro_rules! with_flonum {
     };
 }
 
+impl Flonum {
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            Self::F32(x) => *x as f64,
+            Self::F64(x) => *x,
+        }
+    }
+
+    pub fn infinity() -> Self {
+        Flonum::F64(f64::INFINITY)
+    }
+
+    pub fn neg_infinity() -> Self {
+        Flonum::F64(f64::NEG_INFINITY)
+    }
+
+    pub fn nan() -> Self {
+        Flonum::F64(f64::NAN)
+    }
+}
+
+impl SchemeNumberExactness for Flonum {
+    fn to_inexact(&self) -> ArithResult<Flonum> {
+        Ok(self.clone())
+    }
+
+    fn to_exact(&self) -> ArithResult<Number> {
+        if let Some(r) = BigRational::from_float(self.as_f64()) {
+            Ok(Number::Real(RealNumber::Rational(r)))
+        } else {
+            Err(error::arithmetic_error("Can't convert into exact number"))
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Fixnum {
     Big(BigInt),
@@ -108,6 +182,36 @@ pub enum Fixnum {
     I16(i16),
     I32(i32),
     I64(i64),
+}
+
+impl SchemeNumberExactness for Fixnum {
+    fn to_inexact(&self) -> ArithResult<Flonum> {
+        match self {
+            Self::Big(n) => Err(error::arithmetic_error(
+                "Can't create inexact value of non-machine sized int",
+            )),
+            Self::I8(n) => Ok(Flonum::F32(*n as f32)),
+            Self::I16(n) => Ok(Flonum::F32(*n as f32)),
+            Self::I32(n) => Ok(Flonum::F64(*n as f64)),
+            Self::I64(n) => Ok(Flonum::F64(*n as f64)),
+        }
+    }
+
+    fn to_exact(&self) -> ArithResult<Number> {
+        Ok(Number::Real(RealNumber::Fixnum(self.clone())))
+    }
+}
+
+impl Fixnum {
+    pub fn as_big(&self) -> BigInt {
+        match self {
+            Self::Big(n) => n.clone(),
+            Self::I8(n) => BigInt::from(*n),
+            Self::I16(n) => BigInt::from(*n),
+            Self::I32(n) => BigInt::from(*n),
+            Self::I64(n) => BigInt::from(*n),
+        }
+    }
 }
 
 macro_rules! with_fixnum {
@@ -135,6 +239,13 @@ macro_rules! map_fixnum {
 }
 
 impl Number {
+    pub fn cmp(&self, other: Self) -> Ordering {
+        match (self, other) {
+            (Self::Real(lhs), Self::Real(rhs)) => lhs.cmp(rhs),
+        }
+    }
+
+    // Value constructors
     pub fn inifinity() -> Self {
         Self::Real(RealNumber::Flonum(Flonum::infinity()))
     }
@@ -237,10 +348,73 @@ impl<I: Into<RealNumber>> From<I> for Number {
     }
 }
 
+impl SchemeEqual<Fixnum> for Fixnum {
+    fn is_eq(&self, other: &Fixnum) -> bool {
+        match (self, other) {
+            (Fixnum::Big(x), Fixnum::Big(y)) => x == y,
+
+            (Fixnum::Big(x), Fixnum::I8(y)) => *x == BigInt::from(*y),
+            (Fixnum::Big(x), Fixnum::I16(y)) => *x == BigInt::from(*y),
+            (Fixnum::Big(x), Fixnum::I32(y)) => *x == BigInt::from(*y),
+            (Fixnum::Big(x), Fixnum::I64(y)) => *x == BigInt::from(*y),
+
+            (Fixnum::I8(x), Fixnum::I8(y)) => x == y,
+            (Fixnum::I8(x), Fixnum::I16(y)) => (*x as i16) == *y,
+            (Fixnum::I8(x), Fixnum::I32(y)) => (*x as i32) == *y,
+            (Fixnum::I8(x), Fixnum::I64(y)) => (*x as i64) == *y,
+
+            (Fixnum::I16(x), Fixnum::I16(y)) => x == y,
+            (Fixnum::I16(x), Fixnum::I8(y)) => *x == (*y as i16),
+            (Fixnum::I16(x), Fixnum::I32(y)) => (*x as i32) == *y,
+            (Fixnum::I16(x), Fixnum::I64(y)) => (*x as i64) == *y,
+
+            (Fixnum::I32(x), Fixnum::I32(y)) => x == y,
+            (Fixnum::I32(x), Fixnum::I8(y)) => *x == (*y as i32),
+            (Fixnum::I32(x), Fixnum::I16(y)) => *x == (*y as i32),
+            (Fixnum::I32(x), Fixnum::I64(y)) => (*x as i64) == *y,
+
+            (Fixnum::I64(x), Fixnum::I64(y)) => x == y,
+            (Fixnum::I64(x), Fixnum::I8(y)) => *x == (*y as i64),
+            (Fixnum::I64(x), Fixnum::I16(y)) => *x == (*y as i64),
+            (Fixnum::I64(x), Fixnum::I32(y)) => *x == (*y as i64),
+            _ => other.is_eq(self),
+        }
+    }
+
+    fn is_eqv(&self, other: &Fixnum) -> bool {
+        self.is_eq(other)
+    }
+
+    fn is_equal(&self, other: &Fixnum) -> bool {
+        self.is_eq(other)
+    }
+}
+
+impl SchemeEqual<Flonum> for Flonum {
+    fn is_eq(&self, other: &Flonum) -> bool {
+        match (self, other) {
+            (Flonum::F64(x), Flonum::F64(y)) => x == y,
+            (Flonum::F32(x), Flonum::F32(y)) => x == y,
+            (Flonum::F64(x), Flonum::F32(y)) => *x == (*y as f64),
+            _ => other.is_eq(self),
+        }
+    }
+
+    fn is_eqv(&self, other: &Flonum) -> bool {
+        self.is_eq(other)
+    }
+
+    fn is_equal(&self, other: &Flonum) -> bool {
+        self.is_eq(other)
+    }
+}
+
 impl SchemeEqual<RealNumber> for RealNumber {
     fn is_eq(&self, other: &RealNumber) -> bool {
         match (self, other) {
-            (RealNumber::Fixnum(lhs), RealNumber::Fixnum(rhs)) => lhs == rhs,
+            (RealNumber::Fixnum(lhs), RealNumber::Fixnum(rhs)) => lhs.is_eq(rhs),
+            (RealNumber::Flonum(lhs), RealNumber::Flonum(rhs)) => lhs.is_eq(rhs),
+            (RealNumber::Rational(lhs), RealNumber::Rational(rhs)) => lhs == rhs,
             _ => false,
         }
     }

@@ -26,11 +26,11 @@ pub fn register(vm: &mut VM) {
     super::register_core!(vm, "nan?", nan_p, Arity::Exactly(1));
     super::register_core!(vm, "finite?", finite_p, Arity::Exactly(1));
     super::register_core!(vm, "infinite?", inf_p, Arity::Exactly(1));
+    super::register_core!(vm, "exact?", exact_p, Arity::Exactly(1));
+    super::register_core!(vm, "inexact?", exact_p, Arity::Exactly(1));
 }
 
 // R7RS 6.2.6 Numerical operations
-
-define_predicate!(complex_p, n, n.is_complex());
 
 fn number_p(args: Vec<Value>) -> FunctionResult<Value> {
     match unary_procedure(&args)? {
@@ -39,62 +39,15 @@ fn number_p(args: Vec<Value>) -> FunctionResult<Value> {
     }
 }
 
-/*
-fn complex_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_complex())),
-        _ => Ok(Value::Bool(false)),
-    }
-}*/
-
-fn real_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_real())),
-        _ => Ok(Value::Bool(false)),
-    }
-}
-
-fn rational_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_rational())),
-        _ => Ok(Value::Bool(false)),
-    }
-}
-
-fn integer_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_integer())),
-        _ => Ok(Value::Bool(false)),
-    }
-}
-
-fn nan_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_nan())),
-        _ => Ok(Value::Bool(false)),
-    }
-}
-
-fn inf_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_infinite())),
-        _ => Ok(Value::Bool(false)),
-    }
-}
-
-fn finite_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_finite())),
-        _ => Ok(Value::Bool(false)),
-    }
-}
-
-fn exact_p(args: Vec<Value>) -> FunctionResult<Value> {
-    match unary_procedure(&args)? {
-        Value::Number(n) => Ok(Value::Bool(n.is_exact())),
-        _ => Ok(Value::Bool(false)),
-    }
-}
+define_predicate!(complex_p, n, n.is_complex());
+define_predicate!(real_p, n, n.is_real());
+define_predicate!(rational_p, n, n.is_rational());
+define_predicate!(integer_p, n, n.is_integer());
+define_predicate!(nan_p, n, n.is_nan());
+define_predicate!(inf_p, n, n.is_infinite());
+define_predicate!(finite_p, n, n.is_finite());
+define_predicate!(exact_p, n, n.is_exact());
+define_predicate!(inexact_p, n, n.is_inexact());
 
 /*
 

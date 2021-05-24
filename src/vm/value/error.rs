@@ -12,6 +12,12 @@ pub enum RuntimeError {
     ArgumentError(String),
     #[error("AppplicationError: `{0:?}` is not callable")]
     NoncallableError(Value),
+    #[error("ArithmeticError: `{0}`")]
+    ArithmeticError(String),
+}
+
+pub fn arithmetic_error<T: Into<String>>(msg: T) -> RuntimeError {
+    RuntimeError::ArithmeticError(msg.into())
 }
 
 pub fn arity_mismatch(arity: Arity, arg_count: usize) -> RuntimeError {
