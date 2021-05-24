@@ -3,12 +3,13 @@ use num::BigInt;
 use num::BigRational;
 use std::ops::Neg;
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Exactness {
     Inexact,
     Exact,
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub enum Sign {
     Plus,
     Minus,
@@ -24,6 +25,7 @@ pub trait SchemeNumber {
     fn is_complex(&self) -> bool;
     fn is_finite(&self) -> bool;
     fn is_infinite(&self) -> bool;
+    fn is_neg_infinite(&self) -> bool;
     fn is_nan(&self) -> bool;
 }
 
@@ -38,6 +40,26 @@ pub enum RealNumber {
     Fixnum(Fixnum),
     Flonum(Flonum),
     Rational(BigRational),
+}
+
+macro_rules! map_realnum {
+    ($value:expr, $binding:ident, $op:expr) => {
+        match $value {
+            RealNumber::Fixnum($binding) => RealNumber::Fixnum($op),
+            RealNumber::Flonum($binding) => RealNumber::Flonum($op),
+            RealNumber::Rational($binding) => RealNumber::Rational($op),
+        }
+    };
+}
+
+macro_rules! with_realnum {
+    ($value:expr, $binding:ident, $op:expr) => {
+        match $value {
+            RealNumber::Fixnum($binding) => $op,
+            RealNumber::Flonum($binding) => $op,
+            RealNumber::Rational($binding) => $op,
+        }
+    };
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -64,8 +86,17 @@ impl Flonum {
 macro_rules! map_flonum {
     ($value:expr, $binding:ident, $op:expr) => {
         match $value {
-            Fixnum::F32($binding) => Fixnum::F32($op),
-            Fixnum::F64($binding) => Fixnum::F64($op),
+            Flonum::F32($binding) => Flonum::F32($op),
+            Flonum::F64($binding) => Flonum::F64($op),
+        }
+    };
+}
+
+macro_rules! with_flonum {
+    ($value:expr, $binding:ident, $op:expr) => {
+        match $value {
+            Flonum::F32($binding) => $op,
+            Flonum::F64($binding) => $op,
         }
     };
 }
@@ -77,6 +108,18 @@ pub enum Fixnum {
     I16(i16),
     I32(i32),
     I64(i64),
+}
+
+macro_rules! with_fixnum {
+    ($value:expr, $binding:ident, $op:expr) => {
+        match $value {
+            Fixnum::Big($binding) => $op,
+            Fixnum::I8($binding) => $op,
+            Fixnum::I16($binding) => $op,
+            Fixnum::I32($binding) => $op,
+            Fixnum::I64($binding) => $op,
+        }
+    };
 }
 
 macro_rules! map_fixnum {
@@ -266,6 +309,9 @@ impl SchemeNumber for Fixnum {
     fn is_nan(&self) -> bool {
         false
     }
+    fn is_neg_infinite(&self) -> bool {
+        false
+    }
 }
 
 impl SchemeNumber for Flonum {
@@ -296,23 +342,21 @@ impl SchemeNumber for Flonum {
         false
     }
     fn is_finite(&self) -> bool {
-        match self {
-            Flonum::F32(n) => n.is_finite(),
-            Flonum::F64(n) => n.is_finite(),
-        }
+        with_flonum!(self, n, n.is_finite())
     }
 
     fn is_infinite(&self) -> bool {
-        match self {
-            Flonum::F32(n) => n.is_infinite(),
-            Flonum::F64(n) => n.is_infinite(),
-        }
+        with_flonum!(self, n, n.is_infinite())
     }
 
     fn is_nan(&self) -> bool {
-        match self {
-            Flonum::F32(n) => n.is_nan(),
-            Flonum::F64(n) => n.is_nan(),
+        with_flonum!(self, n, n.is_nan())
+    }
+    fn is_neg_infinite(&self) -> bool {
+        if self.is_infinite() {
+            with_flonum!(self, n, n.is_sign_negative())
+        } else {
+            false
         }
     }
 }
@@ -355,28 +399,20 @@ impl SchemeNumber for BigRational {
     fn is_nan(&self) -> bool {
         false
     }
+    fn is_neg_infinite(&self) -> bool {
+        false
+    }
 }
 
 impl SchemeNumber for RealNumber {
     fn sign(self, sign: Sign) -> Self {
-        if let Sign::Minus = sign {
-            match self {
-                RealNumber::Flonum(n) => n.is_exact(),
-                RealNumber::Fixnum(n) => n.is_exact(),
-                RealNumber::Rational(n) => n.is_exact(),
-            }
-        } else {
-            self
-        }
+        map_realnum!(self, n, n.sign(sign))
     }
 
     fn is_exact(&self) -> bool {
-        match self {
-            RealNumber::Flonum(n) => n.is_exact(),
-            RealNumber::Fixnum(n) => n.is_exact(),
-            RealNumber::Rational(n) => n.is_exact(),
-        }
+        with_realnum!(self, n, n.is_exact())
     }
+
     fn is_inexact(&self) -> bool {
         !self.is_exact()
     }
@@ -400,31 +436,28 @@ impl SchemeNumber for RealNumber {
         false
     }
     fn is_finite(&self) -> bool {
-        match self {
-            RealNumber::Flonum(n) => n.is_finite(),
-            RealNumber::Fixnum(n) => n.is_finite(),
-            RealNumber::Rational(n) => n.is_finite(),
-        }
+        with_realnum!(self, n, n.is_finite())
     }
 
     fn is_infinite(&self) -> bool {
-        match self {
-            RealNumber::Flonum(n) => n.is_infinite(),
-            RealNumber::Fixnum(n) => n.is_infinite(),
-            RealNumber::Rational(n) => n.is_infinite(),
-        }
+        with_realnum!(self, n, n.is_infinite())
     }
 
     fn is_nan(&self) -> bool {
-        match self {
-            RealNumber::Flonum(n) => n.is_nan(),
-            RealNumber::Fixnum(n) => n.is_nan(),
-            RealNumber::Rational(n) => n.is_nan(),
-        }
+        with_realnum!(self, n, n.is_nan())
+    }
+    fn is_neg_infinite(&self) -> bool {
+        with_realnum!(self, n, n.is_neg_infinite())
     }
 }
 
 impl SchemeNumber for Number {
+    fn sign(self, sign: Sign) -> Self {
+        match self {
+            Self::Real(n) => Self::Real(n.sign(sign)),
+        }
+    }
+
     fn is_exact(&self) -> bool {
         match self {
             Self::Real(n) => n.is_exact(),
@@ -471,7 +504,14 @@ impl SchemeNumber for Number {
             Self::Real(n) => n.is_nan(),
         }
     }
+    fn is_neg_infinite(&self) -> bool {
+        match self {
+            Self::Real(n) => n.is_neg_infinite(),
+        }
+    }
 }
+
+// implement SchemeEqual
 
 #[cfg(test)]
 mod tests {

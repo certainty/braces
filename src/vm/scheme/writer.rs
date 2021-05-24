@@ -1,5 +1,7 @@
 use crate::compiler::frontend::parser::sexp;
-use crate::vm::value::number::{Number, RealNumber};
+use crate::vm::value::number::Fixnum;
+use crate::vm::value::number::Flonum;
+use crate::vm::value::number::{Number, RealNumber, SchemeNumber};
 use crate::vm::value::procedure;
 use crate::vm::value::{Factory, Value};
 use std::collections::HashSet;
@@ -56,9 +58,29 @@ impl Writer {
 
     fn write_number(&self, num: &Number) -> String {
         match num {
-            Number::Real(RealNumber::Fixnum(v)) => format!("{}", v),
-            Number::Real(RealNumber::Flonum(v)) => format!("{}", v),
+            Number::Real(RealNumber::Fixnum(v)) => self.write_fixnum(v),
+            Number::Real(RealNumber::Flonum(v)) => self.write_flonum(v),
             Number::Real(RealNumber::Rational(v)) => format!("{}", v),
+        }
+    }
+
+    fn write_flonum(&self, num: &Flonum) -> String {
+        match num {
+            n if n.is_nan() => String::from("+nan.0"),
+            n if n.is_neg_infinite() => String::from("-inf.0"),
+            n if n.is_infinite() => String::from("+inf.0"),
+            Flonum::F32(n) => format!("{}", n),
+            Flonum::F64(n) => format!("{}", n),
+        }
+    }
+
+    fn write_fixnum(&self, num: &Fixnum) -> String {
+        match num {
+            Fixnum::Big(n) => format!("{}", n),
+            Fixnum::I8(n) => format!("{}", n),
+            Fixnum::I16(n) => format!("{}", n),
+            Fixnum::I32(n) => format!("{}", n),
+            Fixnum::I64(n) => format!("{}", n),
         }
     }
 

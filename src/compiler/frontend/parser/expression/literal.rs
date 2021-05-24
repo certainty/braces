@@ -63,7 +63,7 @@ mod tests {
 
         assert_parse_as(
             "123",
-            Expression::constant(make_datum(Sexp::fixnum(BigInt::from(123)), 1, 1)),
+            Expression::constant(make_datum(Sexp::number(BigInt::from(123)), 1, 1)),
         );
     }
 }

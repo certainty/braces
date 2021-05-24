@@ -1,8 +1,7 @@
 use super::datum::Datum;
 use super::datum::Sexp;
-use super::datum::{Exactness, Sign};
 use super::map_datum;
-use crate::vm::value::number::{Fixnum, Flonum, Number, RealNumber};
+use crate::vm::value::number::{Exactness, Fixnum, Flonum, Number, RealNumber, SchemeNumber, Sign};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::one_of;
@@ -69,7 +68,7 @@ fn parse_signed_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, 
     let signed_ureal = tuple((parse_sign, ureal));
 
     map(signed_ureal, |result: (Sign, RealNumber)| {
-        result.1.sign(&result.0)
+        result.1.sign(result.0)
     })
 }
 
@@ -84,7 +83,7 @@ fn parse_inf_nan<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
 
 // <uinteger R> -> <digit R>+
 fn parse_uinteger<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    map(parse_digits(radix), RealNumber::Fixnum)
+    map(parse_digits(radix), RealNumber::from)
 }
 
 fn _parse_u64<'a, P>(digits: P) -> impl FnMut(Input<'a>) -> ParseResult<'a, u64>
@@ -117,7 +116,7 @@ fn parse_rational<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, Rea
 
 fn parse_decimal<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
     map(alt((parse_decimal_short, parse_decimal_full)), |num| {
-        RealNumber::Flonum(num)
+        RealNumber::Flonum(Flonum::from(num))
     })(input)
 }
 
@@ -240,53 +239,55 @@ pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Sign> {
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::sexp::tests::*;
-    use num::BigRational;
 
     #[test]
     fn parse_integer_10() {
-        assert_parse_as("0", Sexp::fixnum(BigInt::from(0)));
-        assert_parse_as("10", Sexp::fixnum(BigInt::from(10)));
-        assert_parse_as("#d10", Sexp::fixnum(BigInt::from(10)));
-        assert_parse_as("#e#d10", Sexp::fixnum(BigInt::from(10)));
-        assert_parse_as("23434", Sexp::fixnum(BigInt::from(23434)));
-        assert_parse_as("-23434", Sexp::fixnum(BigInt::from(-23434)));
+        assert_parse_as("0", Sexp::number(BigInt::from(0)));
+        assert_parse_as("10", Sexp::number(BigInt::from(10)));
+        assert_parse_as("#d10", Sexp::number(BigInt::from(10)));
+        assert_parse_as("#e#d10", Sexp::number(BigInt::from(10)));
+        assert_parse_as("23434", Sexp::number(BigInt::from(23434)));
+        assert_parse_as("-23434", Sexp::number(BigInt::from(-23434)));
     }
 
     #[test]
     fn parse_integer_2() {
-        assert_parse_as("#b0", Sexp::fixnum(BigInt::from(0)));
-        assert_parse_as("#b01011", Sexp::fixnum(BigInt::from(11)));
+        assert_parse_as("#b0", Sexp::number(BigInt::from(0)));
+        assert_parse_as("#b01011", Sexp::number(BigInt::from(11)));
     }
 
     #[test]
     fn parse_integer_8() {
-        assert_parse_as("#o777", Sexp::fixnum(BigInt::from(511)));
-        assert_parse_as("#o0775", Sexp::fixnum(BigInt::from(509)));
+        assert_parse_as("#o777", Sexp::number(BigInt::from(511)));
+        assert_parse_as("#o0775", Sexp::number(BigInt::from(509)));
 
         //assert_parse_error("#o8989")
     }
 
     #[test]
     fn parse_decimal_short() {
-        assert_parse_as(".3", Sexp::flonum(0.3));
-        assert_parse_as(".3e1", Sexp::flonum(3.0));
+        assert_parse_as(".3", Sexp::number(Number::f64(0.3)));
+        assert_parse_as(".3e1", Sexp::number(Number::f64(3.0)));
         assert_parse_ok(".3e-1")
     }
 
     #[test]
     fn parse_decimal() {
-        assert_parse_as("135.3", Sexp::flonum(135.3));
-        assert_parse_as("-135.3", Sexp::flonum(-135.3));
-        assert_parse_as("1.3e2", Sexp::flonum(130.0));
+        assert_parse_as("135.3", Sexp::number(Number::f64(135.3)));
+        assert_parse_as("-135.3", Sexp::number(Number::f64(-135.3)));
+        assert_parse_as("1.3e2", Sexp::number(Number::f64(130.0)));
         assert_parse_ok("1.3e-1")
     }
 
     #[test]
     fn parse_rational() {
-        assert_parse_as("3/4", Sexp::rational(BigInt::from(3), BigInt::from(4)));
+        assert_parse_as(
+            "3/4",
+            Sexp::number(Number::fraction(BigInt::from(3), BigInt::from(4))),
+        );
         assert_parse_as(
             "#b111/100",
-            Sexp::rational(BigInt::from(7), BigInt::from(4)),
+            Sexp::number(Number::fraction(BigInt::from(7), BigInt::from(4))),
         );
     }
 }

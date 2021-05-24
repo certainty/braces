@@ -9,10 +9,9 @@ pub mod procedure;
 pub mod string;
 pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
-use crate::compiler::frontend::parser::sexp::datum::{self, Datum, Sexp};
+use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
 use crate::vm::value::number::RealNumber;
-use num::BigInt;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::convert::Into;
@@ -221,6 +220,7 @@ impl Factory {
         Value::Closure(closure::Closure::new(v, vec![]))
     }
 
+    // TODO: decide if this should this consume datum instead
     pub fn from_datum(&mut self, d: &Datum) -> Value {
         match &d.sexp {
             Sexp::Bool(true) => self.bool_true().clone(),
@@ -232,16 +232,7 @@ impl Factory {
                 self.proper_list(elements)
             }
             Sexp::Char(c) => self.character(*c),
-            Sexp::Number(datum::Number::Real(datum::RealNumber::Fixnum(v))) => {
-                Value::Number(number::Number::Real(number::RealNumber::Fixnum(v.clone())))
-            }
-            Sexp::Number(datum::Number::Real(datum::RealNumber::Flonum(v))) => {
-                Value::Number(number::Number::Real(number::RealNumber::Flonum(v.clone())))
-            }
-            Sexp::Number(datum::Number::Real(datum::RealNumber::Rational(v))) => Value::Number(
-                number::Number::Real(number::RealNumber::Rational(v.clone())),
-            ),
-
+            Sexp::Number(num) => Value::Number(num.clone()),
             _ => todo!(),
         }
     }

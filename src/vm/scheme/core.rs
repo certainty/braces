@@ -26,7 +26,7 @@ pub fn register(vm: &mut VM) {
 
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
 
-    numbers::register(&mut vm);
+    numbers::register(vm);
     //register_core!(vm, "fx+", fx_plus, Arity::Exactly(2));
     //register_core!(vm, "fx-", fx_minus, Arity::Exactly(2));
     //register_core!(vm, "<", fx_lt, Arity::Exactly(2));
