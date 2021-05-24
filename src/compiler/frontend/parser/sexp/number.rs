@@ -1,8 +1,8 @@
+use super::datum::Datum;
 use super::datum::Sexp;
-use super::datum::{Datum, RealNumber};
 use super::datum::{Exactness, Sign};
 use super::map_datum;
-use bigdecimal::BigDecimal;
+use crate::vm::value::number::{Fixnum, Flonum, Number, RealNumber};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::one_of;
@@ -35,7 +35,7 @@ use super::ParseResult;
 pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let (s, pref) = parse_prefix(input)?;
 
-    map_datum(parse_real(pref.radix), Sexp::real)(s)
+    map_datum(parse_real(pref.radix), Sexp::number)(s)
 }
 
 //
@@ -75,13 +75,10 @@ fn parse_signed_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, 
 
 fn parse_inf_nan<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
     alt((
-        value(RealNumber::Flonum(num::Float::nan()), tag("+nan.0")),
-        value(RealNumber::Flonum(num::Float::nan()), tag("-nan.0")),
-        value(RealNumber::Flonum(num::Float::infinity()), tag("+inf.0")),
-        value(
-            RealNumber::Flonum(num::Float::neg_infinity()),
-            tag("-inf.0"),
-        ),
+        value(RealNumber::Flonum(Flonum::nan()), tag("+nan.0")),
+        value(RealNumber::Flonum(Flonum::nan()), tag("-nan.0")),
+        value(RealNumber::Flonum(Flonum::infinity()), tag("+inf.0")),
+        value(RealNumber::Flonum(Flonum::neg_infinity()), tag("-inf.0")),
     ))(input)
 }
 

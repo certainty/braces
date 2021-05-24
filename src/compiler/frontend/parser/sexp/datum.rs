@@ -1,52 +1,6 @@
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::vm::value::number;
 use num::BigInt;
-
-#[derive(Clone)]
-pub enum Exactness {
-    Inexact,
-    Exact,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum Sign {
-    Plus,
-    Minus,
-}
-
-impl Sign {
-    pub fn apply(&self, v: BigInt) -> BigInt {
-        match self {
-            Self::Plus => v,
-            Self::Minus => v * -1,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Number {
-    Real(RealNumber),
-    //Complex(num::Complex<BigInt>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum RealNumber {
-    Fixnum(BigInt),
-    // Should flonum be Rational as Well?
-    // Should we even support flonums here? (Rationals are flonums)
-    // and on the datum level we don't have machine sized types anyway
-    Flonum(f64),
-    Rational(num::BigRational),
-}
-
-impl RealNumber {
-    pub fn sign(&self, s: &Sign) -> Self {
-        match (self, s) {
-            (Self::Fixnum(n), Sign::Minus) => Self::Fixnum(n * -1),
-            (Self::Flonum(n), Sign::Minus) => Self::Flonum(n * -1.0),
-            _ => self.clone(),
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Sexp {
@@ -54,7 +8,7 @@ pub enum Sexp {
     Symbol(String),
     String(String),
     Char(char),
-    Number(Number),
+    Number(number::Number),
     List(Vec<Datum>),
     ImproperList(Vec<Datum>, Box<Datum>),
     Vector(Vec<Datum>),
@@ -78,20 +32,8 @@ impl Sexp {
         Sexp::String(val.into())
     }
 
-    pub fn fixnum(val: BigInt) -> Self {
-        Self::real(RealNumber::Fixnum(val))
-    }
-
-    pub fn flonum(val: f64) -> Self {
-        Self::real(RealNumber::Flonum(val))
-    }
-
-    pub fn real(val: RealNumber) -> Self {
-        Sexp::Number(Number::Real(val))
-    }
-
-    pub fn rational(numer: BigInt, denom: BigInt) -> Self {
-        Self::real(RealNumber::Rational(num::BigRational::from((numer, denom))))
+    pub fn number<I: Into<number::Number>>(num: I) -> Self {
+        Self::Number(num.into())
     }
 
     pub fn list<I>(elements: I) -> Self
