@@ -1,7 +1,7 @@
-use super::error::{self, RuntimeError};
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use num::BigInt;
+use std::ops::Neg;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Fixnum {
@@ -131,20 +131,20 @@ impl SchemeNumber for Fixnum {
 }
 
 impl SchemeNumberExactness for Fixnum {
-    fn to_inexact(&self) -> ArithResult<Flonum> {
+    fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
         match self {
             Self::Big(n) => Err(error::arithmetic_error(
                 "Can't create inexact value of non-machine sized int",
             )),
-            Self::I8(n) => Ok(Flonum::F32(*n as f32)),
-            Self::I16(n) => Ok(Flonum::F32(*n as f32)),
-            Self::I32(n) => Ok(Flonum::F64(*n as f64)),
-            Self::I64(n) => Ok(Flonum::F64(*n as f64)),
+            Self::I8(n) => Ok(flonum::Flonum::F32(*n as f32)),
+            Self::I16(n) => Ok(flonum::Flonum::F32(*n as f32)),
+            Self::I32(n) => Ok(flonum::Flonum::F64(*n as f64)),
+            Self::I64(n) => Ok(flonum::Flonum::F64(*n as f64)),
         }
     }
 
     fn to_exact(&self) -> ArithResult<Number> {
-        Ok(Number::Real(RealNumber::Fixnum(self.clone())))
+        Ok(Number::Real(real::RealNumber::Fixnum(self.clone())))
     }
 }
 

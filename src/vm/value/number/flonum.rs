@@ -2,6 +2,7 @@ use super::error::{self, RuntimeError};
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use num::BigRational;
+use std::ops::Neg;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Flonum {
@@ -123,7 +124,9 @@ impl SchemeNumberExactness for Flonum {
 
     fn to_exact(&self) -> ArithResult<Number> {
         if let Some(r) = BigRational::from_float(self.as_f64()) {
-            Ok(Number::Real(RealNumber::Rational(r)))
+            Ok(Number::Real(real::RealNumber::Rational(
+                rational::Rational::from(r),
+            )))
         } else {
             Err(error::arithmetic_error("Can't convert into exact number"))
         }

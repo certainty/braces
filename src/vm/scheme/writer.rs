@@ -1,7 +1,7 @@
 use crate::compiler::frontend::parser::sexp;
-use crate::vm::value::number::Fixnum;
-use crate::vm::value::number::Flonum;
-use crate::vm::value::number::{Number, RealNumber, SchemeNumber};
+use crate::vm::value::number::fixnum::Fixnum;
+use crate::vm::value::number::flonum::Flonum;
+use crate::vm::value::number::{real::RealNumber, Number, SchemeNumber};
 use crate::vm::value::procedure;
 use crate::vm::value::{Factory, Value};
 use std::collections::HashSet;
@@ -60,7 +60,7 @@ impl Writer {
         match num {
             Number::Real(RealNumber::Fixnum(v)) => self.write_fixnum(v),
             Number::Real(RealNumber::Flonum(v)) => self.write_flonum(v),
-            Number::Real(RealNumber::Rational(v)) => format!("{}", v),
+            Number::Real(RealNumber::Rational(v)) => format!("{}", v.0),
         }
     }
 

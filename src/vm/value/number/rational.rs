@@ -1,11 +1,13 @@
 use super::error::{self, RuntimeError};
+use super::real;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use num::BigRational;
+use std::ops::Neg;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq)]
-pub struct Rational(BigRational);
+pub struct Rational(pub BigRational);
 
 impl<I: Into<BigRational>> From<I> for Rational {
     fn from(n: I) -> Rational {
@@ -13,7 +15,7 @@ impl<I: Into<BigRational>> From<I> for Rational {
     }
 }
 
-impl SchemeNumberExactness for BigRational {
+impl SchemeNumberExactness for Rational {
     fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
         // TODO: implement this
         Err(error::arithmetic_error(
@@ -22,7 +24,7 @@ impl SchemeNumberExactness for BigRational {
     }
 
     fn to_exact(&self) -> ArithResult<Number> {
-        Ok(Number::Real(RealNumber::Rational(self.clone())))
+        Ok(Number::Real(real::RealNumber::Rational(self.clone())))
     }
 }
 
