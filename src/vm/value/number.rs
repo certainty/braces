@@ -1,10 +1,11 @@
 use super::equality::SchemeEqual;
 use super::error::{self, RuntimeError};
-use num::traits::float::{Float, FloatCore};
 use num::BigInt;
 use num::BigRational;
-use std::cmp::{Ord, Ordering};
 use std::ops::Neg;
+mod fixnum;
+mod flonum;
+mod rational;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Exactness {
@@ -45,7 +46,7 @@ pub trait SchemeNumberArith {
 }
 
 pub trait SchemeNumberExactness {
-    fn to_inexact(&self) -> ArithResult<Flonum>;
+    fn to_inexact(&self) -> ArithResult<flonum::Flonum>;
     fn to_exact(&self) -> ArithResult<Number>;
 }
 
@@ -57,9 +58,9 @@ pub enum Number {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum RealNumber {
-    Fixnum(Fixnum),
-    Flonum(Flonum),
-    Rational(BigRational),
+    Fixnum(fixnum::Fixnum),
+    Flonum(flonum::Flonum),
+    Rational(rational::Rational),
 }
 
 macro_rules! map_realnum {
@@ -83,7 +84,7 @@ macro_rules! with_realnum {
 }
 
 impl SchemeNumberExactness for RealNumber {
-    fn to_inexact(&self) -> ArithResult<Flonum> {
+    fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
         with_realnum!(self, n, n.to_inexact())
     }
 
@@ -93,7 +94,7 @@ impl SchemeNumberExactness for RealNumber {
 }
 
 impl SchemeNumberExactness for BigRational {
-    fn to_inexact(&self) -> ArithResult<Flonum> {
+    fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
         // TODO: implement this
         Err(error::arithmetic_error(
             "Can't create inexact value from rational",
@@ -117,146 +118,6 @@ impl RealNumber {
     }*/
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Flonum {
-    F32(f32),
-    F64(f64),
-}
-
-macro_rules! map_flonum {
-    ($value:expr, $binding:ident, $op:expr) => {
-        match $value {
-            Flonum::F32($binding) => Flonum::F32($op),
-            Flonum::F64($binding) => Flonum::F64($op),
-        }
-    };
-}
-
-macro_rules! with_flonum {
-    ($value:expr, $binding:ident, $op:expr) => {
-        match $value {
-            Flonum::F32($binding) => $op,
-            Flonum::F64($binding) => $op,
-        }
-    };
-}
-
-impl Flonum {
-    pub fn as_f64(&self) -> f64 {
-        match self {
-            Self::F32(x) => *x as f64,
-            Self::F64(x) => *x,
-        }
-    }
-
-    pub fn coerce(lhs: Flonum, rhs: Flonum) -> (Flonum, Flonum) {
-        match (&lhs, &rhs) {
-            (Flonum::F32(_), Flonum::F32(_)) => (lhs, rhs),
-            (Flonum::F64(_), Flonum::F64(_)) => (lhs, rhs),
-            (Flonum::F32(_), Flonum::F64(_)) => (Flonum::F64(lhs.as_f64()), rhs),
-            (Flonum::F64(_), Flonum::F32(_)) => (lhs, Flonum::F64(rhs.as_f64())),
-        }
-    }
-
-    pub fn infinity() -> Self {
-        Flonum::F64(f64::INFINITY)
-    }
-
-    pub fn neg_infinity() -> Self {
-        Flonum::F64(f64::NEG_INFINITY)
-    }
-
-    pub fn nan() -> Self {
-        Flonum::F64(f64::NAN)
-    }
-}
-
-impl SchemeNumberExactness for Flonum {
-    fn to_inexact(&self) -> ArithResult<Flonum> {
-        Ok(self.clone())
-    }
-
-    fn to_exact(&self) -> ArithResult<Number> {
-        if let Some(r) = BigRational::from_float(self.as_f64()) {
-            Ok(Number::Real(RealNumber::Rational(r)))
-        } else {
-            Err(error::arithmetic_error("Can't convert into exact number"))
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Fixnum {
-    Big(BigInt),
-    I8(i8),
-    I16(i16),
-    I32(i32),
-    I64(i64),
-}
-
-impl SchemeNumberExactness for Fixnum {
-    fn to_inexact(&self) -> ArithResult<Flonum> {
-        match self {
-            Self::Big(n) => Err(error::arithmetic_error(
-                "Can't create inexact value of non-machine sized int",
-            )),
-            Self::I8(n) => Ok(Flonum::F32(*n as f32)),
-            Self::I16(n) => Ok(Flonum::F32(*n as f32)),
-            Self::I32(n) => Ok(Flonum::F64(*n as f64)),
-            Self::I64(n) => Ok(Flonum::F64(*n as f64)),
-        }
-    }
-
-    fn to_exact(&self) -> ArithResult<Number> {
-        Ok(Number::Real(RealNumber::Fixnum(self.clone())))
-    }
-}
-
-impl Fixnum {
-    pub fn as_big(&self) -> BigInt {
-        match self {
-            Self::Big(n) => n.clone(),
-            Self::I8(n) => BigInt::from(*n),
-            Self::I16(n) => BigInt::from(*n),
-            Self::I32(n) => BigInt::from(*n),
-            Self::I64(n) => BigInt::from(*n),
-        }
-    }
-
-    pub fn coerce(lhs: Fixnum, rhs: Fixnum) -> (Fixnum, Fixnum) {
-        match (&lhs, &rhs) {
-            (Fixnum::Big(_), Fixnum::Big(_)) => todo!(),
-            (Fixnum::Big(_), other) => (lhs, Fixnum::Big(other.as_big())),
-            (other, Fixnum::Big(_)) => ((Fixnum::Big(other.as_big()), rhs)),
-            _ => todo!(),
-        }
-    }
-}
-
-macro_rules! with_fixnum {
-    ($value:expr, $binding:ident, $op:expr) => {
-        match $value {
-            Fixnum::Big($binding) => $op,
-            Fixnum::I8($binding) => $op,
-            Fixnum::I16($binding) => $op,
-            Fixnum::I32($binding) => $op,
-            Fixnum::I64($binding) => $op,
-        }
-    };
-}
-
-macro_rules! map_fixnum {
-    ($value:expr, $binding:ident, $op:expr) => {
-        match $value {
-            Fixnum::Big($binding) => Fixnum::Big($op),
-            Fixnum::I8($binding) => Fixnum::I8($op),
-            Fixnum::I16($binding) => Fixnum::I16($op),
-            Fixnum::I32($binding) => Fixnum::I32($op),
-            Fixnum::I64($binding) => Fixnum::I64($op),
-        }
-    };
-}
-
 impl Number {
     /*
     pub fn cmp(&self, other: Self) -> Ordering {
@@ -267,15 +128,15 @@ impl Number {
 
     // Value constructors
     pub fn inifinity() -> Self {
-        Self::Real(RealNumber::Flonum(Flonum::infinity()))
+        Self::Real(RealNumber::Flonum(flonum::Flonum::infinity()))
     }
 
     pub fn neg_inifinity() -> Self {
-        Self::Real(RealNumber::Flonum(Flonum::neg_infinity()))
+        Self::Real(RealNumber::Flonum(flonum::Flonum::neg_infinity()))
     }
 
     pub fn nan() -> Self {
-        Self::Real(RealNumber::Flonum(Flonum::nan()))
+        Self::Real(RealNumber::Flonum(flonum::Flonum::nan()))
     }
 
     pub fn big<I: Into<BigInt>>(num: I) -> Number {
@@ -327,7 +188,7 @@ impl Number {
     pub fn coerce(lhs: Number, rhs: Number) -> ArithResult<(Number, Number)> {
         match (lhs, rhs) {
             (Number::Real(RealNumber::Fixnum(lhs)), Number::Real(RealNumber::Fixnum(rhs))) => {
-                let (coerced_lhs, coerced_rhs) = Fixnum::coerce(lhs, rhs);
+                let (coerced_lhs, coerced_rhs) = fixnum::Fixnum::coerce(lhs, rhs);
 
                 Ok((
                     Number::Real(RealNumber::Fixnum(coerced_lhs)),
@@ -335,7 +196,7 @@ impl Number {
                 ))
             }
             (Number::Real(RealNumber::Flonum(lhs)), Number::Real(RealNumber::Flonum(rhs))) => {
-                let (coerced_lhs, coerced_rhs) = Flonum::coerce(lhs, rhs);
+                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(lhs, rhs);
 
                 Ok((
                     Number::Real(RealNumber::Flonum(coerced_lhs)),
@@ -351,7 +212,7 @@ impl Number {
 
             // Fixnum / Flonum
             (Number::Real(RealNumber::Fixnum(lhs)), Number::Real(RealNumber::Flonum(rhs))) => {
-                let (coerced_lhs, coerced_rhs) = Flonum::coerce(lhs.to_inexact()?, rhs);
+                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(lhs.to_inexact()?, rhs);
 
                 Ok((
                     Number::Real(RealNumber::Flonum(coerced_lhs)),
@@ -360,7 +221,7 @@ impl Number {
             }
 
             (Number::Real(RealNumber::Flonum(lhs)), Number::Real(RealNumber::Fixnum(rhs))) => {
-                let (coerced_lhs, coerced_rhs) = Flonum::coerce(lhs, rhs.to_inexact()?);
+                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(lhs, rhs.to_inexact()?);
 
                 Ok((
                     Number::Real(RealNumber::Flonum(coerced_lhs)),
@@ -395,49 +256,7 @@ impl Number {
     }
 }
 
-impl From<BigInt> for Fixnum {
-    fn from(num: BigInt) -> Fixnum {
-        Fixnum::Big(num)
-    }
-}
-
-impl From<i8> for Fixnum {
-    fn from(num: i8) -> Fixnum {
-        Fixnum::I8(num)
-    }
-}
-
-impl From<i16> for Fixnum {
-    fn from(num: i16) -> Fixnum {
-        Fixnum::I16(num)
-    }
-}
-
-impl From<i32> for Fixnum {
-    fn from(num: i32) -> Fixnum {
-        Fixnum::I32(num)
-    }
-}
-
-impl From<i64> for Fixnum {
-    fn from(num: i64) -> Fixnum {
-        Fixnum::I64(num)
-    }
-}
-
-impl From<f32> for Flonum {
-    fn from(num: f32) -> Flonum {
-        Flonum::F32(num)
-    }
-}
-
-impl From<f64> for Flonum {
-    fn from(num: f64) -> Flonum {
-        Flonum::F64(num)
-    }
-}
-
-impl<I: Into<Fixnum>> From<I> for RealNumber {
+impl<I: Into<fixnum::Fixnum>> From<I> for RealNumber {
     fn from(n: I) -> RealNumber {
         RealNumber::Fixnum(n.into().into())
     }
@@ -446,67 +265,6 @@ impl<I: Into<Fixnum>> From<I> for RealNumber {
 impl<I: Into<RealNumber>> From<I> for Number {
     fn from(n: I) -> Number {
         Number::Real(n.into())
-    }
-}
-
-impl SchemeEqual<Fixnum> for Fixnum {
-    fn is_eq(&self, other: &Fixnum) -> bool {
-        match (self, other) {
-            (Fixnum::Big(x), Fixnum::Big(y)) => x == y,
-
-            (Fixnum::Big(x), Fixnum::I8(y)) => *x == BigInt::from(*y),
-            (Fixnum::Big(x), Fixnum::I16(y)) => *x == BigInt::from(*y),
-            (Fixnum::Big(x), Fixnum::I32(y)) => *x == BigInt::from(*y),
-            (Fixnum::Big(x), Fixnum::I64(y)) => *x == BigInt::from(*y),
-
-            (Fixnum::I8(x), Fixnum::I8(y)) => x == y,
-            (Fixnum::I8(x), Fixnum::I16(y)) => (*x as i16) == *y,
-            (Fixnum::I8(x), Fixnum::I32(y)) => (*x as i32) == *y,
-            (Fixnum::I8(x), Fixnum::I64(y)) => (*x as i64) == *y,
-
-            (Fixnum::I16(x), Fixnum::I16(y)) => x == y,
-            (Fixnum::I16(x), Fixnum::I8(y)) => *x == (*y as i16),
-            (Fixnum::I16(x), Fixnum::I32(y)) => (*x as i32) == *y,
-            (Fixnum::I16(x), Fixnum::I64(y)) => (*x as i64) == *y,
-
-            (Fixnum::I32(x), Fixnum::I32(y)) => x == y,
-            (Fixnum::I32(x), Fixnum::I8(y)) => *x == (*y as i32),
-            (Fixnum::I32(x), Fixnum::I16(y)) => *x == (*y as i32),
-            (Fixnum::I32(x), Fixnum::I64(y)) => (*x as i64) == *y,
-
-            (Fixnum::I64(x), Fixnum::I64(y)) => x == y,
-            (Fixnum::I64(x), Fixnum::I8(y)) => *x == (*y as i64),
-            (Fixnum::I64(x), Fixnum::I16(y)) => *x == (*y as i64),
-            (Fixnum::I64(x), Fixnum::I32(y)) => *x == (*y as i64),
-            _ => other.is_eq(self),
-        }
-    }
-
-    fn is_eqv(&self, other: &Fixnum) -> bool {
-        self.is_eq(other)
-    }
-
-    fn is_equal(&self, other: &Fixnum) -> bool {
-        self.is_eq(other)
-    }
-}
-
-impl SchemeEqual<Flonum> for Flonum {
-    fn is_eq(&self, other: &Flonum) -> bool {
-        match (self, other) {
-            (Flonum::F64(x), Flonum::F64(y)) => x == y,
-            (Flonum::F32(x), Flonum::F32(y)) => x == y,
-            (Flonum::F64(x), Flonum::F32(y)) => *x == (*y as f64),
-            _ => other.is_eq(self),
-        }
-    }
-
-    fn is_eqv(&self, other: &Flonum) -> bool {
-        self.is_eq(other)
-    }
-
-    fn is_equal(&self, other: &Flonum) -> bool {
-        self.is_eq(other)
     }
 }
 
@@ -543,96 +301,6 @@ impl SchemeEqual<Number> for Number {
 
     fn is_equal(&self, other: &Number) -> bool {
         self.is_eq(other)
-    }
-}
-
-impl SchemeNumber for Fixnum {
-    fn sign(self, sign: Sign) -> Self {
-        if let Sign::Minus = sign {
-            map_fixnum!(self, n, n.neg())
-        } else {
-            self
-        }
-    }
-
-    fn is_exact(&self) -> bool {
-        true
-    }
-    fn is_inexact(&self) -> bool {
-        false
-    }
-    fn is_rational(&self) -> bool {
-        false
-    }
-    fn is_integer(&self) -> bool {
-        true
-    }
-    fn is_real(&self) -> bool {
-        true
-    }
-    fn is_complex(&self) -> bool {
-        false
-    }
-    fn is_finite(&self) -> bool {
-        true
-    }
-
-    fn is_infinite(&self) -> bool {
-        false
-    }
-
-    fn is_nan(&self) -> bool {
-        false
-    }
-    fn is_neg_infinite(&self) -> bool {
-        false
-    }
-}
-
-impl SchemeNumber for Flonum {
-    fn sign(self, sign: Sign) -> Self {
-        if let Sign::Minus = sign {
-            map_flonum!(self, n, n.neg())
-        } else {
-            self
-        }
-    }
-
-    fn is_exact(&self) -> bool {
-        false
-    }
-    fn is_inexact(&self) -> bool {
-        true
-    }
-    fn is_rational(&self) -> bool {
-        !(self.is_nan() || self.is_infinite())
-    }
-    fn is_integer(&self) -> bool {
-        false
-    }
-    fn is_real(&self) -> bool {
-        true
-    }
-    fn is_complex(&self) -> bool {
-        false
-    }
-    fn is_finite(&self) -> bool {
-        with_flonum!(self, n, n.is_finite())
-    }
-
-    fn is_infinite(&self) -> bool {
-        with_flonum!(self, n, n.is_infinite())
-    }
-
-    fn is_nan(&self) -> bool {
-        with_flonum!(self, n, n.is_nan())
-    }
-    fn is_neg_infinite(&self) -> bool {
-        if self.is_infinite() {
-            with_flonum!(self, n, n.is_sign_negative())
-        } else {
-            false
-        }
     }
 }
 
