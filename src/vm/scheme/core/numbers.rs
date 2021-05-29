@@ -4,7 +4,6 @@ use crate::vm::value::procedure::foreign;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
 use crate::vm::value::{error, number, Value};
 use crate::vm::VM;
-use num::Num;
 
 macro_rules! define_predicate {
     ($name:ident, $number:ident, $pred:expr) => {

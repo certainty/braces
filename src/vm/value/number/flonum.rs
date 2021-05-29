@@ -1,29 +1,38 @@
-use super::error::{self, RuntimeError};
+use super::error;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
-use num::BigRational;
+use rug::{float::SmallFloat, Float};
 use std::ops::Neg;
+
+const PRECISION: u32 = 200;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Flonum {
+    Big(Float),
     F32(f32),
     F64(f64),
 }
 
 impl Flonum {
-    pub fn as_f64(&self) -> f64 {
+    pub fn to_float(&self) -> Float {
         match self {
-            Self::F32(x) => *x as f64,
-            Self::F64(x) => *x,
+            Flonum::Big(inner) => inner.clone(),
+            Flonum::F32(inner) => Float::with_val(PRECISION, inner),
+            Flonum::F64(inner) => Float::with_val(PRECISION, inner),
         }
     }
 
     pub fn coerce(lhs: Flonum, rhs: Flonum) -> (Flonum, Flonum) {
         match (&lhs, &rhs) {
+            (Flonum::Big(_), Flonum::Big(_)) => (lhs, rhs),
+            (Flonum::Big(_), Flonum::F32(inner)) => (lhs, Flonum::from(*inner)),
+            (Flonum::F32(inner), Flonum::Big(_)) => (Flonum::from(*inner), rhs),
+            (Flonum::Big(_), Flonum::F64(inner)) => (lhs, Flonum::from(*inner)),
+            (Flonum::F64(inner), Flonum::Big(_)) => (Flonum::from(*inner), rhs),
             (Flonum::F32(_), Flonum::F32(_)) => (lhs, rhs),
             (Flonum::F64(_), Flonum::F64(_)) => (lhs, rhs),
-            (Flonum::F32(_), Flonum::F64(_)) => (Flonum::F64(lhs.as_f64()), rhs),
-            (Flonum::F64(_), Flonum::F32(_)) => (lhs, Flonum::F64(rhs.as_f64())),
+            (Flonum::F32(inner), Flonum::F64(_)) => (Flonum::F64(*inner as f64), rhs),
+            (Flonum::F64(_), Flonum::F32(inner)) => (lhs, Flonum::F64(*inner as f64)),
         }
     }
 
@@ -43,6 +52,7 @@ impl Flonum {
 macro_rules! map_flonum {
     ($value:expr, $binding:ident, $op:expr) => {
         match $value {
+            Flonum::Big($binding) => Flonum::Big($op),
             Flonum::F32($binding) => Flonum::F32($op),
             Flonum::F64($binding) => Flonum::F64($op),
         }
@@ -52,21 +62,34 @@ macro_rules! map_flonum {
 macro_rules! with_flonum {
     ($value:expr, $binding:ident, $op:expr) => {
         match $value {
+            Flonum::Big($binding) => $op,
             Flonum::F32($binding) => $op,
             Flonum::F64($binding) => $op,
         }
     };
 }
 
+impl From<rug::Integer> for Flonum {
+    fn from(num: rug::Integer) -> Flonum {
+        Flonum::Big(Float::with_val(200, num))
+    }
+}
+
 impl From<f32> for Flonum {
     fn from(num: f32) -> Flonum {
-        Flonum::F32(num)
+        Flonum::Big(Float::with_val(PRECISION, num))
     }
 }
 
 impl From<f64> for Flonum {
     fn from(num: f64) -> Flonum {
-        Flonum::F64(num)
+        Flonum::Big(Float::with_val(PRECISION, num))
+    }
+}
+
+impl From<Float> for Flonum {
+    fn from(num: Float) -> Flonum {
+        Flonum::Big(num)
     }
 }
 
@@ -98,15 +121,24 @@ impl SchemeNumber for Flonum {
         false
     }
     fn is_finite(&self) -> bool {
-        with_flonum!(self, n, n.is_finite())
+        match self {
+            Flonum::Big(_) => true,
+            _ => with_flonum!(self, n, n.is_finite()),
+        }
     }
 
     fn is_infinite(&self) -> bool {
-        with_flonum!(self, n, n.is_infinite())
+        match self {
+            Flonum::Big(_) => false,
+            _ => with_flonum!(self, n, n.is_infinite()),
+        }
     }
 
     fn is_nan(&self) -> bool {
-        with_flonum!(self, n, n.is_nan())
+        match self {
+            Flonum::Big(_) => false,
+            _ => with_flonum!(self, n, n.is_nan()),
+        }
     }
     fn is_neg_infinite(&self) -> bool {
         if self.is_infinite() {
@@ -123,7 +155,7 @@ impl SchemeNumberExactness for Flonum {
     }
 
     fn to_exact(&self) -> ArithResult<Number> {
-        if let Some(r) = BigRational::from_float(self.as_f64()) {
+        if let Some(r) = self.to_float().to_rational() {
             Ok(Number::Real(real::RealNumber::Rational(
                 rational::Rational::from(r),
             )))
@@ -149,28 +181,5 @@ impl SchemeEqual<Flonum> for Flonum {
 
     fn is_equal(&self, other: &Flonum) -> bool {
         self.is_eq(other)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn exactness_test() {
-        assert!(!Number::f64(0.1).is_exact());
-        assert!(!Number::f32(0.1).is_exact());
-    }
-
-    #[test]
-    fn all_is_real() {
-        assert!(Number::f64(0.1).is_real());
-        assert!(Number::f32(0.1).is_real());
-    }
-
-    #[test]
-    fn is_rational() {
-        assert!(!Number::f64(0.1).is_rational());
-        assert!(!Number::f32(0.1).is_rational());
     }
 }

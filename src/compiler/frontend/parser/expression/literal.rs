@@ -43,7 +43,7 @@ mod tests {
     use super::*;
     use crate::compiler::frontend::parser::expression::tests::*;
     use crate::compiler::frontend::parser::sexp::datum::Sexp;
-    use num::BigInt;
+    use crate::vm::value::number::Number;
 
     // Literals
     // See: r7rs page 12 for all examples of literals we need to support
@@ -63,7 +63,7 @@ mod tests {
 
         assert_parse_as(
             "123",
-            Expression::constant(make_datum(Sexp::number(BigInt::from(123)), 1, 1)),
+            Expression::constant(make_datum(Sexp::number(Number::big(123)), 1, 1)),
         );
     }
 }

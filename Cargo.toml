@@ -37,8 +37,7 @@ lazy_static = "1.4"
 
 # values
 im-rc = "15.0"
-num = "0.4"
-bigdecimal = "0.2.0"
+rug = "1.12"
 
 # compiler / interpreter
 clap = "3.0.0-beta.2"

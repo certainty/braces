@@ -10,7 +10,6 @@ use nom::character::complete::{char, digit1};
 use nom::combinator::{map, map_res, opt, value};
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
-use num::BigInt;
 
 use super::Input;
 use super::ParseResult;
@@ -157,11 +156,14 @@ fn apply_exponent(num: f64, exp: Option<i32>) -> f64 {
     }
 }
 
-fn parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, BigInt> {
+fn parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, rug::Integer> {
     map(many1(_parse_digits(radix)), move |digits| {
         let digits: String = digits.into_iter().collect();
-        BigInt::parse_bytes(digits.as_bytes(), radix as u32)
-            .expect("BigInt parse digits can't fail")
+
+        rug::Integer::from(
+            rug::Integer::parse_radix(digits.as_bytes(), radix as i32)
+                .expect("Parse Integer digits can't fail"),
+        )
     })
 }
 
@@ -244,24 +246,24 @@ mod tests {
 
     #[test]
     fn parse_integer_10() {
-        assert_parse_as("0", Sexp::number(BigInt::from(0)));
-        assert_parse_as("10", Sexp::number(BigInt::from(10)));
-        assert_parse_as("#d10", Sexp::number(BigInt::from(10)));
-        assert_parse_as("#e#d10", Sexp::number(BigInt::from(10)));
-        assert_parse_as("23434", Sexp::number(BigInt::from(23434)));
-        assert_parse_as("-23434", Sexp::number(BigInt::from(-23434)));
+        assert_parse_as("0", Sexp::number(Number::big(0)));
+        assert_parse_as("10", Sexp::number(Number::big(10)));
+        assert_parse_as("#d10", Sexp::number(Number::big(10)));
+        assert_parse_as("#e#d10", Sexp::number(Number::big(10)));
+        assert_parse_as("23434", Sexp::number(Number::big(23434)));
+        assert_parse_as("-23434", Sexp::number(Number::big(-23434)));
     }
 
     #[test]
     fn parse_integer_2() {
-        assert_parse_as("#b0", Sexp::number(BigInt::from(0)));
-        assert_parse_as("#b01011", Sexp::number(BigInt::from(11)));
+        assert_parse_as("#b0", Sexp::number(Number::big(0)));
+        assert_parse_as("#b01011", Sexp::number(Number::big(11)));
     }
 
     #[test]
     fn parse_integer_8() {
-        assert_parse_as("#o777", Sexp::number(BigInt::from(511)));
-        assert_parse_as("#o0775", Sexp::number(BigInt::from(509)));
+        assert_parse_as("#o777", Sexp::number(Number::big(511)));
+        assert_parse_as("#o0775", Sexp::number(Number::big(509)));
 
         //assert_parse_error("#o8989")
     }
@@ -283,13 +285,7 @@ mod tests {
 
     #[test]
     fn parse_rational() {
-        assert_parse_as(
-            "3/4",
-            Sexp::number(Number::fraction(BigInt::from(3), BigInt::from(4))),
-        );
-        assert_parse_as(
-            "#b111/100",
-            Sexp::number(Number::fraction(BigInt::from(7), BigInt::from(4))),
-        );
+        assert_parse_as("3/4", Sexp::number(Number::fraction(3, 4)));
+        assert_parse_as("#b111/100", Sexp::number(Number::fraction(7, 4)));
     }
 }

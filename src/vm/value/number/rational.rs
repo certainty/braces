@@ -1,26 +1,25 @@
-use super::error::{self, RuntimeError};
 use super::real;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
-use num::BigRational;
 use std::ops::Neg;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq)]
-pub struct Rational(pub BigRational);
+pub struct Rational {
+    pub(crate) inner: rug::Rational,
+}
 
-impl<I: Into<BigRational>> From<I> for Rational {
+impl<I: Into<rug::Rational>> From<I> for Rational {
     fn from(n: I) -> Rational {
-        Rational(n.into())
+        Rational { inner: n.into() }
     }
 }
 
 impl SchemeNumberExactness for Rational {
     fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
-        // TODO: implement this
-        Err(error::arithmetic_error(
-            "Can't create inexact value from rational",
-        ))
+        let inexact = rug::Float::with_val(200, self.inner.numer().clone())
+            / rug::Float::with_val(200, self.inner.denom().clone());
+        Ok(flonum::Flonum::from(inexact))
     }
 
     fn to_exact(&self) -> ArithResult<Number> {
@@ -30,7 +29,7 @@ impl SchemeNumberExactness for Rational {
 
 impl SchemeEqual<Rational> for Rational {
     fn is_eq(&self, other: &Rational) -> bool {
-        self.0 == other.0
+        self.inner == other.inner
     }
 
     fn is_eqv(&self, other: &Rational) -> bool {
@@ -45,7 +44,9 @@ impl SchemeEqual<Rational> for Rational {
 impl SchemeNumber for Rational {
     fn sign(self, sign: Sign) -> Self {
         if let Sign::Minus = sign {
-            Rational(self.0.neg())
+            Rational {
+                inner: self.inner.neg(),
+            }
         } else {
             self
         }

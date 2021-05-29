@@ -60,7 +60,7 @@ impl Writer {
         match num {
             Number::Real(RealNumber::Fixnum(v)) => self.write_fixnum(v),
             Number::Real(RealNumber::Flonum(v)) => self.write_flonum(v),
-            Number::Real(RealNumber::Rational(v)) => format!("{}", v.0),
+            Number::Real(RealNumber::Rational(v)) => format!("{}", v.inner),
         }
     }
 
@@ -69,6 +69,7 @@ impl Writer {
             n if n.is_nan() => String::from("+nan.0"),
             n if n.is_neg_infinite() => String::from("-inf.0"),
             n if n.is_infinite() => String::from("+inf.0"),
+            Flonum::Big(n) => format!("{}", n),
             Flonum::F32(n) => format!("{}", n),
             Flonum::F64(n) => format!("{}", n),
         }

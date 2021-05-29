@@ -1,11 +1,12 @@
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
-use num::BigInt;
+use rug::integer::SmallInteger;
+use rug::Integer;
 use std::ops::Neg;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Fixnum {
-    Big(BigInt),
+    Big(Integer),
     I8(i8),
     I16(i16),
     I32(i32),
@@ -13,19 +14,19 @@ pub enum Fixnum {
 }
 
 impl Fixnum {
-    pub fn as_big(&self) -> BigInt {
+    pub fn as_big(&self) -> Integer {
         match self {
             Self::Big(n) => n.clone(),
-            Self::I8(n) => BigInt::from(*n),
-            Self::I16(n) => BigInt::from(*n),
-            Self::I32(n) => BigInt::from(*n),
-            Self::I64(n) => BigInt::from(*n),
+            Self::I8(n) => Integer::from(*n),
+            Self::I16(n) => Integer::from(*n),
+            Self::I32(n) => Integer::from(*n),
+            Self::I64(n) => Integer::from(*n),
         }
     }
 
     pub fn coerce(lhs: Fixnum, rhs: Fixnum) -> (Fixnum, Fixnum) {
         match (&lhs, &rhs) {
-            (Fixnum::Big(_), Fixnum::Big(_)) => todo!(),
+            (Fixnum::Big(_), Fixnum::Big(_)) => (lhs, rhs),
             (Fixnum::Big(_), other) => (lhs, Fixnum::Big(other.as_big())),
             (other, Fixnum::Big(_)) => ((Fixnum::Big(other.as_big()), rhs)),
             _ => todo!(),
@@ -57,8 +58,8 @@ macro_rules! map_fixnum {
     };
 }
 
-impl From<BigInt> for Fixnum {
-    fn from(num: BigInt) -> Fixnum {
+impl From<Integer> for Fixnum {
+    fn from(num: Integer) -> Fixnum {
         Fixnum::Big(num)
     }
 }
@@ -133,9 +134,7 @@ impl SchemeNumber for Fixnum {
 impl SchemeNumberExactness for Fixnum {
     fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
         match self {
-            Self::Big(n) => Err(error::arithmetic_error(
-                "Can't create inexact value of non-machine sized int",
-            )),
+            Self::Big(n) => Ok(flonum::Flonum::from(n.clone())),
             Self::I8(n) => Ok(flonum::Flonum::F32(*n as f32)),
             Self::I16(n) => Ok(flonum::Flonum::F32(*n as f32)),
             Self::I32(n) => Ok(flonum::Flonum::F64(*n as f64)),
@@ -153,10 +152,10 @@ impl SchemeEqual<Fixnum> for Fixnum {
         match (self, other) {
             (Fixnum::Big(x), Fixnum::Big(y)) => x == y,
 
-            (Fixnum::Big(x), Fixnum::I8(y)) => *x == BigInt::from(*y),
-            (Fixnum::Big(x), Fixnum::I16(y)) => *x == BigInt::from(*y),
-            (Fixnum::Big(x), Fixnum::I32(y)) => *x == BigInt::from(*y),
-            (Fixnum::Big(x), Fixnum::I64(y)) => *x == BigInt::from(*y),
+            (Fixnum::Big(x), Fixnum::I8(y)) => *x == *SmallInteger::from(*y),
+            (Fixnum::Big(x), Fixnum::I16(y)) => *x == *SmallInteger::from(*y),
+            (Fixnum::Big(x), Fixnum::I32(y)) => *x == *SmallInteger::from(*y),
+            (Fixnum::Big(x), Fixnum::I64(y)) => *x == *SmallInteger::from(*y),
 
             (Fixnum::I8(x), Fixnum::I8(y)) => x == y,
             (Fixnum::I8(x), Fixnum::I16(y)) => (*x as i16) == *y,
@@ -187,37 +186,5 @@ impl SchemeEqual<Fixnum> for Fixnum {
 
     fn is_equal(&self, other: &Fixnum) -> bool {
         self.is_eq(other)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn exactness_test() {
-        assert!(Number::i8(1).is_exact());
-        assert!(Number::i16(1).is_exact());
-        assert!(Number::i32(1).is_exact());
-        assert!(Number::i64(1).is_exact());
-        assert!(Number::big(1).is_exact());
-    }
-
-    #[test]
-    fn all_is_real() {
-        assert!(Number::i8(1).is_real());
-        assert!(Number::i16(1).is_real());
-        assert!(Number::i32(1).is_real());
-        assert!(Number::i64(1).is_real());
-        assert!(Number::big(1).is_real());
-    }
-
-    #[test]
-    fn is_rational() {
-        assert!(!Number::i8(1).is_rational());
-        assert!(!Number::i16(1).is_rational());
-        assert!(!Number::i32(1).is_rational());
-        assert!(!Number::i64(1).is_rational());
-        assert!(!Number::big(1).is_rational());
     }
 }

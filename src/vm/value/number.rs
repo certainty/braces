@@ -1,6 +1,6 @@
 use super::equality::SchemeEqual;
 use super::error::{self, RuntimeError};
-use num::BigInt;
+use rug::Integer;
 pub mod fixnum;
 pub mod flonum;
 pub mod rational;
@@ -76,11 +76,11 @@ impl Number {
         Self::Real(real::RealNumber::Flonum(flonum::Flonum::nan()))
     }
 
-    pub fn big<I: Into<BigInt>>(num: I) -> Number {
+    pub fn big<I: Into<Integer>>(num: I) -> Number {
         Self::Real(num.into().into())
     }
 
-    pub fn fraction<N: Into<BigInt>, D: Into<BigInt>>(numer: N, denom: D) -> Number {
+    pub fn fraction<N: Into<Integer>, D: Into<Integer>>(numer: N, denom: D) -> Number {
         Self::Real(real::RealNumber::Rational(rational::Rational::from((
             numer.into(),
             denom.into(),

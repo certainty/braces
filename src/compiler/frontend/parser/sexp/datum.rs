@@ -1,6 +1,5 @@
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::vm::value::number;
-use num::BigInt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Sexp {

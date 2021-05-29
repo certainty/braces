@@ -53,6 +53,7 @@ impl RealNumber {
         }
     }*/
 }
+
 impl<I: Into<fixnum::Fixnum>> From<I> for RealNumber {
     fn from(n: I) -> RealNumber {
         RealNumber::Fixnum(n.into().into())
