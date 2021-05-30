@@ -4,6 +4,7 @@ use crate::vm::value::procedure::foreign;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
 use crate::vm::value::{error, number, Value};
 use crate::vm::VM;
+use std::ops::Add;
 
 macro_rules! define_predicate {
     ($name:ident, $number:ident, $pred:expr) => {
@@ -27,6 +28,7 @@ pub fn register(vm: &mut VM) {
     super::register_core!(vm, "infinite?", inf_p, Arity::Exactly(1));
     super::register_core!(vm, "exact?", exact_p, Arity::Exactly(1));
     super::register_core!(vm, "inexact?", exact_p, Arity::Exactly(1));
+    super::register_core!(vm, "+", plus, Arity::Exactly(2));
 }
 
 // R7RS 6.2.6 Numerical operations
@@ -48,19 +50,15 @@ define_predicate!(finite_p, n, n.is_finite());
 define_predicate!(exact_p, n, n.is_exact());
 define_predicate!(inexact_p, n, n.is_inexact());
 
-/*
-
-pub fn fx_plus(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn plus(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
-        (
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
-        ) => Ok(Value::Number(number::Number::Real(
-            number::RealNumber::Fixnum(lhs + rhs),
-        ))),
+        (Value::Number(lhs), Value::Number(rhs)) => {
+            Ok(Value::Number(lhs.clone().add(rhs.clone())?))
+        }
         _ => Err(error::argument_error("Expected exactly two fixnums")),
     }
 }
+/*
 
 pub fn fx_minus(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
