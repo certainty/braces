@@ -1,6 +1,8 @@
 use super::real;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
+use az::{CheckedAs, CheckedCast};
+use std::ops::Add;
 use std::ops::Neg;
 
 #[repr(transparent)]
@@ -16,14 +18,14 @@ impl<I: Into<rug::Rational>> From<I> for Rational {
 }
 
 impl SchemeNumberExactness for Rational {
-    fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
+    fn to_inexact(self) -> flonum::Flonum {
         let inexact = rug::Float::with_val(200, self.inner.numer().clone())
             / rug::Float::with_val(200, self.inner.denom().clone());
-        Ok(flonum::Flonum::from(inexact))
+        flonum::Flonum::from(inexact)
     }
 
-    fn to_exact(&self) -> ArithResult<Number> {
-        Ok(Number::Real(real::RealNumber::Rational(self.clone())))
+    fn to_exact(self) -> Option<Number> {
+        Some(Number::Real(real::RealNumber::Rational(self.clone())))
     }
 }
 
@@ -83,5 +85,56 @@ impl SchemeNumber for Rational {
     }
     fn is_neg_infinite(&self) -> bool {
         false
+    }
+}
+
+impl CheckedCast<flonum::Flonum> for Rational {
+    fn checked_cast(self) -> Option<flonum::Flonum> {
+        let inexact = rug::Float::with_val(flonum::PRECISION, self.inner.numer().clone())
+            / rug::Float::with_val(200, self.inner.denom().clone());
+
+        Some(flonum::Flonum::from(inexact))
+    }
+}
+
+impl From<fixnum::Fixnum> for Rational {
+    fn from(n: fixnum::Fixnum) -> Rational {
+        match n {
+            fixnum::Fixnum::Big(n) => Self::from(n),
+            fixnum::Fixnum::I8(n) => Self::from(n),
+            fixnum::Fixnum::I16(n) => Self::from(n),
+            fixnum::Fixnum::I32(n) => Self::from(n),
+            fixnum::Fixnum::I64(n) => Self::from(n),
+        }
+    }
+}
+
+impl Add<Rational> for Rational {
+    type Output = ArithResult<Rational>;
+
+    fn add(self, rhs: Rational) -> Self::Output {
+        Ok(Rational {
+            inner: self.inner.add(rhs.inner),
+        })
+    }
+}
+
+impl Add<fixnum::Fixnum> for Rational {
+    type Output = ArithResult<Rational>;
+
+    fn add(self, rhs: fixnum::Fixnum) -> Self::Output {
+        self.add(Self::from(rhs))
+    }
+}
+
+impl Add<flonum::Flonum> for Rational {
+    type Output = ArithResult<flonum::Flonum>;
+
+    fn add(self, rhs: flonum::Flonum) -> Self::Output {
+        if let Some(lhs) = self.checked_as::<flonum::Flonum>() {
+            lhs.add(rhs)
+        } else {
+            Err(error::arithmetic_error("Can't convert rational to flonum"))
+        }
     }
 }

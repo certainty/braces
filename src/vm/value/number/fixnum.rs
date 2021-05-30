@@ -1,8 +1,9 @@
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
+use az::{CheckedAs, CheckedCast};
 use rug::integer::SmallInteger;
 use rug::Integer;
-use std::ops::Neg;
+use std::ops::{Add, Neg};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Fixnum {
@@ -54,6 +55,32 @@ macro_rules! map_fixnum {
             Fixnum::I16($binding) => Fixnum::I16($op),
             Fixnum::I32($binding) => Fixnum::I32($op),
             Fixnum::I64($binding) => Fixnum::I64($op),
+        }
+    };
+}
+
+macro_rules! binop {
+    ($lhs:expr, $rhs:expr, $op:ident) => {
+        match ($lhs, $rhs) {
+            // big goes with everything
+            (Fixnum::Big(lhs), Fixnum::Big(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::Big(lhs), Fixnum::I8(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::Big(lhs), Fixnum::I16(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::Big(lhs), Fixnum::I32(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::Big(lhs), Fixnum::I64(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::I8(lhs), Fixnum::Big(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::I16(lhs), Fixnum::Big(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::I32(lhs), Fixnum::Big(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+            (Fixnum::I64(lhs), Fixnum::Big(rhs)) => Ok(Fixnum::Big(lhs.$op(rhs))),
+
+            // machine types can't be mixed
+            (Fixnum::I64(lhs), Fixnum::I64(rhs)) => Ok(Fixnum::I64(lhs.$op(rhs))),
+            (Fixnum::I32(lhs), Fixnum::I32(rhs)) => Ok(Fixnum::I32(lhs.$op(rhs))),
+            (Fixnum::I16(lhs), Fixnum::I16(rhs)) => Ok(Fixnum::I16(lhs.$op(rhs))),
+            (Fixnum::I8(lhs), Fixnum::I8(rhs)) => Ok(Fixnum::I8(lhs.$op(rhs))),
+            _ => Err(error::arithmetic_error(
+                "Incompatible numeric types for addition",
+            )),
         }
     };
 }
@@ -132,18 +159,18 @@ impl SchemeNumber for Fixnum {
 }
 
 impl SchemeNumberExactness for Fixnum {
-    fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
+    fn to_inexact(self) -> flonum::Flonum {
         match self {
-            Self::Big(n) => Ok(flonum::Flonum::from(n.clone())),
-            Self::I8(n) => Ok(flonum::Flonum::F32(*n as f32)),
-            Self::I16(n) => Ok(flonum::Flonum::F32(*n as f32)),
-            Self::I32(n) => Ok(flonum::Flonum::F64(*n as f64)),
-            Self::I64(n) => Ok(flonum::Flonum::F64(*n as f64)),
+            Self::Big(n) => flonum::Flonum::from(n.clone()),
+            Self::I8(n) => flonum::Flonum::F32(n as f32),
+            Self::I16(n) => flonum::Flonum::F32(n as f32),
+            Self::I32(n) => flonum::Flonum::F64(n as f64),
+            Self::I64(n) => flonum::Flonum::F64(n as f64),
         }
     }
 
-    fn to_exact(&self) -> ArithResult<Number> {
-        Ok(Number::Real(real::RealNumber::Fixnum(self.clone())))
+    fn to_exact(self) -> Option<Number> {
+        Some(Number::Real(real::RealNumber::Fixnum(self)))
     }
 }
 
@@ -186,5 +213,49 @@ impl SchemeEqual<Fixnum> for Fixnum {
 
     fn is_equal(&self, other: &Fixnum) -> bool {
         self.is_eq(other)
+    }
+}
+
+// casts
+impl CheckedCast<rational::Rational> for Fixnum {
+    fn checked_cast(self) -> Option<rational::Rational> {
+        Some(rational::Rational::from(self))
+    }
+}
+
+impl CheckedCast<flonum::Flonum> for Fixnum {
+    fn checked_cast(self) -> Option<flonum::Flonum> {
+        Some(match self {
+            Self::Big(n) => flonum::Flonum::from(n.clone()),
+            Self::I8(n) => flonum::Flonum::F32(n as f32),
+            Self::I16(n) => flonum::Flonum::F32(n as f32),
+            Self::I32(n) => flonum::Flonum::F64(n as f64),
+            Self::I64(n) => flonum::Flonum::F64(n as f64),
+        })
+    }
+}
+
+// Arith
+impl Add<Fixnum> for Fixnum {
+    type Output = ArithResult<Fixnum>;
+
+    fn add(self, rhs: Fixnum) -> Self::Output {
+        binop!(self, rhs, add)
+    }
+}
+
+impl Add<flonum::Flonum> for Fixnum {
+    type Output = ArithResult<flonum::Flonum>;
+
+    fn add(self, rhs: flonum::Flonum) -> Self::Output {
+        rhs.add(self)
+    }
+}
+
+impl Add<rational::Rational> for Fixnum {
+    type Output = ArithResult<rational::Rational>;
+
+    fn add(self, rhs: rational::Rational) -> Self::Output {
+        rhs.add(self)
     }
 }

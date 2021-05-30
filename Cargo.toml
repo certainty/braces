@@ -38,6 +38,7 @@ lazy_static = "1.4"
 # values
 im-rc = "15.0"
 rug = "1.12"
+az = "1.1.1"
 
 # compiler / interpreter
 clap = "3.0.0-beta.2"

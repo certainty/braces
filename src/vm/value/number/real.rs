@@ -4,6 +4,7 @@ use super::flonum;
 use super::rational;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
+use std::ops::Add;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum RealNumber {
@@ -32,12 +33,46 @@ macro_rules! with_realnum {
     };
 }
 
+macro_rules! binop {
+    ($lhs:expr, $rhs:expr, $op:ident) => {
+        match ($lhs, $rhs) {
+            (RealNumber::Fixnum(lhs), RealNumber::Fixnum(rhs)) => {
+                Ok(RealNumber::Fixnum(lhs.$op(rhs)?))
+            }
+            (RealNumber::Fixnum(lhs), RealNumber::Flonum(rhs)) => {
+                Ok(RealNumber::Flonum(lhs.$op(rhs)?))
+            }
+            (RealNumber::Fixnum(lhs), RealNumber::Rational(rhs)) => {
+                Ok(RealNumber::Rational(lhs.$op(rhs)?))
+            }
+            (RealNumber::Flonum(lhs), RealNumber::Fixnum(rhs)) => {
+                Ok(RealNumber::Flonum(lhs.$op(rhs)?))
+            }
+            (RealNumber::Flonum(lhs), RealNumber::Rational(rhs)) => {
+                Ok(RealNumber::Flonum(lhs.$op(rhs)?))
+            }
+            (RealNumber::Flonum(lhs), RealNumber::Flonum(rhs)) => {
+                Ok(RealNumber::Flonum(lhs.$op(rhs)?))
+            }
+            (RealNumber::Rational(lhs), RealNumber::Fixnum(rhs)) => {
+                Ok(RealNumber::Rational(lhs.$op(rhs)?))
+            }
+            (RealNumber::Rational(lhs), RealNumber::Flonum(rhs)) => {
+                Ok(RealNumber::Flonum(lhs.$op(rhs)?))
+            }
+            (RealNumber::Rational(lhs), RealNumber::Rational(rhs)) => {
+                Ok(RealNumber::Rational(lhs.$op(rhs)?))
+            }
+        }
+    };
+}
+
 impl SchemeNumberExactness for RealNumber {
-    fn to_inexact(&self) -> ArithResult<flonum::Flonum> {
+    fn to_inexact(self) -> flonum::Flonum {
         with_realnum!(self, n, n.to_inexact())
     }
 
-    fn to_exact(&self) -> ArithResult<Number> {
+    fn to_exact(self) -> Option<Number> {
         with_realnum!(self, n, n.to_exact())
     }
 }
@@ -123,5 +158,13 @@ impl SchemeNumber for RealNumber {
     }
     fn is_neg_infinite(&self) -> bool {
         with_realnum!(self, n, n.is_neg_infinite())
+    }
+}
+
+impl Add<RealNumber> for RealNumber {
+    type Output = ArithResult<RealNumber>;
+
+    fn add(self, rhs: RealNumber) -> Self::Output {
+        binop!(self, rhs, add)
     }
 }

@@ -5,6 +5,9 @@ pub mod fixnum;
 pub mod flonum;
 pub mod rational;
 pub mod real;
+use std::ops::{Add, Div, Mul, Sub};
+
+type ArithResult<T> = std::result::Result<T, RuntimeError>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Exactness {
@@ -32,21 +35,9 @@ pub trait SchemeNumber {
     fn is_nan(&self) -> bool;
 }
 
-type ArithResult<T> = std::result::Result<T, RuntimeError>;
-
-pub trait SchemeNumberArith {
-    fn abs(&self) -> ArithResult<Number>;
-    fn neg(&self) -> ArithResult<Number>;
-    fn plus(&self, other: Number) -> ArithResult<Number>;
-    fn minus(&self, other: Number) -> ArithResult<Number>;
-    fn mul(&self, other: Number) -> ArithResult<Number>;
-    fn div(&self, other: Number) -> ArithResult<Number>;
-    fn modulo(&self, other: Number) -> ArithResult<Number>;
-}
-
 pub trait SchemeNumberExactness {
-    fn to_inexact(&self) -> ArithResult<flonum::Flonum>;
-    fn to_exact(&self) -> ArithResult<Number>;
+    fn to_inexact(self) -> flonum::Flonum;
+    fn to_exact(self) -> Option<Number>;
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -111,6 +102,10 @@ impl Number {
         Self::Real(real::RealNumber::Flonum(num.into()))
     }
 
+    pub fn big_f<I: Into<rug::Float>>(num: I) -> Number {
+        Self::Real(real::RealNumber::Flonum(flonum::Flonum::Big(num.into())))
+    }
+
     // Coerce two numbers so that they can be applied to the same operation
     // We apply the following coercion rules because they are simple (not necessarily performant)
     //
@@ -122,6 +117,7 @@ impl Number {
     // 6. If `lhs` and `rhs` are of types integer and float, the integer will be cast to a float. Should the integer be too big for the float, an error will be raised.
     // 7. If `lhs` and `rhs` are of types integer and rational, the integer will be converted to a rational.
     // 8. If `lhs` and `rhs` are of types float and rational, the float will be converted to a rational.
+    /*
     pub fn coerce(lhs: Number, rhs: Number) -> ArithResult<(Number, Number)> {
         match (lhs, rhs) {
             (
@@ -159,7 +155,7 @@ impl Number {
                 Number::Real(real::RealNumber::Fixnum(lhs)),
                 Number::Real(real::RealNumber::Flonum(rhs)),
             ) => {
-                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(lhs.to_inexact()?, rhs);
+                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(Number::Real(real::RealNumber::Fixnum(lhs.to_inexact()))), rhs);
 
                 Ok((
                     Number::Real(real::RealNumber::Flonum(coerced_lhs)),
@@ -206,18 +202,18 @@ impl Number {
                 Number::Real(real::RealNumber::Flonum(rhs)),
             ) => Ok((
                 Number::Real(real::RealNumber::Rational(lhs)),
-                rhs.to_exact()?,
+                Number::Real(real::RealNumber::Fixnum(rhs.to_exact())),
             )),
 
             (
                 Number::Real(real::RealNumber::Flonum(lhs)),
                 Number::Real(real::RealNumber::Rational(rhs)),
             ) => Ok((
-                lhs.to_exact()?,
+                Number::Real(real::RealNumber::Fixnum(lhs.to_exact())),
                 Number::Real(real::RealNumber::Rational(rhs)),
             )),
         }
-    }
+    }*/
 }
 
 impl<I: Into<real::RealNumber>> From<I> for Number {
@@ -230,7 +226,6 @@ impl SchemeEqual<Number> for Number {
     fn is_eq(&self, other: &Number) -> bool {
         match (self, other) {
             (Number::Real(lhs), Number::Real(rhs)) => lhs.is_eq(rhs),
-            _ => false,
         }
     }
 
@@ -302,6 +297,18 @@ impl SchemeNumber for Number {
         }
     }
 }
+// make lifting scheme numbers to rug numbers easier
+
+// implement arithmetic
+impl Add<Number> for Number {
+    type Output = ArithResult<Number>;
+
+    fn add(self, rhs: Number) -> Self::Output {
+        match (self, rhs) {
+            (Number::Real(lhs), Number::Real(rhs)) => Ok(Number::Real(lhs.add(rhs)?)),
+        }
+    }
+}
 
 // implement SchemeEqual
 
@@ -309,6 +316,7 @@ impl SchemeNumber for Number {
 mod tests {
     use super::*;
 
+    #[test]
     fn all_is_real() {
         assert!(Number::f64(0.1).is_real());
         assert!(Number::f32(0.1).is_real());

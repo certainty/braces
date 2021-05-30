@@ -1,10 +1,12 @@
 use super::error;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
+use az::{CheckedAs, CheckedCast};
 use rug::{float::SmallFloat, Float};
+use std::ops::Add;
 use std::ops::Neg;
 
-const PRECISION: u32 = 200;
+pub const PRECISION: u32 = 200;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Flonum {
@@ -69,6 +71,26 @@ macro_rules! with_flonum {
     };
 }
 
+macro_rules! binop {
+    ($lhs:expr, $rhs:expr, $op:ident) => {
+        match ($lhs, $rhs) {
+            // big goes with everything
+            (Flonum::Big(lhs), Flonum::Big(rhs)) => Ok(Flonum::Big(lhs.$op(rhs))),
+            (Flonum::Big(lhs), Flonum::F32(rhs)) => Ok(Flonum::Big(lhs.$op(rhs))),
+            (Flonum::Big(lhs), Flonum::F64(rhs)) => Ok(Flonum::Big(lhs.$op(rhs))),
+            (Flonum::F32(lhs), Flonum::Big(rhs)) => Ok(Flonum::Big(lhs.$op(rhs))),
+            (Flonum::F64(lhs), Flonum::Big(rhs)) => Ok(Flonum::Big(lhs.$op(rhs))),
+
+            // machine types can't be mixed
+            (Flonum::F32(lhs), Flonum::F32(rhs)) => Ok(Flonum::F32(lhs.$op(rhs))),
+            (Flonum::F64(lhs), Flonum::F64(rhs)) => Ok(Flonum::F64(lhs.$op(rhs))),
+            _ => Err(error::arithmetic_error(
+                "Incompatible numeric types for addition",
+            )),
+        }
+    };
+}
+
 impl From<rug::Integer> for Flonum {
     fn from(num: rug::Integer) -> Flonum {
         Flonum::Big(Float::with_val(200, num))
@@ -90,6 +112,38 @@ impl From<f64> for Flonum {
 impl From<Float> for Flonum {
     fn from(num: Float) -> Flonum {
         Flonum::Big(num)
+    }
+}
+
+impl Add<Flonum> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn add(self, rhs: Flonum) -> Self::Output {
+        binop!(self, rhs, add)
+    }
+}
+
+impl Add<fixnum::Fixnum> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn add(self, rhs: fixnum::Fixnum) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            binop!(self, flo, add)
+        } else {
+            Err(error::arithmetic_error("Can't convert fixnum to flonum"))
+        }
+    }
+}
+
+impl Add<rational::Rational> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn add(self, rhs: rational::Rational) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            binop!(self, flo, add)
+        } else {
+            Err(error::arithmetic_error("Can't convert rational to flonum"))
+        }
     }
 }
 
@@ -150,17 +204,17 @@ impl SchemeNumber for Flonum {
 }
 
 impl SchemeNumberExactness for Flonum {
-    fn to_inexact(&self) -> ArithResult<Flonum> {
-        Ok(self.clone())
+    fn to_inexact(self) -> Flonum {
+        self
     }
 
-    fn to_exact(&self) -> ArithResult<Number> {
+    fn to_exact(self) -> Option<Number> {
         if let Some(r) = self.to_float().to_rational() {
-            Ok(Number::Real(real::RealNumber::Rational(
+            Some(Number::Real(real::RealNumber::Rational(
                 rational::Rational::from(r),
             )))
         } else {
-            Err(error::arithmetic_error("Can't convert into exact number"))
+            None
         }
     }
 }
@@ -181,5 +235,14 @@ impl SchemeEqual<Flonum> for Flonum {
 
     fn is_equal(&self, other: &Flonum) -> bool {
         self.is_eq(other)
+    }
+}
+
+// casts
+impl CheckedCast<rational::Rational> for Flonum {
+    fn checked_cast(self) -> Option<rational::Rational> {
+        self.to_float()
+            .to_rational()
+            .map(|r| rational::Rational { inner: r })
     }
 }
