@@ -1,14 +1,8 @@
-use rug::integer::SmallInteger;
-
-use super::error::{self, RuntimeError};
-use super::fixnum;
-use super::flonum;
-use super::rational;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use std::ops::{Add, Div, Mul, Sub};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum RealNumber {
     Fixnum(fixnum::Fixnum),
     Flonum(flonum::Flonum),

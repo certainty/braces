@@ -7,7 +7,7 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 pub const PRECISION: u32 = 200;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Flonum {
     inner: Float,
 }

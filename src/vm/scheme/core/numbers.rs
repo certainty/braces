@@ -32,6 +32,7 @@ pub fn register(vm: &mut VM) {
     super::register_core!(vm, "-", sub, Arity::AtLeast(1));
     super::register_core!(vm, "*", mul, Arity::Many);
     super::register_core!(vm, "/", div, Arity::AtLeast(1));
+    super::register_core!(vm, "<", lt, Arity::Many);
 }
 
 // R7RS 6.2.6 Numerical operations
@@ -109,38 +110,28 @@ pub fn div(args: Vec<Value>) -> FunctionResult<Value> {
     }
 }
 
-fn as_number(v: Value) -> FunctionResult<number::Number> {
+fn as_number(v: &Value) -> FunctionResult<&number::Number> {
     match v {
         Value::Number(n) => Ok(n),
         v => return Err(error::argument_error(v.clone(), "is not a number")),
     }
 }
 
+pub fn lt(args: Vec<Value>) -> FunctionResult<Value> {
+    let mut is_lt = true;
+
+    for n in 0..args.len() {
+        if n == 0 {
+            is_lt = true;
+        } else {
+            is_lt = as_number(&args[n - 1])? < as_number(&args[n])?;
+        }
+    }
+
+    Ok(Value::Bool(is_lt))
+}
+
 /*
-
-pub fn fx_minus(args: Vec<Value>) -> FunctionResult<Value> {
-    match binary_procedure(&args)? {
-        (
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
-        ) => Ok(Value::Number(number::Number::Real(
-            number::RealNumber::Fixnum(lhs - rhs),
-        ))),
-        _ => Err(error::argument_error("Expected exactly two fixnums")),
-    }
-}
-
-pub fn fx_lt(args: Vec<Value>) -> FunctionResult<Value> {
-    println!("args: {:?}", args);
-    match binary_procedure(&args)? {
-        (
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
-        ) => Ok(Value::Bool(lhs < rhs)),
-        _ => Err(error::argument_error("Expected exactly two fixnums")),
-    }
-}
-
 pub fn fx_lt_eq(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (
@@ -252,12 +243,26 @@ mod tests {
         assert_eq!(result, number::Number::flonum(2.0));
     }
 
+    #[test]
+    fn test_lt() {
+        assert_matches!(run_string("(<)"), Value::Bool(true));
+        assert_matches!(run_string("(< 2 3)"), Value::Bool(true));
+        assert_matches!(run_string("(< 2 3 4)"), Value::Bool(true));
+        assert_matches!(run_string("(< 3 2)"), Value::Bool(false));
+        assert_matches!(run_string("(< 3 3)"), Value::Bool(false));
+        assert_matches!(run_string("(< 3 5 2)"), Value::Bool(false));
+    }
+
     fn run_as_number(inp: &str) -> Option<number::Number> {
-        let mut vm = VM::default();
-        if let Value::Number(n) = vm.run_string(inp, "test numbers").unwrap() {
+        if let Value::Number(n) = run_string(inp) {
             Some(n)
         } else {
             None
         }
+    }
+
+    fn run_string(inp: &str) -> Value {
+        let mut vm = VM::default();
+        vm.run_string(inp, "test numbers").unwrap()
     }
 }

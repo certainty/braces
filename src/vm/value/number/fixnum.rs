@@ -5,7 +5,7 @@ use rug::Integer;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[repr(transparent)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Fixnum {
     inner: Integer,
 }

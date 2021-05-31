@@ -40,7 +40,7 @@ pub trait SchemeNumberExactness {
     fn to_exact(self) -> Option<Number>;
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Number {
     Real(real::RealNumber),
     // Complex
@@ -74,113 +74,6 @@ impl Number {
             denom.into(),
         ))))
     }
-
-    //
-    // 1. If `lhs` and `rhs` are both integers of the same type, just return both
-    // 2. If `lhs` and `rhs` are both integers of different types, then the smaller type will be cast to the bigger type
-    // 3. If `lhs` and `rhs` are both floats of the same type, just return both
-    // 4. If `lhs` and `rhs` are both floats of different types, then the smaller type will be cast to the bigger
-    // 5. If `lhs` and `rhs` are both rational, just return both
-    // 6. If `lhs` and `rhs` are of types integer and float, the integer will be cast to a float. Should the integer be too big for the float, an error will be raised.
-    // 7. If `lhs` and `rhs` are of types integer and rational, the integer will be converted to a rational.
-    // 8. If `lhs` and `rhs` are of types float and rational, the float will be converted to a rational.
-    /*
-    pub fn coerce(lhs: Number, rhs: Number) -> ArithResult<(Number, Number)> {
-        match (lhs, rhs) {
-            (
-                Number::Real(real::RealNumber::Fixnum(lhs)),
-                Number::Real(real::RealNumber::Fixnum(rhs)),
-            ) => {
-                let (coerced_lhs, coerced_rhs) = fixnum::Fixnum::coerce(lhs, rhs);
-
-                Ok((
-                    Number::Real(real::RealNumber::Fixnum(coerced_lhs)),
-                    Number::Real(real::RealNumber::Fixnum(coerced_rhs)),
-                ))
-            }
-            (
-                Number::Real(real::RealNumber::Flonum(lhs)),
-                Number::Real(real::RealNumber::Flonum(rhs)),
-            ) => {
-                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(lhs, rhs);
-
-                Ok((
-                    Number::Real(real::RealNumber::Flonum(coerced_lhs)),
-                    Number::Real(real::RealNumber::Flonum(coerced_rhs)),
-                ))
-            }
-            (
-                Number::Real(real::RealNumber::Rational(lhs)),
-                Number::Real(real::RealNumber::Rational(rhs)),
-            ) => Ok((
-                Number::Real(real::RealNumber::Rational(lhs)),
-                Number::Real(real::RealNumber::Rational(rhs)),
-            )),
-
-            // Fixnum / Flonum
-            (
-                Number::Real(real::RealNumber::Fixnum(lhs)),
-                Number::Real(real::RealNumber::Flonum(rhs)),
-            ) => {
-                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(Number::Real(real::RealNumber::Fixnum(lhs.to_inexact()))), rhs);
-
-                Ok((
-                    Number::Real(real::RealNumber::Flonum(coerced_lhs)),
-                    Number::Real(real::RealNumber::Flonum(coerced_rhs)),
-                ))
-            }
-
-            (
-                Number::Real(real::RealNumber::Flonum(lhs)),
-                Number::Real(real::RealNumber::Fixnum(rhs)),
-            ) => {
-                let (coerced_lhs, coerced_rhs) = flonum::Flonum::coerce(lhs, rhs.to_inexact()?);
-
-                Ok((
-                    Number::Real(real::RealNumber::Flonum(coerced_lhs)),
-                    Number::Real(real::RealNumber::Flonum(coerced_rhs)),
-                ))
-            }
-
-            // Fixnum / Rational
-            (
-                Number::Real(real::RealNumber::Rational(lhs)),
-                Number::Real(real::RealNumber::Fixnum(rhs)),
-            ) => Ok((
-                Number::Real(real::RealNumber::Rational(lhs)),
-                Number::Real(real::RealNumber::Rational(rational::Rational::from(
-                    rhs.as_big(),
-                ))),
-            )),
-
-            (
-                Number::Real(real::RealNumber::Fixnum(lhs)),
-                Number::Real(real::RealNumber::Rational(rhs)),
-            ) => Ok((
-                Number::Real(real::RealNumber::Rational(rational::Rational::from(
-                    lhs.as_big(),
-                ))),
-                Number::Real(real::RealNumber::Rational(rhs)),
-            )),
-
-            // Flonum / Rational
-            (
-                Number::Real(real::RealNumber::Rational(lhs)),
-                Number::Real(real::RealNumber::Flonum(rhs)),
-            ) => Ok((
-                Number::Real(real::RealNumber::Rational(lhs)),
-                Number::Real(real::RealNumber::Fixnum(rhs.to_exact())),
-            )),
-
-            (
-                Number::Real(real::RealNumber::Flonum(lhs)),
-                Number::Real(real::RealNumber::Rational(rhs)),
-            ) => Ok((
-                Number::Real(real::RealNumber::Fixnum(lhs.to_exact())),
-                Number::Real(real::RealNumber::Rational(rhs)),
-            )),
-        }
-    }*/
 }
 
 // conversions and casts

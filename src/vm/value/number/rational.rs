@@ -5,7 +5,7 @@ use az::{CheckedAs, CheckedCast};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[repr(transparent)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub struct Rational {
     pub(crate) inner: rug::Rational,
 }
