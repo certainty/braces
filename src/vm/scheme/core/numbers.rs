@@ -171,3 +171,93 @@ pub fn fx_gt_eq(args: Vec<Value>) -> FunctionResult<Value> {
     }
 }
 */
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vm::VM;
+
+    #[test]
+    fn arith_addition() {
+        let result = run_as_number("(+)").unwrap();
+        assert_eq!(result, number::Number::fixnum(0));
+
+        let result = run_as_number("(+ 1)").unwrap();
+        assert_eq!(result, number::Number::fixnum(1));
+
+        let result = run_as_number("(+ 1 10)").unwrap();
+        assert_eq!(result, number::Number::fixnum(11));
+
+        let result = run_as_number("(+ 1 10 5)").unwrap();
+        assert_eq!(result, number::Number::fixnum(16));
+    }
+
+    #[test]
+    fn arith_subtraction() {
+        let result = run_as_number("(- 2 2)").unwrap();
+        assert_eq!(result, number::Number::fixnum(0));
+
+        let result = run_as_number("(- 2 4)").unwrap();
+        assert_eq!(result, number::Number::fixnum(-2));
+    }
+
+    #[test]
+    fn arith_multiplication() {
+        let result = run_as_number("(*)").unwrap();
+        assert_eq!(result, number::Number::fixnum(1));
+
+        let result = run_as_number("(* 2)").unwrap();
+        assert_eq!(result, number::Number::fixnum(2));
+
+        let result = run_as_number("(* 2 12)").unwrap();
+        assert_eq!(result, number::Number::fixnum(24));
+
+        let result = run_as_number("(* 2 12 10)").unwrap();
+        assert_eq!(result, number::Number::fixnum(240));
+    }
+
+    #[test]
+    fn arith_division() {
+        let result = run_as_number("(/ 4 2)").unwrap();
+        assert_eq!(result, number::Number::fixnum(2));
+    }
+
+    #[test]
+    fn test_div_for_fixnum() {
+        let result = run_as_number("(/ 4 2)").unwrap();
+        assert_eq!(result, number::Number::fixnum(2));
+
+        let result = run_as_number("(/ 4 3)").unwrap();
+        assert_eq!(result, number::Number::fraction(4, 3));
+    }
+
+    #[test]
+    fn mix_arithmetic() {
+        let result = run_as_number("(/ 4 2.0)").unwrap();
+        assert_eq!(result, number::Number::flonum(2.0));
+
+        let result = run_as_number("(/ 4.0 2)").unwrap();
+        assert_eq!(result, number::Number::flonum(2.0));
+
+        let result = run_as_number("(+ 4 2.0)").unwrap();
+        assert_eq!(result, number::Number::flonum(6.0));
+
+        let result = run_as_number("(+ 4.0 2)").unwrap();
+        assert_eq!(result, number::Number::flonum(6.0));
+
+        let result = run_as_number("(- 4 2.0)").unwrap();
+        assert_eq!(result, number::Number::flonum(2.0));
+
+        let result = run_as_number("(- 4.0 2)").unwrap();
+        assert_eq!(result, number::Number::flonum(2.0));
+    }
+
+    fn run_as_number(inp: &str) -> Option<number::Number> {
+        let mut vm = VM::default();
+        if let Value::Number(n) = vm.run_string(inp, "test numbers").unwrap() {
+            Some(n)
+        } else {
+            None
+        }
+    }
+}
