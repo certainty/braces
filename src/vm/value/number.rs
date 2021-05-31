@@ -279,6 +279,36 @@ impl Add<Number> for Number {
     }
 }
 
+impl Sub<Number> for Number {
+    type Output = ArithResult<Number>;
+
+    fn sub(self, rhs: Number) -> Self::Output {
+        match (self, rhs) {
+            (Number::Real(lhs), Number::Real(rhs)) => Ok(Number::Real(lhs.sub(rhs)?)),
+        }
+    }
+}
+
+impl Div<Number> for Number {
+    type Output = ArithResult<Number>;
+
+    fn div(self, rhs: Number) -> Self::Output {
+        match (self, rhs) {
+            (Number::Real(lhs), Number::Real(rhs)) => Ok(Number::Real(lhs.div(rhs)?)),
+        }
+    }
+}
+
+impl Mul<Number> for Number {
+    type Output = ArithResult<Number>;
+
+    fn mul(self, rhs: Number) -> Self::Output {
+        match (self, rhs) {
+            (Number::Real(lhs), Number::Real(rhs)) => Ok(Number::Real(lhs.mul(rhs)?)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

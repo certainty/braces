@@ -1,10 +1,10 @@
 use crate::vm::scheme::ffi::*;
 use crate::vm::value::number::SchemeNumber;
 use crate::vm::value::procedure::foreign;
-use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
+use crate::vm::value::procedure::Arity;
 use crate::vm::value::{error, number, Value};
 use crate::vm::VM;
-use std::ops::Add;
+use std::ops::{Add, Div, Mul, Sub};
 
 macro_rules! define_predicate {
     ($name:ident, $number:ident, $pred:expr) => {
@@ -27,8 +27,11 @@ pub fn register(vm: &mut VM) {
     super::register_core!(vm, "finite?", finite_p, Arity::Exactly(1));
     super::register_core!(vm, "infinite?", inf_p, Arity::Exactly(1));
     super::register_core!(vm, "exact?", exact_p, Arity::Exactly(1));
-    super::register_core!(vm, "inexact?", exact_p, Arity::Exactly(1));
-    super::register_core!(vm, "+", plus, Arity::Exactly(2));
+    super::register_core!(vm, "inexact?", inexact_p, Arity::Exactly(1));
+    super::register_core!(vm, "+", add, Arity::Many);
+    super::register_core!(vm, "-", sub, Arity::AtLeast(1));
+    super::register_core!(vm, "*", mul, Arity::Many);
+    super::register_core!(vm, "/", div, Arity::AtLeast(1));
 }
 
 // R7RS 6.2.6 Numerical operations
@@ -50,14 +53,69 @@ define_predicate!(finite_p, n, n.is_finite());
 define_predicate!(exact_p, n, n.is_exact());
 define_predicate!(inexact_p, n, n.is_inexact());
 
-pub fn plus(args: Vec<Value>) -> FunctionResult<Value> {
-    match binary_procedure(&args)? {
-        (Value::Number(lhs), Value::Number(rhs)) => {
-            Ok(Value::Number(lhs.clone().add(rhs.clone())?))
+pub fn add(args: Vec<Value>) -> FunctionResult<Value> {
+    let mut result = number::Number::fixnum(0);
+
+    for n in args {
+        match n {
+            Value::Number(n) => result = result.add(n)?,
+            v => return Err(error::argument_error(v.clone(), "is not a number")),
         }
-        _ => Err(error::argument_error("Expected exactly two fixnums")),
+    }
+
+    Ok(Value::Number(result))
+}
+
+pub fn mul(args: Vec<Value>) -> FunctionResult<Value> {
+    let mut result = number::Number::fixnum(1);
+
+    for n in args {
+        match n {
+            Value::Number(n) => result = result.mul(n)?,
+            v => return Err(error::argument_error(v.clone(), "is not a number")),
+        }
+    }
+
+    Ok(Value::Number(result))
+}
+
+pub fn sub(args: Vec<Value>) -> FunctionResult<Value> {
+    if let Value::Number(mut result) = args[0].clone() {
+        for n in args[1..].iter().cloned() {
+            match n {
+                Value::Number(n) => result = result.sub(n)?,
+                v => return Err(error::argument_error(v.clone(), "is not a number")),
+            }
+        }
+
+        Ok(Value::Number(result))
+    } else {
+        return Err(error::argument_error(args[0].clone(), "is not a number"));
     }
 }
+
+pub fn div(args: Vec<Value>) -> FunctionResult<Value> {
+    if let Value::Number(mut result) = args[0].clone() {
+        for n in args[1..].iter().cloned() {
+            match n {
+                Value::Number(n) => result = result.div(n)?,
+                v => return Err(error::argument_error(v.clone(), "is not a number")),
+            }
+        }
+
+        Ok(Value::Number(result))
+    } else {
+        return Err(error::argument_error(args[0].clone(), "is not a number"));
+    }
+}
+
+fn as_number(v: Value) -> FunctionResult<number::Number> {
+    match v {
+        Value::Number(n) => Ok(n),
+        v => return Err(error::argument_error(v.clone(), "is not a number")),
+    }
+}
+
 /*
 
 pub fn fx_minus(args: Vec<Value>) -> FunctionResult<Value> {

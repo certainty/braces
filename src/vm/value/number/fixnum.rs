@@ -2,7 +2,7 @@ use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use az::{CheckedAs, CheckedCast};
 use rug::Integer;
-use std::ops::{Add, Neg};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Clone)]
@@ -62,7 +62,7 @@ impl SchemeNumber for Fixnum {
         false
     }
     fn is_rational(&self) -> bool {
-        false
+        true
     }
     fn is_integer(&self) -> bool {
         true
@@ -135,5 +135,77 @@ impl Add<rational::Rational> for Fixnum {
 
     fn add(self, rhs: rational::Rational) -> Self::Output {
         rhs.add(self)
+    }
+}
+
+impl Mul<Fixnum> for Fixnum {
+    type Output = ArithResult<Fixnum>;
+
+    fn mul(self, rhs: Fixnum) -> Self::Output {
+        Ok(Fixnum::new(self.inner * rhs.inner))
+    }
+}
+
+impl Mul<flonum::Flonum> for Fixnum {
+    type Output = ArithResult<flonum::Flonum>;
+
+    fn mul(self, rhs: flonum::Flonum) -> Self::Output {
+        rhs.mul(self)
+    }
+}
+
+impl Mul<rational::Rational> for Fixnum {
+    type Output = ArithResult<rational::Rational>;
+
+    fn mul(self, rhs: rational::Rational) -> Self::Output {
+        rhs.mul(self)
+    }
+}
+
+impl Sub<Fixnum> for Fixnum {
+    type Output = ArithResult<Fixnum>;
+
+    fn sub(self, rhs: Fixnum) -> Self::Output {
+        Ok(Fixnum::new(self.inner - rhs.inner))
+    }
+}
+
+impl Sub<flonum::Flonum> for Fixnum {
+    type Output = ArithResult<flonum::Flonum>;
+
+    fn sub(self, rhs: flonum::Flonum) -> Self::Output {
+        self.to_inexact().sub(rhs)
+    }
+}
+
+impl Sub<rational::Rational> for Fixnum {
+    type Output = ArithResult<rational::Rational>;
+
+    fn sub(self, rhs: rational::Rational) -> Self::Output {
+        rational::Rational::from(self.inner.clone()).sub(rhs)
+    }
+}
+
+impl Div<Fixnum> for Fixnum {
+    type Output = ArithResult<Fixnum>;
+
+    fn div(self, rhs: Fixnum) -> Self::Output {
+        Ok(Fixnum::new(self.inner / rhs.inner))
+    }
+}
+
+impl Div<flonum::Flonum> for Fixnum {
+    type Output = ArithResult<flonum::Flonum>;
+
+    fn div(self, rhs: flonum::Flonum) -> Self::Output {
+        self.to_inexact().div(rhs)
+    }
+}
+
+impl Div<rational::Rational> for Fixnum {
+    type Output = ArithResult<rational::Rational>;
+
+    fn div(self, rhs: rational::Rational) -> Self::Output {
+        rational::Rational::from(self.inner.clone()).div(rhs)
     }
 }

@@ -3,7 +3,7 @@ use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use az::{CheckedAs, CheckedCast};
 use rug::Float;
-use std::ops::{Add, Div, Neg};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 pub const PRECISION: u32 = 200;
 
@@ -175,10 +175,98 @@ impl Add<rational::Rational> for Flonum {
     }
 }
 
+impl Mul<Flonum> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn mul(self, rhs: Flonum) -> Self::Output {
+        Ok(Flonum::new(self.inner * rhs.inner))
+    }
+}
+
+impl Mul<fixnum::Fixnum> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn mul(self, rhs: fixnum::Fixnum) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            self.mul(flo)
+        } else {
+            Err(error::arithmetic_error("Can't convert fixnum to flonum"))
+        }
+    }
+}
+
+impl Mul<rational::Rational> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn mul(self, rhs: rational::Rational) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            self.mul(flo)
+        } else {
+            Err(error::arithmetic_error("Can't convert rational to flonum"))
+        }
+    }
+}
+
+impl Sub<Flonum> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn sub(self, rhs: Flonum) -> Self::Output {
+        Ok(Flonum::new(self.inner.sub(rhs.inner)))
+    }
+}
+
+impl Sub<fixnum::Fixnum> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn sub(self, rhs: fixnum::Fixnum) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            self.sub(flo)
+        } else {
+            Err(error::arithmetic_error("Can't convert fixnum to flonum"))
+        }
+    }
+}
+
+impl Sub<rational::Rational> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn sub(self, rhs: rational::Rational) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            self.sub(flo)
+        } else {
+            Err(error::arithmetic_error("Can't convert rational to flonum"))
+        }
+    }
+}
+
 impl Div<Flonum> for Flonum {
     type Output = ArithResult<Flonum>;
 
     fn div(self, rhs: Flonum) -> Self::Output {
         Ok(Flonum::new(self.inner.div(rhs.inner)))
+    }
+}
+
+impl Div<fixnum::Fixnum> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn div(self, rhs: fixnum::Fixnum) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            self.div(flo)
+        } else {
+            Err(error::arithmetic_error("Can't convert fixnum to flonum"))
+        }
+    }
+}
+
+impl Div<rational::Rational> for Flonum {
+    type Output = ArithResult<Flonum>;
+
+    fn div(self, rhs: rational::Rational) -> Self::Output {
+        if let Some(flo) = rhs.checked_as::<flonum::Flonum>() {
+            self.div(flo)
+        } else {
+            Err(error::arithmetic_error("Can't convert rational to flonum"))
+        }
     }
 }

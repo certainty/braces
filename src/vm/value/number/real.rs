@@ -1,10 +1,12 @@
+use rug::integer::SmallInteger;
+
 use super::error::{self, RuntimeError};
 use super::fixnum;
 use super::flonum;
 use super::rational;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
-use std::ops::Add;
+use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum RealNumber {
@@ -166,5 +168,39 @@ impl Add<RealNumber> for RealNumber {
 
     fn add(self, rhs: RealNumber) -> Self::Output {
         binop!(self, rhs, add)
+    }
+}
+
+impl Sub<RealNumber> for RealNumber {
+    type Output = ArithResult<RealNumber>;
+
+    fn sub(self, rhs: RealNumber) -> Self::Output {
+        binop!(self, rhs, sub)
+    }
+}
+impl Mul<RealNumber> for RealNumber {
+    type Output = ArithResult<RealNumber>;
+
+    fn mul(self, rhs: RealNumber) -> Self::Output {
+        binop!(self, rhs, mul)
+    }
+}
+impl Div<RealNumber> for RealNumber {
+    type Output = ArithResult<RealNumber>;
+
+    fn div(self, rhs: RealNumber) -> Self::Output {
+        if let (RealNumber::Fixnum(lhs), RealNumber::Fixnum(rhs)) = (&self, &rhs) {
+            let r = rational::Rational::from(lhs.as_inner());
+            let result = r.div(rhs.clone())?;
+            if result.inner.denom() == &rug::Integer::from(1) {
+                Ok(RealNumber::Fixnum(fixnum::Fixnum::from(
+                    result.inner.numer(),
+                )))
+            } else {
+                Ok(RealNumber::Rational(result))
+            }
+        } else {
+            binop!(self, rhs, div)
+        }
     }
 }
