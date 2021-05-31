@@ -33,6 +33,10 @@ pub fn register(vm: &mut VM) {
     super::register_core!(vm, "*", mul, Arity::Many);
     super::register_core!(vm, "/", div, Arity::AtLeast(1));
     super::register_core!(vm, "<", lt, Arity::Many);
+    super::register_core!(vm, "<=", lt_eq, Arity::Many);
+    super::register_core!(vm, ">", gt, Arity::Many);
+    super::register_core!(vm, ">=", gt_eq, Arity::Many);
+    super::register_core!(vm, "=", num_eq, Arity::Many);
 }
 
 // R7RS 6.2.6 Numerical operations
@@ -118,17 +122,73 @@ fn as_number(v: &Value) -> FunctionResult<&number::Number> {
 }
 
 pub fn lt(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut is_lt = true;
+    let mut result = true;
 
     for n in 0..args.len() {
         if n == 0 {
-            is_lt = true;
+            result = true;
         } else {
-            is_lt = as_number(&args[n - 1])? < as_number(&args[n])?;
+            result = as_number(&args[n - 1])? < as_number(&args[n])?;
         }
     }
 
-    Ok(Value::Bool(is_lt))
+    Ok(Value::Bool(result))
+}
+
+pub fn lt_eq(args: Vec<Value>) -> FunctionResult<Value> {
+    let mut result = true;
+
+    for n in 0..args.len() {
+        if n == 0 {
+            result = true;
+        } else {
+            result = as_number(&args[n - 1])? <= as_number(&args[n])?;
+        }
+    }
+
+    Ok(Value::Bool(result))
+}
+
+pub fn gt(args: Vec<Value>) -> FunctionResult<Value> {
+    let mut result = true;
+
+    for n in 0..args.len() {
+        if n == 0 {
+            result = true;
+        } else {
+            result = as_number(&args[n - 1])? > as_number(&args[n])?;
+        }
+    }
+
+    Ok(Value::Bool(result))
+}
+
+pub fn gt_eq(args: Vec<Value>) -> FunctionResult<Value> {
+    let mut result = true;
+
+    for n in 0..args.len() {
+        if n == 0 {
+            result = true;
+        } else {
+            result = as_number(&args[n - 1])? >= as_number(&args[n])?;
+        }
+    }
+
+    Ok(Value::Bool(result))
+}
+
+pub fn num_eq(args: Vec<Value>) -> FunctionResult<Value> {
+    let mut result = true;
+
+    for n in 0..args.len() {
+        if n == 0 {
+            result = true;
+        } else {
+            result = as_number(&args[n - 1])? == as_number(&args[n])?;
+        }
+    }
+
+    Ok(Value::Bool(result))
 }
 
 /*
