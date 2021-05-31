@@ -47,13 +47,6 @@ pub enum Number {
 }
 
 impl Number {
-    /*
-    pub fn cmp(&self, other: Self) -> Ordering {
-        match (self, other) {
-            (Self::Real(lhs), Self::Real(rhs)) => lhs.cmp(rhs),
-        }
-    }*/
-
     // Value constructors
     pub fn inifinity() -> Self {
         Self::Real(real::RealNumber::Flonum(flonum::Flonum::infinity()))
@@ -67,8 +60,12 @@ impl Number {
         Self::Real(real::RealNumber::Flonum(flonum::Flonum::nan()))
     }
 
-    pub fn big<I: Into<Integer>>(num: I) -> Number {
-        Self::Real(num.into().into())
+    pub fn flonum<I: Into<flonum::Flonum>>(num: I) -> Number {
+        Self::Real(real::RealNumber::Flonum(num.into()))
+    }
+
+    pub fn fixnum<I: Into<fixnum::Fixnum>>(num: I) -> Number {
+        Self::Real(real::RealNumber::Fixnum(num.into()))
     }
 
     pub fn fraction<N: Into<Integer>, D: Into<Integer>>(numer: N, denom: D) -> Number {
@@ -78,36 +75,6 @@ impl Number {
         ))))
     }
 
-    pub fn i8(num: i8) -> Number {
-        Self::Real(num.into())
-    }
-
-    pub fn i16(num: i16) -> Number {
-        Self::Real(num.into())
-    }
-
-    pub fn i32(num: i32) -> Number {
-        Self::Real(num.into())
-    }
-
-    pub fn i64(num: i64) -> Number {
-        Self::Real(num.into())
-    }
-
-    pub fn f32(num: f32) -> Number {
-        Self::Real(real::RealNumber::Flonum(num.into()))
-    }
-
-    pub fn f64(num: f64) -> Number {
-        Self::Real(real::RealNumber::Flonum(num.into()))
-    }
-
-    pub fn big_f<I: Into<rug::Float>>(num: I) -> Number {
-        Self::Real(real::RealNumber::Flonum(flonum::Flonum::Big(num.into())))
-    }
-
-    // Coerce two numbers so that they can be applied to the same operation
-    // We apply the following coercion rules because they are simple (not necessarily performant)
     //
     // 1. If `lhs` and `rhs` are both integers of the same type, just return both
     // 2. If `lhs` and `rhs` are both integers of different types, then the smaller type will be cast to the bigger type
@@ -216,6 +183,8 @@ impl Number {
     }*/
 }
 
+// conversions and casts
+
 impl<I: Into<real::RealNumber>> From<I> for Number {
     fn from(n: I) -> Number {
         Number::Real(n.into())
@@ -310,33 +279,19 @@ impl Add<Number> for Number {
     }
 }
 
-// implement SchemeEqual
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn all_is_real() {
-        assert!(Number::f64(0.1).is_real());
-        assert!(Number::f32(0.1).is_real());
-        assert!(Number::i8(1).is_real());
-        assert!(Number::i16(1).is_real());
-        assert!(Number::i32(1).is_real());
-        assert!(Number::i64(1).is_real());
-        assert!(Number::big(1).is_real());
+        assert!(Number::fixnum(1).is_real());
         assert!(Number::fraction(1, 2).is_real());
     }
 
     #[test]
     fn is_rational() {
-        assert!(!Number::f64(0.1).is_rational());
-        assert!(!Number::f32(0.1).is_rational());
-        assert!(!Number::i8(1).is_rational());
-        assert!(!Number::i16(1).is_rational());
-        assert!(!Number::i32(1).is_rational());
-        assert!(!Number::i64(1).is_rational());
-        assert!(!Number::big(1).is_rational());
+        assert!(!Number::fixnum(1).is_rational());
         assert!(Number::fraction(1, 2).is_rational());
     }
 

@@ -69,20 +69,12 @@ impl Writer {
             n if n.is_nan() => String::from("+nan.0"),
             n if n.is_neg_infinite() => String::from("-inf.0"),
             n if n.is_infinite() => String::from("+inf.0"),
-            Flonum::Big(n) => format!("{}", n),
-            Flonum::F32(n) => format!("{}", n),
-            Flonum::F64(n) => format!("{}", n),
+            _ => format!("{}", num.as_inner()),
         }
     }
 
     fn write_fixnum(&self, num: &Fixnum) -> String {
-        match num {
-            Fixnum::Big(n) => format!("{}", n),
-            Fixnum::I8(n) => format!("{}", n),
-            Fixnum::I16(n) => format!("{}", n),
-            Fixnum::I32(n) => format!("{}", n),
-            Fixnum::I64(n) => format!("{}", n),
-        }
+        format!("{}", num.as_inner())
     }
 
     fn write_symbol(&self, sym: &str, quote: bool) -> String {

@@ -2,13 +2,28 @@ use super::real;
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use az::{CheckedAs, CheckedCast};
-use std::ops::Add;
-use std::ops::Neg;
+use std::ops::{Add, Div, Neg};
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rational {
     pub(crate) inner: rug::Rational,
+}
+
+impl Rational {
+    pub fn new(inner: rug::Rational) -> Self {
+        Self { inner }
+    }
+
+    pub fn as_inner(&self) -> &rug::Rational {
+        &self.inner
+    }
+
+    pub fn map<Op: FnOnce(rug::Rational) -> rug::Rational>(&self, op: Op) -> Self {
+        Self {
+            inner: op(self.inner.clone()),
+        }
+    }
 }
 
 impl<I: Into<rug::Rational>> From<I> for Rational {
@@ -17,11 +32,25 @@ impl<I: Into<rug::Rational>> From<I> for Rational {
     }
 }
 
+impl From<fixnum::Fixnum> for Rational {
+    fn from(n: fixnum::Fixnum) -> Rational {
+        Self::from(n.as_inner())
+    }
+}
+
+impl CheckedCast<flonum::Flonum> for Rational {
+    fn checked_cast(self) -> Option<flonum::Flonum> {
+        let numer_f = flonum::Flonum::from(self.inner.numer().clone());
+        let denom_f = flonum::Flonum::from(self.inner.denom().clone());
+
+        numer_f.div(denom_f).ok()
+    }
+}
+
 impl SchemeNumberExactness for Rational {
     fn to_inexact(self) -> flonum::Flonum {
-        let inexact = rug::Float::with_val(200, self.inner.numer().clone())
-            / rug::Float::with_val(200, self.inner.denom().clone());
-        flonum::Flonum::from(inexact)
+        self.checked_as::<flonum::Flonum>()
+            .expect("division can't fail")
     }
 
     fn to_exact(self) -> Option<Number> {
@@ -85,27 +114,6 @@ impl SchemeNumber for Rational {
     }
     fn is_neg_infinite(&self) -> bool {
         false
-    }
-}
-
-impl CheckedCast<flonum::Flonum> for Rational {
-    fn checked_cast(self) -> Option<flonum::Flonum> {
-        let inexact = rug::Float::with_val(flonum::PRECISION, self.inner.numer().clone())
-            / rug::Float::with_val(200, self.inner.denom().clone());
-
-        Some(flonum::Flonum::from(inexact))
-    }
-}
-
-impl From<fixnum::Fixnum> for Rational {
-    fn from(n: fixnum::Fixnum) -> Rational {
-        match n {
-            fixnum::Fixnum::Big(n) => Self::from(n),
-            fixnum::Fixnum::I8(n) => Self::from(n),
-            fixnum::Fixnum::I16(n) => Self::from(n),
-            fixnum::Fixnum::I32(n) => Self::from(n),
-            fixnum::Fixnum::I64(n) => Self::from(n),
-        }
     }
 }
 

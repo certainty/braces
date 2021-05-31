@@ -246,40 +246,40 @@ mod tests {
 
     #[test]
     fn parse_integer_10() {
-        assert_parse_as("0", Sexp::number(Number::big(0)));
-        assert_parse_as("10", Sexp::number(Number::big(10)));
-        assert_parse_as("#d10", Sexp::number(Number::big(10)));
-        assert_parse_as("#e#d10", Sexp::number(Number::big(10)));
-        assert_parse_as("23434", Sexp::number(Number::big(23434)));
-        assert_parse_as("-23434", Sexp::number(Number::big(-23434)));
+        assert_parse_as("0", Sexp::number(Number::fixnum(0)));
+        assert_parse_as("10", Sexp::number(Number::fixnum(10)));
+        assert_parse_as("#d10", Sexp::number(Number::fixnum(10)));
+        assert_parse_as("#e#d10", Sexp::number(Number::fixnum(10)));
+        assert_parse_as("23434", Sexp::number(Number::fixnum(23434)));
+        assert_parse_as("-23434", Sexp::number(Number::fixnum(-23434)));
     }
 
     #[test]
     fn parse_integer_2() {
-        assert_parse_as("#b0", Sexp::number(Number::big(0)));
-        assert_parse_as("#b01011", Sexp::number(Number::big(11)));
+        assert_parse_as("#b0", Sexp::number(Number::fixnum(0)));
+        assert_parse_as("#b01011", Sexp::number(Number::fixnum(11)));
     }
 
     #[test]
     fn parse_integer_8() {
-        assert_parse_as("#o777", Sexp::number(Number::big(511)));
-        assert_parse_as("#o0775", Sexp::number(Number::big(509)));
+        assert_parse_as("#o777", Sexp::number(Number::fixnum(511)));
+        assert_parse_as("#o0775", Sexp::number(Number::fixnum(509)));
 
         //assert_parse_error("#o8989")
     }
 
     #[test]
     fn parse_decimal_short() {
-        assert_parse_as(".3", Sexp::number(Number::f64(0.3)));
-        assert_parse_as(".3e1", Sexp::number(Number::f64(3.0)));
+        assert_parse_as(".3", Sexp::number(Number::flonum(0.3)));
+        assert_parse_as(".3e1", Sexp::number(Number::flonum(3.0)));
         assert_parse_ok(".3e-1")
     }
 
     #[test]
     fn parse_decimal() {
-        assert_parse_as("135.3", Sexp::number(Number::f64(135.3)));
-        assert_parse_as("-135.3", Sexp::number(Number::f64(-135.3)));
-        assert_parse_as("1.3e2", Sexp::number(Number::f64(130.0)));
+        assert_parse_as("135.3", Sexp::number(Number::flonum(135.3)));
+        assert_parse_as("-135.3", Sexp::number(Number::flonum(-135.3)));
+        assert_parse_as("1.3e2", Sexp::number(Number::flonum(130.0)));
         assert_parse_ok("1.3e-1")
     }
 
