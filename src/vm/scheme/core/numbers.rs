@@ -40,7 +40,6 @@ pub fn register(vm: &mut VM) {
 }
 
 // R7RS 6.2.6 Numerical operations
-
 fn number_p(args: Vec<Value>) -> FunctionResult<Value> {
     match unary_procedure(&args)? {
         Value::Number(_) => Ok(Value::Bool(true)),
@@ -190,38 +189,6 @@ pub fn num_eq(args: Vec<Value>) -> FunctionResult<Value> {
 
     Ok(Value::Bool(result))
 }
-
-/*
-pub fn fx_lt_eq(args: Vec<Value>) -> FunctionResult<Value> {
-    match binary_procedure(&args)? {
-        (
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
-        ) => Ok(Value::Bool(lhs <= rhs)),
-        _ => Err(error::argument_error("Expected exactly two fixnums")),
-    }
-}
-
-pub fn fx_gt(args: Vec<Value>) -> FunctionResult<Value> {
-    match binary_procedure(&args)? {
-        (
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
-        ) => Ok(Value::Bool(lhs > rhs)),
-        _ => Err(error::argument_error("Expected exactly two fixnums")),
-    }
-}
-
-pub fn fx_gt_eq(args: Vec<Value>) -> FunctionResult<Value> {
-    match binary_procedure(&args)? {
-        (
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(lhs))),
-            Value::Number(number::Number::Real(number::RealNumber::Fixnum(rhs))),
-        ) => Ok(Value::Bool(lhs >= rhs)),
-        _ => Err(error::argument_error("Expected exactly two fixnums")),
-    }
-}
-*/
 
 #[cfg(test)]
 mod tests {
