@@ -5,9 +5,9 @@ use crate::vm::value::number::rational::Rational;
 use crate::vm::value::number::{flonum::Flonum, real::RealNumber, Exactness, SchemeNumber, Sign};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
+use nom::character::complete::char;
 use nom::character::complete::one_of;
-use nom::character::complete::{char, digit1};
-use nom::combinator::{map, map_res, opt, value};
+use nom::combinator::{map, opt, value};
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 

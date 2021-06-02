@@ -3,7 +3,7 @@ use super::*;
 use crate::vm::value::equality::SchemeEqual;
 use az::{CheckedAs, CheckedCast};
 use rug::Float;
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 pub const PRECISION: u32 = 200;
 

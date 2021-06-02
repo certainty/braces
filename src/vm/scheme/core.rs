@@ -1,8 +1,8 @@
 pub mod numbers;
 use super::ffi::*;
 use crate::vm::value::procedure::foreign;
+use crate::vm::value::Value;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
-use crate::vm::value::{error, number, Value};
 use crate::vm::VM;
 
 macro_rules! register_core {
@@ -25,16 +25,9 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "null?", null_p, Arity::Exactly(1));
 
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
+    register_core!(vm, "inspect", inspect, Arity::Exactly(1));
 
     numbers::register(vm);
-    //register_core!(vm, "fx+", fx_plus, Arity::Exactly(2));
-    //register_core!(vm, "fx-", fx_minus, Arity::Exactly(2));
-    //register_core!(vm, "<", fx_lt, Arity::Exactly(2));
-    //register_core!(vm, "<=", fx_lt_eq, Arity::Exactly(2));
-    //register_core!(vm, ">", fx_gt, Arity::Exactly(2));
-    //register_core!(vm, ">=", fx_gt_eq, Arity::Exactly(2));
-
-    register_core!(vm, "inspect", inspect, Arity::Exactly(1));
 }
 
 //  R7RS 6.1

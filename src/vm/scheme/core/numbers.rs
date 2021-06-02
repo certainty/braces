@@ -47,6 +47,13 @@ fn number_p(args: Vec<Value>) -> FunctionResult<Value> {
     }
 }
 
+fn as_number(v: &Value) -> FunctionResult<&number::Number> {
+    match v {
+        Value::Number(n) => Ok(n),
+        v => return Err(error::argument_error(v.clone(), "is not a number")),
+    }
+}
+
 define_predicate!(complex_p, n, n.is_complex());
 define_predicate!(real_p, n, n.is_real());
 define_predicate!(rational_p, n, n.is_rational());
@@ -57,138 +64,71 @@ define_predicate!(finite_p, n, n.is_finite());
 define_predicate!(exact_p, n, n.is_exact());
 define_predicate!(inexact_p, n, n.is_inexact());
 
-pub fn add(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut result = number::Number::fixnum(0);
+macro_rules! define_fold {
+    ($func:ident, $identity:expr, $op:ident) => {
+        pub fn $func(args: Vec<Value>) -> FunctionResult<Value> {
+            let mut result = number::Number::fixnum($identity);
 
-    for n in args {
-        match n {
-            Value::Number(n) => result = result.add(n)?,
-            v => return Err(error::argument_error(v.clone(), "is not a number")),
+            for n in args {
+                match n {
+                    Value::Number(n) => result = result.$op(n)?,
+                    v => return Err(error::argument_error(v.clone(), "is not a number")),
+                }
+            }
+
+            Ok(Value::Number(result))
         }
-    }
-
-    Ok(Value::Number(result))
+    };
 }
 
-pub fn mul(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut result = number::Number::fixnum(1);
+define_fold!(add, 0, add);
+define_fold!(mul, 1, mul);
 
-    for n in args {
-        match n {
-            Value::Number(n) => result = result.mul(n)?,
-            v => return Err(error::argument_error(v.clone(), "is not a number")),
-        }
-    }
+macro_rules! define_reduction {
+    ($func:ident, $op:ident) => {
+        pub fn $func(args: Vec<Value>) -> FunctionResult<Value> {
+            if let Value::Number(mut result) = args[0].clone() {
+                for n in args[1..].iter().cloned() {
+                    match n {
+                        Value::Number(n) => result = result.$op(n)?,
+                        v => return Err(error::argument_error(v.clone(), "is not a number")),
+                    }
+                }
 
-    Ok(Value::Number(result))
-}
-
-pub fn sub(args: Vec<Value>) -> FunctionResult<Value> {
-    if let Value::Number(mut result) = args[0].clone() {
-        for n in args[1..].iter().cloned() {
-            match n {
-                Value::Number(n) => result = result.sub(n)?,
-                v => return Err(error::argument_error(v.clone(), "is not a number")),
+                Ok(Value::Number(result))
+            } else {
+                return Err(error::argument_error(args[0].clone(), "is not a number"));
             }
         }
-
-        Ok(Value::Number(result))
-    } else {
-        return Err(error::argument_error(args[0].clone(), "is not a number"));
-    }
+    };
 }
 
-pub fn div(args: Vec<Value>) -> FunctionResult<Value> {
-    if let Value::Number(mut result) = args[0].clone() {
-        for n in args[1..].iter().cloned() {
-            match n {
-                Value::Number(n) => result = result.div(n)?,
-                v => return Err(error::argument_error(v.clone(), "is not a number")),
+define_reduction!(sub, sub);
+define_reduction!(div, div);
+
+macro_rules! define_ordering {
+    ($func:ident, $op:tt) => {
+        fn $func(args: Vec<Value>) -> FunctionResult<Value> {
+            let mut result = true;
+
+            for n in 0..args.len() {
+                if n == 0 {
+                    result = true;
+                } else {
+                    result = as_number(&args[n - 1])? $op as_number(&args[n])?;
+                }
             }
+
+            Ok(Value::Bool(result))
         }
-
-        Ok(Value::Number(result))
-    } else {
-        return Err(error::argument_error(args[0].clone(), "is not a number"));
-    }
+    };
 }
 
-fn as_number(v: &Value) -> FunctionResult<&number::Number> {
-    match v {
-        Value::Number(n) => Ok(n),
-        v => return Err(error::argument_error(v.clone(), "is not a number")),
-    }
-}
-
-pub fn lt(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut result = true;
-
-    for n in 0..args.len() {
-        if n == 0 {
-            result = true;
-        } else {
-            result = as_number(&args[n - 1])? < as_number(&args[n])?;
-        }
-    }
-
-    Ok(Value::Bool(result))
-}
-
-pub fn lt_eq(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut result = true;
-
-    for n in 0..args.len() {
-        if n == 0 {
-            result = true;
-        } else {
-            result = as_number(&args[n - 1])? <= as_number(&args[n])?;
-        }
-    }
-
-    Ok(Value::Bool(result))
-}
-
-pub fn gt(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut result = true;
-
-    for n in 0..args.len() {
-        if n == 0 {
-            result = true;
-        } else {
-            result = as_number(&args[n - 1])? > as_number(&args[n])?;
-        }
-    }
-
-    Ok(Value::Bool(result))
-}
-
-pub fn gt_eq(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut result = true;
-
-    for n in 0..args.len() {
-        if n == 0 {
-            result = true;
-        } else {
-            result = as_number(&args[n - 1])? >= as_number(&args[n])?;
-        }
-    }
-
-    Ok(Value::Bool(result))
-}
-
-pub fn num_eq(args: Vec<Value>) -> FunctionResult<Value> {
-    let mut result = true;
-
-    for n in 0..args.len() {
-        if n == 0 {
-            result = true;
-        } else {
-            result = as_number(&args[n - 1])? == as_number(&args[n])?;
-        }
-    }
-
-    Ok(Value::Bool(result))
-}
+define_ordering!(lt, <);
+define_ordering!(lt_eq, <=);
+define_ordering!(gt, >);
+define_ordering!(gt_eq, >=);
+define_ordering!(num_eq, ==);
 
 #[cfg(test)]
 mod tests {
