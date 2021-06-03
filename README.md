@@ -19,7 +19,7 @@ make repl
   - [x] bool
   - [x] symbol
   - [x] char
-  - [ ] number
+  - [x] number
   - [ ] vector
   - [ ] byte-vector
   - [x] proper list
@@ -41,6 +41,15 @@ make repl
 ### TCO
 - [ ] identify tail calls
 - [ ] optimise tail calls
+
+### Errors
+- [ ] fix backtraces 
+- [ ] improve error reporting for sexp parser
+- [ ] improve error reporting for expressions
+
+### Macros
+- [ ] add macro expansion phase
+- [ ] add syntactic closure macro system
 
 ### Continuations
 - [ ] figure out how to implement them
