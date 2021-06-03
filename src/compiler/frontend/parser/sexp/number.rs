@@ -1,8 +1,11 @@
 use super::datum::Datum;
 use super::datum::Sexp;
 use super::map_datum;
+use crate::vm::value::number;
+use crate::vm::value::number::fixnum::Fixnum;
 use crate::vm::value::number::rational::Rational;
 use crate::vm::value::number::{flonum::Flonum, real::RealNumber, Exactness, SchemeNumber, Sign};
+use az::{CheckedAs, CheckedCast};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
@@ -34,7 +37,7 @@ use super::ParseResult;
 pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let (s, pref) = parse_prefix(input)?;
 
-    map_datum(parse_real(pref.radix), Sexp::number)(s)
+    map_datum(parse_real(pref), Sexp::number)(s)
 }
 
 //
@@ -59,17 +62,35 @@ pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 // <ureal R> -> <uinteger R> | <uninteger R> / <uninteger R> | <decimal R>
 //
 //
-fn parse_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    move |input| alt((parse_signed_real(radix), parse_inf_nan))(input)
+fn parse_real<'a>(prefix: Prefix) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    move |input| alt((parse_signed_real(prefix.clone()), parse_inf_nan))(input)
 }
 
-fn parse_signed_real<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    let ureal = alt((parse_decimal, parse_rational(radix), parse_uinteger(radix)));
-    let signed_ureal = tuple((parse_sign, ureal));
+fn parse_signed_real<'a>(prefix: Prefix) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    let ureal = alt((
+        parse_decimal,
+        parse_rational(prefix.clone()),
+        parse_uinteger(prefix.clone()),
+    ));
+    let mut signed_ureal = tuple((parse_sign, ureal));
 
-    map(signed_ureal, |result: (Sign, RealNumber)| {
-        result.1.sign(result.0)
-    })
+    move |input| {
+        let (s, (sign, num)) = signed_ureal(input)?;
+        if let Some(num) = apply_exactness(num.sign(sign), &prefix.exactness) {
+            Ok((s, num))
+        } else {
+            Err(error::parse_error("Can't parse number"))
+        }
+    }
+}
+
+fn apply_exactness<'a>(num: RealNumber, exactness: &Option<Exactness>) -> Option<RealNumber> {
+    match (num, exactness) {
+        (RealNumber::Flonum(flonum), Some(Exactness::Exact)) => todo!(),
+        (RealNumber::Fixnum(flonum), Some(Exactness::Inexact)) => todo!(),
+        (RealNumber::Rational(flonum), Some(Exactness::Inexact)) => todo!(),
+        _ => Some(num),
+    }
 }
 
 fn parse_inf_nan<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
@@ -82,8 +103,8 @@ fn parse_inf_nan<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
 }
 
 // <uinteger R> -> <digit R>+
-fn parse_uinteger<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
-    map(parse_digits(radix), RealNumber::from)
+fn parse_uinteger<'a>(prefix: Prefix) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+    map(parse_digits(prefix.radix), RealNumber::from)
 }
 
 fn _parse_u64<'a, P>(digits: P) -> impl FnMut(Input<'a>) -> ParseResult<'a, u64>
@@ -102,9 +123,13 @@ where
 
 // <rational R> -> <uinteger R> / <uinteger R>
 
-fn parse_rational<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
+fn parse_rational<'a>(prefix: Prefix) -> impl FnMut(Input<'a>) -> ParseResult<'a, RealNumber> {
     map(
-        tuple((parse_digits(radix), char('/'), parse_digits(radix))),
+        tuple((
+            parse_digits(prefix.radix),
+            char('/'),
+            parse_digits(prefix.radix),
+        )),
         |(numer, _, denom)| RealNumber::Rational(Rational::from((numer, denom))),
     )
 }
@@ -195,6 +220,7 @@ fn parse_suffix<'a>(input: Input<'a>) -> ParseResult<'a, Option<i32>> {
     }
 }
 
+#[derive(Clone, Debug)]
 struct Prefix {
     radix: u8,
     exactness: Option<Exactness>,
