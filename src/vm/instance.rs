@@ -147,6 +147,7 @@ impl<'a> Instance<'a> {
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
 
                 &Instruction::Call(args) => self.apply(args)?,
+                &Instruction::TailCall(args) => self.tail_call(args)?,
 
                 &Instruction::JumpIfFalse(to) => self.jump_if_false(to)?,
                 &Instruction::Jump(to) => self.jump(to)?,
@@ -622,6 +623,70 @@ impl<'a> Instance<'a> {
                 self.runtime_error(e, Some(proc.name.clone()))
             }
         }
+    }
+
+    #[inline]
+    fn tail_call(&mut self, args: usize) -> Result<()> {
+        let callable = self.peek(args).clone();
+
+        match callable {
+            value::Value::Closure(cl) => self.tail_call_closure(cl.clone(), args)?,
+            value::Value::Procedure(procedure::Procedure::Native(p)) => {
+                self.tail_call_native(p.clone(), args)?
+            }
+            value::Value::Procedure(procedure::Procedure::Foreign(p)) => {
+                // always tail call in the sense that it doesn't create a call-frame anyways
+                self.apply_foreign(p.clone(), args)?
+            }
+            other => {
+                return self.runtime_error(error::non_callable(other), None);
+            }
+        };
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////
+    // tail call closure with supplied arguments
+    //
+    //
+    // ## Stack effect
+    //
+    // Pushes the arguments onto the stack
+    //
+    #[inline]
+    fn tail_call_closure(&mut self, closure: Closure, arg_count: usize) -> Result<()> {
+        self.check_arity(&closure.procedure().arity, arg_count)?;
+        // make sure the previous arguments are reset on the stack so we can provide the new ones
+        let arg_count = self.bind_arguments(&closure.procedure().arity, arg_count)?;
+
+        // prepare the top frame for the tail call
+        self.push_frame(closure, arg_count)?;
+        self.disassemble_frame();
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////
+    // tail call a native procedure with supplied arguments
+    //
+    //
+    // ## Stack effect
+    //
+    //
+    #[inline]
+    fn tail_call_native(
+        &mut self,
+        proc: Rc<procedure::native::Procedure>,
+        arg_count: usize,
+    ) -> Result<()> {
+        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
+        self.check_arity(&proc.arity, arg_count)?;
+        let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
+        let closure = proc.into();
+
+        // prepare the top frame for the tail call
+        self.push_frame(closure, arg_count)?;
+        self.disassemble_frame();
+        Ok(())
     }
 
     ////////////////////////////////////////////////////////////////////////
