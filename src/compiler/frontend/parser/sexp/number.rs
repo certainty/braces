@@ -1,16 +1,15 @@
 use super::datum::Datum;
 use super::datum::Sexp;
 use super::map_datum;
-use crate::vm::value::number;
-use crate::vm::value::number::fixnum::Fixnum;
 use crate::vm::value::number::rational::Rational;
 use crate::vm::value::number::{flonum::Flonum, real::RealNumber, Exactness, SchemeNumber, Sign};
-use az::{CheckedAs, CheckedCast};
+use az::CheckedAs;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
 use nom::character::complete::one_of;
 use nom::combinator::{map, opt, value};
+use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 
@@ -79,16 +78,27 @@ fn parse_signed_real<'a>(prefix: Prefix) -> impl FnMut(Input<'a>) -> ParseResult
         if let Some(num) = apply_exactness(num.sign(sign), &prefix.exactness) {
             Ok((s, num))
         } else {
-            Err(error::parse_error("Can't parse number"))
+            Err(nom::Err::Error(VerboseError::from_error_kind(
+                s,
+                ErrorKind::Verify,
+            )))
         }
     }
 }
 
 fn apply_exactness<'a>(num: RealNumber, exactness: &Option<Exactness>) -> Option<RealNumber> {
-    match (num, exactness) {
-        (RealNumber::Flonum(flonum), Some(Exactness::Exact)) => todo!(),
-        (RealNumber::Fixnum(flonum), Some(Exactness::Inexact)) => todo!(),
-        (RealNumber::Rational(flonum), Some(Exactness::Inexact)) => todo!(),
+    match (&num, exactness) {
+        (RealNumber::Flonum(flonum), Some(Exactness::Exact)) => flonum
+            .clone()
+            .checked_as::<Rational>()
+            .map(RealNumber::Rational),
+        (RealNumber::Fixnum(fixnum), Some(Exactness::Inexact)) => fixnum
+            .clone()
+            .checked_as::<Flonum>()
+            .map(RealNumber::Flonum),
+        (RealNumber::Rational(rat), Some(Exactness::Inexact)) => {
+            rat.clone().checked_as::<Flonum>().map(RealNumber::Flonum)
+        }
         _ => Some(num),
     }
 }
@@ -230,11 +240,19 @@ fn parse_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Prefix> {
     alt((
         (map(tuple((parse_exactness, parse_radix)), |res| Prefix {
             radix: res.1,
-            exactness: res.0,
+            exactness: Some(res.0),
         })),
         (map(tuple((parse_radix, parse_exactness)), |res| Prefix {
             radix: res.0,
-            exactness: res.1,
+            exactness: Some(res.1),
+        })),
+        (map(parse_exactness, |res| Prefix {
+            radix: 10,
+            exactness: Some(res),
+        })),
+        (map(parse_radix, |res| Prefix {
+            radix: res,
+            exactness: None,
         })),
     ))(input)
 }
@@ -248,11 +266,11 @@ fn parse_radix<'a>(input: Input<'a>) -> ParseResult<'a, u8> {
     ))(input)
 }
 
-fn parse_exactness<'a>(input: Input<'a>) -> ParseResult<'a, Option<Exactness>> {
-    opt(alt((
+fn parse_exactness<'a>(input: Input<'a>) -> ParseResult<'a, Exactness> {
+    alt((
         value(Exactness::Inexact, tag("#i")),
         value(Exactness::Exact, tag("#e")),
-    )))(input)
+    ))(input)
 }
 
 pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Sign> {
@@ -313,5 +331,16 @@ mod tests {
     fn parse_rational() {
         assert_parse_as("3/4", Sexp::number(Number::fraction(3, 4)));
         assert_parse_as("#b111/100", Sexp::number(Number::fraction(7, 4)));
+    }
+
+    #[test]
+    fn parse_with_exactness() {
+        assert_parse_as("#e0.25", Sexp::number(Number::fraction(1, 4)));
+        assert_parse_as("#i1", Sexp::number(Number::flonum(1.0)));
+        assert_parse_as("#i1/4", Sexp::number(Number::flonum(0.25)));
+
+        // mix radix and exactness
+        assert_parse_as("#e#d0.25", Sexp::number(Number::fraction(1, 4)));
+        assert_parse_as("#d#e0.25", Sexp::number(Number::fraction(1, 4)));
     }
 }
