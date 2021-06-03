@@ -1,4 +1,4 @@
-extern crate im;
+extern crate im_rc;
 extern crate thiserror;
 
 extern crate lazy_static;

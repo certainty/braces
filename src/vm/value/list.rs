@@ -1,6 +1,6 @@
 use super::equality::SchemeEqual;
 use super::Value;
-use im::Vector;
+use im_rc::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
 
@@ -81,7 +81,7 @@ impl List {
 
 pub struct Iter<'a> {
     is_empty: bool,
-    inner: Option<im::vector::Iter<'a, Value>>,
+    inner: Option<im_rc::vector::Iter<'a, Value>>,
 }
 
 impl<'a> Iter<'a> {
@@ -92,7 +92,7 @@ impl<'a> Iter<'a> {
         }
     }
 
-    fn new(inner: im::vector::Iter<'a, Value>) -> Iter<'a> {
+    fn new(inner: im_rc::vector::Iter<'a, Value>) -> Iter<'a> {
         Iter {
             is_empty: false,
             inner: Some(inner),
@@ -117,7 +117,7 @@ impl<'a> Iterator for Iter<'a> {
 
 impl FromIterator<Value> for List {
     fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
-        let ls: im::vector::Vector<Value> = std::iter::FromIterator::from_iter(iter);
+        let ls: im_rc::vector::Vector<Value> = std::iter::FromIterator::from_iter(iter);
         if ls.is_empty() {
             List::Nil
         } else {
@@ -128,11 +128,11 @@ impl FromIterator<Value> for List {
 
 impl IntoIterator for List {
     type Item = Value;
-    type IntoIter = im::vector::ConsumingIter<Value>;
+    type IntoIter = im_rc::vector::ConsumingIter<Value>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            List::Nil => im::vector::Vector::new().into_iter(),
+            List::Nil => im_rc::vector::Vector::new().into_iter(),
             List::Cons(e) => e.into_iter(),
         }
     }
@@ -140,7 +140,7 @@ impl IntoIterator for List {
 
 impl From<Vec<Value>> for List {
     fn from(elements: Vec<Value>) -> Self {
-        let ls: im::vector::Vector<Value> = elements.into_iter().collect();
+        let ls: im_rc::vector::Vector<Value> = elements.into_iter().collect();
 
         if ls.is_empty() {
             List::Nil

@@ -4,12 +4,14 @@ pub mod closure;
 pub mod equality;
 pub mod error;
 pub mod list;
+pub mod number;
 pub mod procedure;
 pub mod string;
 pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
+use crate::vm::value::number::real::RealNumber;
 use std::cell::Ref;
 use std::cell::RefCell;
 use std::convert::Into;
@@ -62,6 +64,7 @@ pub enum Value {
     Bool(bool),
     Symbol(Symbol),
     Char(char),
+    Number(number::Number),
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
@@ -174,6 +177,10 @@ impl Factory {
         Value::Char(c)
     }
 
+    pub fn real<N: Into<RealNumber>>(&self, v: N) -> Value {
+        Value::Number(number::Number::Real(v.into()))
+    }
+
     pub fn sym<T: Into<std::string::String>>(&mut self, v: T) -> Symbol {
         let k = self.symbols.get_or_intern(v.into());
         Symbol(k)
@@ -213,6 +220,7 @@ impl Factory {
         Value::Closure(closure::Closure::new(v, vec![]))
     }
 
+    // TODO: decide if this should this consume datum instead
     pub fn from_datum(&mut self, d: &Datum) -> Value {
         match &d.sexp {
             Sexp::Bool(true) => self.bool_true().clone(),
@@ -224,6 +232,7 @@ impl Factory {
                 self.proper_list(elements)
             }
             Sexp::Char(c) => self.character(*c),
+            Sexp::Number(num) => Value::Number(num.clone()),
             _ => todo!(),
         }
     }

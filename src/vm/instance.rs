@@ -207,6 +207,7 @@ impl<'a> Instance<'a> {
         for _ in 0..n {
             result.push(self.pop())
         }
+        result.reverse();
 
         result
     }
@@ -543,7 +544,7 @@ impl<'a> Instance<'a> {
                 self.apply_foreign(p.clone(), args)?
             }
             other => {
-                return self.runtime_error(error::non_callable(other));
+                return self.runtime_error(error::non_callable(other), None);
             }
         };
         Ok(())
@@ -579,6 +580,7 @@ impl<'a> Instance<'a> {
         proc: Rc<procedure::native::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
+        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
         self.check_arity(&proc.arity, arg_count)?;
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();
@@ -608,12 +610,17 @@ impl<'a> Instance<'a> {
     ) -> Result<()> {
         self.check_arity(&proc.arity, arg_count)?;
         let arguments = self.pop_n(arg_count).iter().cloned().collect();
+        // also pop the procedure itself
+        self.pop();
         match proc.call(arguments) {
             Ok(v) => {
                 self.push(v)?;
                 Ok(())
             }
-            Err(e) => self.runtime_error(e),
+            Err(e) => {
+                println!("Error in foreign function: {}", proc.name.clone());
+                self.runtime_error(e, Some(proc.name.clone()))
+            }
         }
     }
 
@@ -674,15 +681,13 @@ impl<'a> Instance<'a> {
             Arity::AtLeast(n) => {
                 // stuff the last values into a new local
                 let rest_count = arg_count - n;
-                let mut rest_values = self.pop_n(rest_count);
-                rest_values.reverse();
+                let rest_values = self.pop_n(rest_count);
                 let rest_list = self.values.proper_list(rest_values);
                 self.push(rest_list)?;
                 Ok(n + 1)
             }
             Arity::Many => {
-                let mut rest_values = self.pop_n(arg_count);
-                rest_values.reverse();
+                let rest_values = self.pop_n(arg_count);
                 let rest_list = self.values.proper_list(rest_values);
                 self.push(rest_list)?;
                 Ok(1)
@@ -695,7 +700,7 @@ impl<'a> Instance<'a> {
             Arity::Exactly(n) if arg_count == *n => Ok(()),
             Arity::AtLeast(n) if arg_count >= *n => Ok(()),
             Arity::Many => Ok(()),
-            other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count)),
+            other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count), None),
         }
     }
 
@@ -724,7 +729,7 @@ impl<'a> Instance<'a> {
         if let Some(value) = self.toplevel.get_owned(&id) {
             self.push(value)?;
         } else {
-            self.runtime_error(error::undefined_variable(id))?;
+            self.runtime_error(error::undefined_variable(id), None)?;
         }
         Ok(())
     }
@@ -734,7 +739,7 @@ impl<'a> Instance<'a> {
         let id = self.read_identifier(addr)?;
 
         if !self.toplevel.get(&id).is_some() {
-            return self.runtime_error(error::undefined_variable(id.clone()));
+            return self.runtime_error(error::undefined_variable(id.clone()), None);
         } else {
             self.toplevel.set(id.clone(), v.clone());
             self.push(self.values.unspecified())?;
@@ -798,13 +803,14 @@ impl<'a> Instance<'a> {
     }
 
     // TODO: add a representation for stack trace and add it to the error
-    fn runtime_error<T>(&self, e: error::RuntimeError) -> Result<T> {
+    fn runtime_error<T>(&self, e: error::RuntimeError, context: Option<String>) -> Result<T> {
         let result = Err(Error::RuntimeError(
             e,
             self.active_frame()
                 .line_number_for_current_instruction()
                 .unwrap_or(0),
             StackTrace::from(&self.call_stack),
+            context,
         ));
         result
     }

@@ -1,4 +1,5 @@
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::vm::value::number;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Sexp {
@@ -6,6 +7,7 @@ pub enum Sexp {
     Symbol(String),
     String(String),
     Char(char),
+    Number(number::Number),
     List(Vec<Datum>),
     ImproperList(Vec<Datum>, Box<Datum>),
     Vector(Vec<Datum>),
@@ -27,6 +29,10 @@ impl Sexp {
 
     pub fn string(val: impl Into<String>) -> Self {
         Sexp::String(val.into())
+    }
+
+    pub fn number<I: Into<number::Number>>(num: I) -> Self {
+        Self::Number(num.into())
     }
 
     pub fn list<I>(elements: I) -> Self

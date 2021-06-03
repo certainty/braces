@@ -30,7 +30,12 @@ pub enum Error {
     #[error(transparent)]
     CompilerError(#[from] compiler::Error),
     #[error("RuntimeError at {1}: {0}")]
-    RuntimeError(error::RuntimeError, usize, stack_trace::StackTrace),
+    RuntimeError(
+        error::RuntimeError,
+        usize,
+        stack_trace::StackTrace,
+        Option<String>,
+    ),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
 }

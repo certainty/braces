@@ -8,10 +8,16 @@ pub enum RuntimeError {
     UndefinedVariable(Symbol),
     #[error("ArityError: Function expected `{0:?}` arguments but received {1}")]
     ArityError(Arity, usize),
-    #[error("ArgumentError: `{0}` is undefined")]
-    ArgumentError(String),
+    #[error("ArgumentError: {1}")]
+    ArgumentError(Value, String),
     #[error("AppplicationError: `{0:?}` is not callable")]
     NoncallableError(Value),
+    #[error("ArithmeticError: `{0}`")]
+    ArithmeticError(String),
+}
+
+pub fn arithmetic_error<T: Into<String>>(msg: T) -> RuntimeError {
+    RuntimeError::ArithmeticError(msg.into())
 }
 
 pub fn arity_mismatch(arity: Arity, arg_count: usize) -> RuntimeError {
@@ -26,6 +32,6 @@ pub fn undefined_variable(id: Symbol) -> RuntimeError {
     RuntimeError::UndefinedVariable(id)
 }
 
-pub fn argument_error<I: Into<String>>(message: I) -> RuntimeError {
-    RuntimeError::ArgumentError(message.into())
+pub fn argument_error<I: Into<String>>(v: Value, message: I) -> RuntimeError {
+    RuntimeError::ArgumentError(v, message.into())
 }

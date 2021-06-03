@@ -1,3 +1,4 @@
+pub mod numbers;
 use super::ffi::*;
 use crate::vm::value::procedure::foreign;
 use crate::vm::value::Value;
@@ -10,6 +11,7 @@ macro_rules! register_core {
             .unwrap()
     };
 }
+pub(crate) use register_core;
 
 pub fn register(vm: &mut VM) {
     register_core!(vm, "eqv?", eqv, Arity::Exactly(2));
@@ -23,8 +25,9 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "null?", null_p, Arity::Exactly(1));
 
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
-
     register_core!(vm, "inspect", inspect, Arity::Exactly(1));
+
+    numbers::register(vm);
 }
 
 //  R7RS 6.1

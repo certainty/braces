@@ -1,4 +1,7 @@
 use crate::compiler::frontend::parser::sexp;
+use crate::vm::value::number::fixnum::Fixnum;
+use crate::vm::value::number::flonum::Flonum;
+use crate::vm::value::number::{real::RealNumber, Number, SchemeNumber};
 use crate::vm::value::procedure;
 use crate::vm::value::{Factory, Value};
 use std::collections::HashSet;
@@ -16,8 +19,9 @@ pub struct Writer {
 
 impl Writer {
     pub fn new() -> Self {
-        let special_initial: HashSet<char> =
-            String::from(sexp::SYMBOL_SPECIAL_INITIAL).chars().collect();
+        let special_initial: HashSet<char> = String::from(sexp::symbol::SYMBOL_SPECIAL_INITIAL)
+            .chars()
+            .collect();
         Writer {
             symbol_special_initial: special_initial,
         }
@@ -33,6 +37,7 @@ impl Writer {
             Value::Bool(false) => "#f".to_string(),
             Value::Symbol(s) => self.write_symbol(s.as_str(), quote),
             Value::Char(c) => self.write_char(*c),
+            Value::Number(num) => self.write_number(num),
             Value::InternedString(s) => self.write_string(s.as_str()),
             Value::UninternedString(s) => self.write_string(&s),
             Value::Closure(closure) => {
@@ -49,6 +54,27 @@ impl Writer {
             }
             Value::Unspecified => "#<unspecified>".to_string(),
         }
+    }
+
+    fn write_number(&self, num: &Number) -> String {
+        match num {
+            Number::Real(RealNumber::Fixnum(v)) => self.write_fixnum(v),
+            Number::Real(RealNumber::Flonum(v)) => self.write_flonum(v),
+            Number::Real(RealNumber::Rational(v)) => format!("{}", v.inner),
+        }
+    }
+
+    fn write_flonum(&self, num: &Flonum) -> String {
+        match num {
+            n if n.is_nan() => String::from("+nan.0"),
+            n if n.is_neg_infinite() => String::from("-inf.0"),
+            n if n.is_infinite() => String::from("+inf.0"),
+            _ => format!("{}", num.as_inner()),
+        }
+    }
+
+    fn write_fixnum(&self, num: &Fixnum) -> String {
+        format!("{}", num.as_inner())
     }
 
     fn write_symbol(&self, sym: &str, quote: bool) -> String {

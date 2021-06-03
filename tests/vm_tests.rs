@@ -66,6 +66,7 @@ fn test_vm_set() {
         Err(Error::RuntimeError(
             error::RuntimeError::UndefinedVariable(_),
             _,
+            _,
             _
         ))
     );
@@ -96,6 +97,7 @@ fn test_vm_lambda() {
         result,
         Err(Error::RuntimeError(
             error::RuntimeError::ArityError(Arity::Exactly(1), _),
+            _,
             _,
             _
         ))

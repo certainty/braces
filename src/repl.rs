@@ -174,9 +174,20 @@ impl Repl {
             Ok(Value::Unspecified) => (),
             Ok(v) => println!("{}", self.vm.write(&v)),
             Err(vm::Error::CompilerError(e)) => e.print_user_friendly_message(),
-            Err(vm::Error::RuntimeError(msg, line, stack_trace)) => {
-                eprintln!("{}:{}\n{}", msg, line, stack_trace.as_string())
+            Err(vm::Error::RuntimeError(msg, line, stack_trace, Some(ctx))) => {
+                eprintln!(
+                    "{} in line {} [in {}]\n{}",
+                    msg,
+                    line,
+                    ctx,
+                    stack_trace.as_string()
+                )
             }
+
+            Err(vm::Error::RuntimeError(msg, line, stack_trace, _)) => {
+                eprintln!("{} in line {}\n{}", msg, line, stack_trace.as_string())
+            }
+
             Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
         }
         Ok(())
