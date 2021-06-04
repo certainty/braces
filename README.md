@@ -39,8 +39,8 @@ make repl
 - [x] completion of bound identifiers
 
 ### TCO
-- [ ] identify tail calls
-- [ ] optimise tail calls
+- [x] identify tail calls
+- [x] optimise tail calls
 
 ### Errors
 - [ ] fix backtraces 
