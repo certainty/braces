@@ -42,6 +42,11 @@ impl<V> Stack<V> {
         self.repr.pop().unwrap()
     }
 
+    pub fn pop_n(&mut self, n: usize) -> Vec<V> {
+        let start = self.repr.len() - n;
+        self.repr.drain(start..).collect()
+    }
+
     // Peek into the stack at the position that is `distance` elements away from the stack top.
     //
     // | 10 | <- top
@@ -122,6 +127,25 @@ mod tests {
         assert_eq!(stack.as_vec(), &vec![Value::Bool(true), Value::Bool(false)]);
         assert_eq!(stack.pop(), Value::Bool(false));
         assert_eq!(stack.as_vec(), &vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_stack_pop_n() {
+        let mut stack: Stack<Value> = Stack::default();
+
+        stack.push(Value::Bool(true));
+        stack.push(Value::Bool(false));
+        stack.push(Value::Bool(false));
+        stack.push(Value::Bool(true));
+
+        assert_eq!(stack.pop_n(2), vec![Value::Bool(false), Value::Bool(true)]);
+
+        // just make sure pushing still works
+        stack.push(Value::Bool(false));
+        assert_eq!(
+            stack.as_vec(),
+            &vec![Value::Bool(true), Value::Bool(false), Value::Bool(false)]
+        )
     }
 
     #[test]
