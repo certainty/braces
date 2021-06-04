@@ -304,10 +304,6 @@ impl CodeGenerator {
     fn emit_apply(&mut self, application: &ApplicationExpression, context: &Context) -> Result<()> {
         self.emit_instructions(&application.operator, &Context::NonTail)?;
 
-        if context.is_tail_context() {
-            self.emit_instruction(Instruction::SetupTailCall, application.source_location())?;
-        }
-
         for operand in &application.operands {
             self.emit_instructions(&operand, &Context::NonTail)?;
         }
@@ -535,7 +531,6 @@ mod tests {
                 Instruction::Define(_),
                 // apply foo
                 Instruction::GetGlobal(_),
-                Instruction::SetupTailCall,
                 Instruction::TailCall(_),
                 Instruction::Return
             ]

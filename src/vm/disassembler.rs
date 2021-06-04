@@ -45,7 +45,6 @@ impl<T: Write> Disassembler<T> {
             &Instruction::Call(args) => {
                 self.disassemble_simple(&format!("OP_CALL({})", args), address)
             }
-            &Instruction::SetupTailCall => self.disassemble_simple("OP_SETUP_TC", address),
 
             &Instruction::TailCall(args) => {
                 self.disassemble_simple(&format!("OP_TC({})", args), address)

@@ -17,8 +17,7 @@ pub enum Instruction {
     CloseUpValue(AddressType),
     JumpIfFalse(AddressType),
     Jump(AddressType),
-    Call(usize), // number of arguments
-    SetupTailCall,
+    Call(usize),     // number of arguments
     TailCall(usize), // number of arguments
     Break,           // Reserved for future use
     Return,

@@ -147,7 +147,6 @@ impl<'a> Instance<'a> {
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
 
                 &Instruction::Call(args) => self.apply(args)?,
-                &Instruction::SetupTailCall => self.setup_tail_call()?,
                 &Instruction::TailCall(args) => self.tail_call(args)?,
 
                 &Instruction::JumpIfFalse(to) => self.jump_if_false(to)?,
@@ -651,16 +650,28 @@ impl<'a> Instance<'a> {
 
     // rewind the arguments so that they can be overwritten with new arguments of the tail call
     #[inline]
-    fn setup_tail_call(&mut self) -> Result<()> {
+    fn setup_tail_call(&mut self, args: usize) -> Result<()> {
+        // prepare the stack
+        // all the arguments are now at the top of the stack
+        // we transfer them to the start of the frame_base here, which is safe to do only at this point
+        // since all local variable references have been resolved and we're right before the call
+        let arguments = self.stack.pop_n(args);
+        // now save the last value
         let value = self.pop();
+        // prepare stack frame for overwrite
         self.stack.truncate(self.active_frame().stack_base);
-        self.push(value.clone())?;
+        // restore the saved value
+        self.push(value)?;
+        // push the arguments again
+        for arg in arguments {
+            self.push(arg)?
+        }
         Ok(())
     }
 
     #[inline]
     fn tail_call(&mut self, args: usize) -> Result<()> {
-        self.debug_stack();
+        self.setup_tail_call(args)?;
         let callable = self.peek(args).clone();
 
         match callable {
