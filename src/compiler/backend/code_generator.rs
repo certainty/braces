@@ -507,6 +507,107 @@ mod tests {
     use crate::vm::value::procedure::native;
     use std::rc::Rc;
 
+    // Test tail context and tail calls
+    // R7RS Section 3.5
+    #[test]
+    fn test_compile_tail_call_in_conditional() {
+        let chunk = compile("(if #t (foo))");
+
+        assert_matches!(
+            &chunk.code[..],
+            [
+                Instruction::True,
+                Instruction::JumpIfFalse(_),
+                Instruction::Pop,
+                Instruction::GetGlobal(_),
+                // (foo)
+                Instruction::TailCall(_),
+                Instruction::Jump(_),
+                Instruction::Pop,
+                Instruction::Const(_),
+                Instruction::Return
+            ]
+        );
+
+        let chunk = compile("(if #t (foo) (bar))");
+
+        assert_matches!(
+            &chunk.code[..],
+            [
+                Instruction::True,
+                Instruction::JumpIfFalse(_),
+                Instruction::Pop,
+                Instruction::GetGlobal(_),
+                // (foo)
+                Instruction::Call(_),
+                Instruction::Jump(_),
+                Instruction::Pop,
+                Instruction::GetGlobal(_),
+                Instruction::TailCall(_),
+                Instruction::Return
+            ]
+        )
+    }
+
+    #[test]
+    fn test_compile_tail_call_in_begin() {
+        let chunk = compile("(begin (foo))");
+
+        assert_matches!(
+            &chunk.code[..],
+            [
+                // (bar)
+                Instruction::GetGlobal(_),
+                Instruction::TailCall(_),
+                Instruction::Return
+            ]
+        );
+
+        let chunk = compile("(begin (bar) (foo))");
+
+        assert_matches!(
+            &chunk.code[..],
+            [
+                // (bar)
+                Instruction::GetGlobal(_),
+                Instruction::Call(_),
+                Instruction::GetGlobal(_),
+                Instruction::TailCall(_),
+                Instruction::Return
+            ]
+        );
+    }
+
+    #[test]
+    fn test_compile_tail_call_in_let() {
+        let chunk = compile("(let ((x (foo))) (bar) (baz))");
+
+        assert_matches!(
+            &chunk.code[..],
+            [
+                Instruction::Closure(_),
+                Instruction::GetGlobal(_),
+                // (foo)
+                Instruction::Call(_),
+                // the body of the (let)
+                Instruction::TailCall(_),
+                Instruction::Return
+            ]
+        );
+
+        let let_closure = proc_from(&chunk.constants[0]);
+        assert_matches!(
+            &let_closure.code().code[..],
+            [
+                Instruction::GetGlobal(_),
+                Instruction::Call(_),
+                Instruction::GetGlobal(_),
+                Instruction::TailCall(_),
+                Instruction::Return
+            ]
+        )
+    }
+
     #[test]
     fn test_compile_closures() {
         let chunk = compile(
