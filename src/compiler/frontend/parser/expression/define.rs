@@ -1,14 +1,17 @@
+use super::error::Error;
 use super::identifier;
 use super::identifier::Identifier;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
-use crate::compiler::frontend::parser::sexp::datum::Datum;
+use super::{body, lambda};
+use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum DefinitionExpression {
     DefineSimple(Identifier, Box<Expression>, SourceLocation),
+    DefineProcedure(Identifier, lambda::LambdaExpression, SourceLocation),
     Begin(Vec<Box<DefinitionExpression>>, SourceLocation),
 }
 
@@ -16,6 +19,7 @@ impl HasSourceLocation for DefinitionExpression {
     fn source_location<'a>(&'a self) -> &'a SourceLocation {
         match self {
             DefinitionExpression::DefineSimple(_, _, loc) => loc,
+            DefinitionExpression::DefineProcedure(_, _, loc) => loc,
             DefinitionExpression::Begin(_, loc) => loc,
         }
     }
@@ -53,6 +57,11 @@ pub fn do_parse_definition(
     loc: &SourceLocation,
 ) -> Result<DefinitionExpression> {
     match operands {
+        // (define (<IDENTIFIER> <def formals>) <body>)
+        [definition, exprs @ ..] if definition.sexp().is_proper_list() => {
+            parse_procedure_definition(definition, exprs)
+        }
+        // (define  <IDENTIFIER> <expression>)
         [identifier, expr] => Ok(DefinitionExpression::DefineSimple(
             identifier::parse_identifier(&identifier).res()?,
             Box::new(Expression::parse(&expr)?),
@@ -69,6 +78,31 @@ pub fn do_parse_definition(
         }
     }
 }
+
+fn parse_procedure_definition(definition: &Datum, body: &[Datum]) -> Result<DefinitionExpression> {
+    match definition.sexp() {
+        Sexp::List(ls) => match &ls[..] {
+            [identifier, def_formals @ ..] => {
+                let name = identifier::parse_identifier(&identifier).res()?;
+                let label = name.string().clone();
+                let formals = lambda::parse_formals(&Datum::new(Sexp::List(def_formals.to_vec()), definition.source_location().clone()))?;
+                let body = body::parse(body, definition.source_location())?;
+
+                Ok(DefinitionExpression::DefineProcedure(
+                    name,
+                    lambda::build(formals, body, Some(label), definition.source_location().clone()),
+                    definition.source_location().clone()
+                ))
+            },
+            _ => Error::parse_error("Invalid precedure definition. Expected (define (<IDENTIFIER> <def formals>) <body>)", definition.source_location().clone())
+        },
+        _ => Error::parse_error(
+            "Invalid procedure definition. Expected (define (<IDENTIFIER> <def formals>) <body>)",
+            definition.source_location().clone(),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

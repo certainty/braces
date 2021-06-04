@@ -52,6 +52,13 @@ impl Sexp {
         Self::ImproperList(elts, Box::new(element))
     }
 
+    pub fn is_proper_list(&self) -> bool {
+        match self {
+            Self::List(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn vector<I>(elements: I) -> Self
     where
         I: IntoIterator,
