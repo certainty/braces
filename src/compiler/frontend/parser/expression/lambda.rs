@@ -100,7 +100,7 @@ pub fn do_parse_lambda(
     }
 }
 
-fn parse_formals(datum: &Datum) -> Result<Formals> {
+pub fn parse_formals(datum: &Datum) -> Result<Formals> {
     match datum.sexp() {
         Sexp::List(ls) => {
             let identifiers: Result<Vec<Identifier>> =
