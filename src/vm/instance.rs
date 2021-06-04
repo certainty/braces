@@ -147,6 +147,7 @@ impl<'a> Instance<'a> {
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
 
                 &Instruction::Call(args) => self.apply(args)?,
+                &Instruction::SetupTailCall => self.setup_tail_call()?,
                 &Instruction::TailCall(args) => self.tail_call(args)?,
 
                 &Instruction::JumpIfFalse(to) => self.jump_if_false(to)?,
@@ -289,6 +290,28 @@ impl<'a> Instance<'a> {
         let frame = CallFrame::new(closure, base);
         self.call_stack.push(frame);
         self.active_frame = self.call_stack.top_mut_ptr();
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    // Reuse the current stack frame to set-up a tail call
+    //
+    // For the documentation of the stack layout before a call check the documentation of `push_frame`.
+    //
+    // This function re-uses the currently active frame in a tail-call.
+    // Tail calls are special in that the result is not required to continue the computation.
+    // This also means we don't need to push a new stack-frame but can re-use the current stack frame instead
+    //
+    #[inline]
+    fn overwrite_frame(
+        &mut self,
+        closure: value::closure::Closure,
+        arg_count: usize,
+    ) -> Result<()> {
+        //re-use the current frame for our purposes
+        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
+        self.active_mut_frame().stack_base = base;
+        self.active_mut_frame().closure = closure;
         Ok(())
     }
 
@@ -625,6 +648,13 @@ impl<'a> Instance<'a> {
         }
     }
 
+    // rewind the arguments so that they can be overwritten with new arguments of the tail call
+    #[inline]
+    fn setup_tail_call(&mut self) -> Result<()> {
+        self.stack.truncate(self.active_frame().stack_base + 1);
+        Ok(())
+    }
+
     #[inline]
     fn tail_call(&mut self, args: usize) -> Result<()> {
         let callable = self.peek(args).clone();
@@ -657,10 +687,11 @@ impl<'a> Instance<'a> {
     fn tail_call_closure(&mut self, closure: Closure, arg_count: usize) -> Result<()> {
         self.check_arity(&closure.procedure().arity, arg_count)?;
         // make sure the previous arguments are reset on the stack so we can provide the new ones
+        // since the function doesn't really return we can simply discard the arguments
         let arg_count = self.bind_arguments(&closure.procedure().arity, arg_count)?;
 
         // prepare the top frame for the tail call
-        self.push_frame(closure, arg_count)?;
+        self.overwrite_frame(closure, arg_count)?;
         self.disassemble_frame();
         Ok(())
     }
@@ -684,7 +715,7 @@ impl<'a> Instance<'a> {
         let closure = proc.into();
 
         // prepare the top frame for the tail call
-        self.push_frame(closure, arg_count)?;
+        self.overwrite_frame(closure, arg_count)?;
         self.disassemble_frame();
         Ok(())
     }

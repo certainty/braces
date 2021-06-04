@@ -70,6 +70,21 @@ pub struct CodeGenerator {
     chunk: Chunk,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Context {
+    Tail,
+    NonTail,
+}
+
+impl Context {
+    pub fn is_tail_context(&self) -> bool {
+        match self {
+            Self::Tail => true,
+            _ => false,
+        }
+    }
+}
+
 impl CodeGenerator {
     pub fn new(target: Target, parent_variables: Option<VariablesRef>) -> Self {
         let variables = Variables::child(parent_variables);
@@ -206,28 +221,33 @@ impl CodeGenerator {
     //
     /////////////////////////////////////////////////////////////////////////
 
-    fn emit_instructions(&mut self, ast: &Expression) -> Result<()> {
+    fn emit_instructions(&mut self, ast: &Expression, context: &Context) -> Result<()> {
         match ast {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
-            Expression::Assign(expr) => self.emit_set_variable(expr)?,
+            Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
-            Expression::If(if_expr) => self.emit_if(if_expr)?,
-            Expression::Let(let_exp) => self.emit_instructions(&let_exp.to_lambda())?,
+            Expression::If(if_expr) => self.emit_if(if_expr, context)?,
+            Expression::Let(let_exp) => self.emit_instructions(&let_exp.to_lambda(), context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
-            Expression::Begin(expr) => self.emit_begin(expr)?,
-            Expression::Command(expr) => self.emit_instructions(expr)?,
-            Expression::Apply(expr) => self.emit_apply(expr)?,
+            Expression::Begin(expr) => self.emit_begin(expr, context)?,
+            Expression::Command(expr) => self.emit_instructions(expr, context)?,
+            Expression::Apply(expr) => self.emit_apply(expr, context)?,
         }
         Ok(())
     }
 
-    fn emit_if(&mut self, expr: &IfExpression) -> Result<()> {
-        self.emit_instructions(&expr.test)?;
+    fn emit_if(&mut self, expr: &IfExpression, context: &Context) -> Result<()> {
+        self.emit_instructions(&expr.test, &Context::NonTail)?;
         let then_jump = self.emit_jump(Instruction::JumpIfFalse(0), expr.source_location())?;
         self.emit_pop()?;
-        self.emit_instructions(&expr.consequent)?;
+
+        if expr.alternate.is_some() {
+            self.emit_instructions(&expr.consequent, &Context::NonTail)?;
+        } else {
+            self.emit_instructions(&expr.consequent, context)?;
+        }
 
         match &expr.alternate {
             Some(else_expr) => {
@@ -235,7 +255,7 @@ impl CodeGenerator {
                     self.emit_jump(Instruction::Jump(0), else_expr.source_location())?;
                 self.patch_jump(then_jump)?;
                 self.emit_pop()?;
-                self.emit_instructions(else_expr)?;
+                self.emit_instructions(else_expr, context)?;
                 self.patch_jump(else_jump)?;
             }
             _ => {
@@ -281,15 +301,24 @@ impl CodeGenerator {
     // Call(2)
     //
     //
-    fn emit_apply(&mut self, application: &ApplicationExpression) -> Result<()> {
-        self.emit_instructions(&application.operator)?;
-        for operand in &application.operands {
-            self.emit_instructions(&operand)?;
+    fn emit_apply(&mut self, application: &ApplicationExpression, context: &Context) -> Result<()> {
+        self.emit_instructions(&application.operator, &Context::NonTail)?;
+
+        if context.is_tail_context() {
+            self.emit_instruction(Instruction::SetupTailCall, application.source_location())?;
         }
-        self.emit_instruction(
-            Instruction::Call(application.operands.len()),
-            application.source_location(),
-        )?;
+
+        for operand in &application.operands {
+            self.emit_instructions(&operand, &Context::NonTail)?;
+        }
+
+        let instr = if context.is_tail_context() {
+            Instruction::TailCall(application.operands.len())
+        } else {
+            Instruction::Call(application.operands.len())
+        };
+
+        self.emit_instruction(instr, application.source_location())?;
 
         Ok(())
     }
@@ -300,11 +329,17 @@ impl CodeGenerator {
     // emits the instructions that are required to clean-up when
     // the scope is left again.
     //
-    fn emit_begin(&mut self, expr: &BeginExpression) -> Result<()> {
+    fn emit_begin(&mut self, expr: &BeginExpression, context: &Context) -> Result<()> {
         self.begin_scope();
-        self.emit_instructions(&expr.first)?;
-        for exp in &expr.rest {
-            self.emit_instructions(&*exp)?;
+
+        if expr.rest.is_empty() {
+            self.emit_instructions(&expr.first, context)?;
+        } else {
+            self.emit_instructions(&expr.first, &Context::NonTail)?;
+
+            for exp in &expr.rest {
+                self.emit_instructions(&*exp, context)?;
+            }
         }
         self.end_scope(true)?;
         Ok(())
@@ -333,9 +368,9 @@ impl CodeGenerator {
         }
     }
 
-    fn emit_set_variable(&mut self, expr: &SetExpression) -> Result<()> {
+    fn emit_set_variable(&mut self, expr: &SetExpression, context: &Context) -> Result<()> {
         // push the value of the expression
-        self.emit_instructions(&expr.value)?;
+        self.emit_instructions(&expr.value, context)?;
 
         // is it local?
         if let Some(addr) = self.resolve_local(&expr.name) {
@@ -355,8 +390,13 @@ impl CodeGenerator {
             self.emit_definition(&def)?;
         }
 
-        for expr in &body.sequence {
-            self.emit_instructions(&expr)?;
+        for (idx, expr) in body.sequence.iter().enumerate() {
+            // last expression
+            if idx == (body.sequence.len() - 1) {
+                self.emit_instructions(&expr, &Context::Tail)?;
+            } else {
+                self.emit_instructions(&expr, &Context::NonTail)?;
+            }
         }
         Ok(())
     }
@@ -369,7 +409,7 @@ impl CodeGenerator {
     fn emit_definition(&mut self, definition: &DefinitionExpression) -> Result<()> {
         match definition {
             DefinitionExpression::DefineSimple(id, expr, _loc) => {
-                self.emit_instructions(expr)?;
+                self.emit_instructions(expr, &Context::NonTail)?;
                 let id_sym = self.sym(&id.string());
                 let const_addr = self.current_chunk().add_constant(id_sym);
 
@@ -495,7 +535,8 @@ mod tests {
                 Instruction::Define(_),
                 // apply foo
                 Instruction::GetGlobal(_),
-                Instruction::Call(_),
+                Instruction::SetupTailCall,
+                Instruction::TailCall(_),
                 Instruction::Return
             ]
         );
