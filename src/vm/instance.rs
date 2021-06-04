@@ -308,10 +308,11 @@ impl<'a> Instance<'a> {
         closure: value::closure::Closure,
         arg_count: usize,
     ) -> Result<()> {
-        //re-use the current frame for our purposes
+        //re-use the current frame for tail calls
         let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
         self.active_mut_frame().stack_base = base;
         self.active_mut_frame().closure = closure;
+        self.active_mut_frame().set_ip(0);
         Ok(())
     }
 
@@ -651,12 +652,15 @@ impl<'a> Instance<'a> {
     // rewind the arguments so that they can be overwritten with new arguments of the tail call
     #[inline]
     fn setup_tail_call(&mut self) -> Result<()> {
-        self.stack.truncate(self.active_frame().stack_base + 1);
+        let value = self.pop();
+        self.stack.truncate(self.active_frame().stack_base);
+        self.push(value.clone())?;
         Ok(())
     }
 
     #[inline]
     fn tail_call(&mut self, args: usize) -> Result<()> {
+        self.debug_stack();
         let callable = self.peek(args).clone();
 
         match callable {
