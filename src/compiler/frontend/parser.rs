@@ -2,7 +2,8 @@ pub mod expression;
 pub mod sexp;
 use crate::compiler::source::Source;
 use expression::error::Error;
-use sexp::datum::Datum;
+use rustc_hash::FxHashMap;
+use sexp::datum::{Datum, Sexp};
 use sexp::error::ReadError;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -27,5 +28,44 @@ impl Parser {
 
     pub fn parse_expression<T: Source>(&self, source: &mut T) -> Result<expression::Expression> {
         expression::Expression::parse_one(source)
+    }
+}
+
+pub struct AlphaConversionPhase {
+    syntax_env: FxHashMap<String, bool>,
+}
+
+impl AlphaConversionPhase {
+    pub fn new() -> Self {
+        Self {
+            syntax_env: FxHashMap::default(),
+        }
+    }
+
+    pub fn apply(&self, sexps: Vec<Datum>) -> Result<Vec<expression::Expression>> {
+        sexps.iter().map(|e| self.analyze(e)).collect()
+    }
+
+    fn analyze(&self, datum: &Datum) -> Result<expression::Expression> {
+        match datum.sexp() {
+            Sexp::List(ls) => match Self::head_symbol(ls) {
+                Some(s) if s == "define-syntax" => todo!(),
+                Some(s) if self.is_syntax(&s) => todo!(),
+                Some(_) => todo!(),
+                None => todo!(),
+            },
+            _ => todo!(),
+        }
+    }
+
+    fn head_symbol<'a>(ls: &'a Vec<Datum>) -> Option<&'a str> {
+        match ls.first().map(|e| e.sexp()) {
+            Some(Sexp::Symbol(s)) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    fn is_syntax(&self, identifier: &str) -> bool {
+        self.syntax_env.contains_key(&String::from(identifier))
     }
 }

@@ -1,8 +1,20 @@
+use crate::compiler;
+use crate::compiler::source::*;
 use clap::Clap;
 
-#[derive(Clap)]
-pub struct Opts {}
+#[derive(Clap, Debug)]
+#[clap(version = "0.1", author = "David K.", about = "compile <input>")]
+pub struct Opts {
+    input: String,
+}
 
-pub fn execute(_opts: &Opts) -> anyhow::Result<()> {
+pub fn execute(opts: &Opts) -> anyhow::Result<()> {
+    let mut compiler = compiler::Compiler::new();
+    let file_path = std::path::PathBuf::from(opts.input.clone());
+    let mut source = FileSource::new(file_path);
+    let output = compiler.test_phase(&mut source)?;
+
+    println!("{:#?}", output);
+
     Ok(())
 }

@@ -51,6 +51,7 @@ impl UserMessage for super::Error {
         match self {
             super::Error::ParseError(e) => e.print_user_friendly_message(),
             super::Error::GenerationError(e) => eprintln!("Failed to generate code: {:?}", e),
+            super::Error::ReadError(e) => eprintln!("Failed to sexps: {:?}", e),
         }
     }
 }

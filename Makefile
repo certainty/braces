@@ -32,6 +32,10 @@ run:
 debug_run: 
 	$(CARGO) run --features debug_vm --features debug_code --bin bracesi -- run $(RUN_FILE)
 
+compile: 
+	$(CARGO) run --features debug_vm --features debug_code --bin bracesi -- compile $(SOURCE_FILE)
+
+
 repl:
 	$(CARGO) run --bin bracesi -- repl
 

@@ -7,6 +7,7 @@ pub mod utils;
 use crate::vm::value;
 use backend::code_generator;
 use backend::code_generator::{CodeGenerator, Target};
+use frontend::parser::sexp::error::ReadError;
 use frontend::parser::Parser;
 use source::Source;
 use thiserror::Error;
@@ -20,6 +21,9 @@ pub enum Error {
 
     #[error(transparent)]
     GenerationError(#[from] code_generator::Error),
+
+    #[error(transparent)]
+    ReadError(#[from] ReadError),
 }
 
 pub struct Compiler {
@@ -54,5 +58,16 @@ impl Compiler {
         let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
 
         Ok(code_gen.generate(vec![ast])?)
+    }
+
+    pub fn test_phase<T: Source>(
+        &mut self,
+        source: &mut T,
+    ) -> Result<Vec<frontend::parser::expression::Expression>> {
+        let sexps = self.parser.parse_datum_sequence(source)?;
+        let alpha_conversion = frontend::parser::AlphaConversionPhase::new();
+        let expr = alpha_conversion.apply(sexps)?;
+
+        Ok(expr)
     }
 }

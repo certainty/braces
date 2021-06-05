@@ -163,6 +163,13 @@ impl<T> FromIterator<ParseResult<T>> for Vec<Result<T>> {
 }
 
 #[derive(Clone, PartialEq, Debug)]
+pub struct MacroUseExpression {
+    name: Identifier,
+    sexps: Vec<Datum>,
+    source_location: SourceLocation,
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(Identifier),
     Quotation(QuotationExpression),
@@ -173,6 +180,7 @@ pub enum Expression {
     Let(LetExpression),
     If(IfExpression),
     Apply(ApplicationExpression),
+    MacroUse(MacroUseExpression),
     Command(Box<Expression>),
     Begin(BeginExpression),
 }
@@ -191,6 +199,7 @@ impl HasSourceLocation for Expression {
             Self::Apply(exp) => exp.source_location(),
             Self::Command(exp) => exp.source_location(),
             Self::Begin(exp) => exp.source_location(),
+            Self::MacroUse(exp) => &exp.source_location,
         }
     }
 }

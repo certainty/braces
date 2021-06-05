@@ -223,6 +223,7 @@ impl CodeGenerator {
 
     fn emit_instructions(&mut self, ast: &Expression, context: &Context) -> Result<()> {
         match ast {
+            Expression::MacroUse(_) => (), // all work done in a previous phase
             Expression::Identifier(id) => self.emit_get_variable(id)?,
             Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
