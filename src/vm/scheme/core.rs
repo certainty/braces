@@ -1,37 +1,38 @@
 pub mod numbers;
+pub mod syntax;
 use super::ffi::*;
 use crate::vm::value::procedure::foreign;
 use crate::vm::value::Value;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
 use crate::vm::VM;
 
-macro_rules! register_core {
+macro_rules! register_procedure {
     ($vm:expr, $name:literal, $func:expr, $arity:expr) => {
         $vm.register_foreign(foreign::Procedure::new($name, $func, $arity))
             .unwrap()
     };
 }
-pub(crate) use register_core;
+pub(crate) use register_procedure;
 
 pub fn register(vm: &mut VM) {
-    register_core!(vm, "eqv?", eqv, Arity::Exactly(2));
-    register_core!(vm, "eq?", eq, Arity::Exactly(2));
-    register_core!(vm, "equal?", equal, Arity::Exactly(2));
+    register_procedure!(vm, "eqv?", eqv, Arity::Exactly(2));
+    register_procedure!(vm, "eq?", eq, Arity::Exactly(2));
+    register_procedure!(vm, "equal?", equal, Arity::Exactly(2));
 
-    register_core!(vm, "char?", char_p, Arity::Exactly(1));
-    register_core!(vm, "symbol?", symbol_p, Arity::Exactly(1));
-    register_core!(vm, "list?", string_p, Arity::Exactly(1));
-    register_core!(vm, "procedure?", procedure_p, Arity::Exactly(1));
-    register_core!(vm, "null?", null_p, Arity::Exactly(1));
+    register_procedure!(vm, "char?", char_p, Arity::Exactly(1));
+    register_procedure!(vm, "symbol?", symbol_p, Arity::Exactly(1));
+    register_procedure!(vm, "list?", string_p, Arity::Exactly(1));
+    register_procedure!(vm, "procedure?", procedure_p, Arity::Exactly(1));
+    register_procedure!(vm, "null?", null_p, Arity::Exactly(1));
 
-    register_core!(vm, "not", bool_not, Arity::Exactly(1));
-    register_core!(vm, "inspect", inspect, Arity::Exactly(1));
+    register_procedure!(vm, "not", bool_not, Arity::Exactly(1));
+    register_procedure!(vm, "inspect", inspect, Arity::Exactly(1));
 
     numbers::register(vm);
 }
 
 //  R7RS 6.1
-//  (eqv? obj1 obj2
+//  (eqv? obj1 obj2)
 pub fn eqv(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (lhs, rhs) => Ok(Value::Bool(lhs.is_eqv(rhs))),

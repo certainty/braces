@@ -15,6 +15,7 @@ use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use crate::vm::disassembler::Disassembler;
+use compiler::frontend::parser::expression::identifier::Identifier;
 use global::TopLevel;
 use instance::Instance;
 use rustc_hash::FxHashMap;
@@ -23,7 +24,7 @@ use scheme::writer::Writer;
 use std::io::stdout;
 use std::path::PathBuf;
 use thiserror::Error;
-use value::Value;
+use value::{closure::Closure, Value};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -151,11 +152,24 @@ impl VM {
         Ok(())
     }
 
+    pub fn register_foreign_syntax_transformer(
+        &mut self,
+        name: Identifier,
+        transformer: foreign::Procedure,
+    ) -> Result<()> {
+        todo!()
+    }
+
     pub fn disassemble(&self, proc: &native::Procedure) -> Result<()> {
         let mut dissassembler = Disassembler::new(stdout());
 
         dissassembler.disassemble(&proc.chunk, &proc.name.clone().unwrap_or(String::from("")));
         Ok(())
+    }
+
+    fn interprete_procedure(&mut self, closure: Closure, arguments: Vec<Value>) -> Result<Value> {
+        // run the closure with the arguments and return the result
+        todo!()
     }
 
     fn interprete(&mut self, unit: CompilationUnit) -> Result<Value> {
