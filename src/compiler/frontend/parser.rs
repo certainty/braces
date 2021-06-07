@@ -48,11 +48,21 @@ impl AlphaConversionPhase {
 
     fn analyze(&self, datum: &Datum) -> Result<expression::Expression> {
         match datum.sexp() {
-            Sexp::List(ls) => match Self::head_symbol(ls) {
-                Some(s) if s == "define-syntax" => todo!(),
-                Some(s) if self.is_syntax(&s) => todo!(),
-                Some(_) => todo!(),
-                None => todo!(),
+            Sexp::List(ls) => match &ls[..] {
+                [op, args @ ..] => match &op.sexp {
+                    Sexp::Symbol(s) if self.is_syntax(&s) => {
+                        let id = expression::identifier::Identifier::new(s, op.location.clone());
+
+                        Ok(expression::Expression::macro_use(
+                            id,
+                            args.to_vec(),
+                            datum.location.clone(),
+                        ))
+                    }
+
+                    _ => todo!(),
+                },
+                _ => todo!(),
             },
             _ => todo!(),
         }

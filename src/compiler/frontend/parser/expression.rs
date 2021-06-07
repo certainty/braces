@@ -265,6 +265,18 @@ impl Expression {
         Expression::Apply(apply::build(operator, operands, loc))
     }
 
+    pub fn macro_use(
+        name: Identifier,
+        sexps: Vec<Datum>,
+        source_location: SourceLocation,
+    ) -> Expression {
+        Expression::MacroUse(MacroUseExpression {
+            name,
+            sexps,
+            source_location,
+        })
+    }
+
     /// Create body expression, which is used in expressions introducing new
     /// scopes like <let>, <begin> and <lambda>
     pub fn to_body_expression(&self) -> BodyExpression {
