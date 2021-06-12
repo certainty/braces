@@ -208,9 +208,9 @@ impl HasSourceLocation for Expression {
 impl Expression {
     pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
         let ast = Parser.parse_datum_sequence(source)?;
-        //println!("{:#?}", ast);
+        //   println!("{:#?}", ast);
         let expanded_ast = MacroExpander::expand(ast)?;
-        //println!("{:#?}", expanded_ast);
+        //    println!("{:#?}", expanded_ast);
         expanded_ast.iter().map(Self::parse).collect()
     }
 
@@ -221,6 +221,18 @@ impl Expression {
     pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
         let ast = Parser.parse_datum(source)?;
         Self::parse(&ast)
+    }
+
+    pub fn parse_lambda(datum: &Datum) -> Result<lambda::LambdaExpression> {
+        let expr = Self::parse(datum)?;
+        if let Expression::Lambda(lambda_expr) = expr {
+            Ok(lambda_expr)
+        } else {
+            Error::parse_error(
+                "Expected datum to parse as lambda",
+                datum.source_location().clone(),
+            )
+        }
     }
 
     pub fn constant(datum: Datum) -> Expression {

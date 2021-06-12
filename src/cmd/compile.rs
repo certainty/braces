@@ -12,7 +12,7 @@ pub fn execute(opts: &Opts) -> anyhow::Result<()> {
     let mut compiler = compiler::Compiler::new();
     let file_path = std::path::PathBuf::from(opts.input.clone());
     let mut source = FileSource::new(file_path);
-    let output = compiler.test_phase(&mut source)?;
+    let output = compiler.compile_program(&mut source)?;
 
     println!("{:#?}", output);
 

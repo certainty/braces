@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
+    #[error("RuntimError: {0}")]
+    RuntimeError(String),
     #[error("UndefinedVariableError: Variable `{0:?}` is undefined")]
     UndefinedVariable(Symbol),
     #[error("ArityError: Function expected `{0:?}` arguments but received {1}")]
@@ -14,6 +16,10 @@ pub enum RuntimeError {
     NoncallableError(Value),
     #[error("ArithmeticError: `{0}`")]
     ArithmeticError(String),
+}
+
+pub fn runtime_error<T: Into<String>>(msg: T) -> RuntimeError {
+    RuntimeError::RuntimeError(msg.into())
 }
 
 pub fn arithmetic_error<T: Into<String>>(msg: T) -> RuntimeError {

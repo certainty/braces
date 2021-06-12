@@ -7,6 +7,8 @@ pub mod utils;
 use crate::vm::value;
 use backend::code_generator;
 use backend::code_generator::{CodeGenerator, Target};
+use frontend::parser::expression::Expression;
+use frontend::parser::sexp::datum::Datum;
 use frontend::parser::sexp::error::ReadError;
 use frontend::parser::Parser;
 use source::Source;
@@ -47,6 +49,18 @@ impl Compiler {
         Compiler { parser: Parser }
     }
 
+    pub fn compile_lambda(&mut self, datum: &Datum) -> Result<value::procedure::Procedure> {
+        let lambda_expr = Expression::parse_lambda(datum)?;
+        let proc = CodeGenerator::generate_procedure(
+            None,
+            Target::Procedure(None),
+            &lambda_expr.body,
+            &lambda_expr.formals,
+        )?;
+
+        Ok(value::procedure::Procedure::native(proc))
+    }
+
     pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
         let ast = self.parser.parse_program(source)?;
         let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
@@ -58,16 +72,5 @@ impl Compiler {
         let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
 
         Ok(code_gen.generate(vec![ast])?)
-    }
-
-    pub fn test_phase<T: Source>(
-        &mut self,
-        source: &mut T,
-    ) -> Result<Vec<frontend::parser::expression::Expression>> {
-        let sexps = self.parser.parse_datum_sequence(source)?;
-        let alpha_conversion = frontend::parser::AlphaConversionPhase::new();
-        let expr = alpha_conversion.apply(sexps)?;
-
-        Ok(expr)
     }
 }

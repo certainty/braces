@@ -189,6 +189,7 @@ impl Repl {
             }
 
             Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
+            Err(e) => eprintln!("{}", e),
         }
         Ok(())
     }

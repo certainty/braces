@@ -74,7 +74,7 @@ impl<V> Stack<V> {
         unsafe {
             self.repr
                 .as_mut_ptr()
-                .add(std::cmp::max(self.repr.len() - 1, 0))
+                .add(std::cmp::max((self.repr.len() as isize) - 1, 0) as usize)
         }
     }
 

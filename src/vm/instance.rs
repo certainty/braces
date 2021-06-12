@@ -82,7 +82,7 @@ pub struct Instance<'a> {
 // Likely candidates for optimizations are the stack(s)
 impl<'a> Instance<'a> {
     pub fn new(
-        initial_closure: value::closure::Closure,
+        initial_closure: Option<value::closure::Closure>,
         call_stack_size: usize,
         toplevel: &'a mut TopLevel,
         values: &'a mut value::Factory,
@@ -91,14 +91,14 @@ impl<'a> Instance<'a> {
         let mut stack = ValueStack::new(call_stack_size * 255);
         let mut call_stack = CallStack::new(call_stack_size);
 
-        // the first value on the stack is the initial procedure
-        stack.push(Value::Closure(initial_closure.clone()));
-
-        // the first active stack frame is that of the current procedure
-        call_stack.push(CallFrame::new(initial_closure, 0));
+        if let Some(closure) = initial_closure {
+            // the first value on the stack is the initial procedure
+            stack.push(Value::Closure(closure.clone()));
+            // the first active stack frame is that of the current procedure
+            call_stack.push(CallFrame::new(closure, 0));
+        }
 
         let active_frame = call_stack.top_mut_ptr();
-
         Self {
             values,
             stack,
@@ -117,8 +117,40 @@ impl<'a> Instance<'a> {
         values: &'a mut value::Factory,
         debug_mode: bool,
     ) -> Result<Value> {
-        let mut instance = Self::new(initial_closure, stack_size, toplevel, values, debug_mode);
+        let mut instance = Self::new(
+            Some(initial_closure),
+            stack_size,
+            toplevel,
+            values,
+            debug_mode,
+        );
         instance.run()
+    }
+
+    pub fn interprete_macro_transformer(
+        transformer: value::procedure::Procedure,
+        rename: value::procedure::Procedure,
+        compare: value::procedure::Procedure,
+        exp: Value,
+        stack_size: usize,
+        toplevel: &'a mut TopLevel,
+        values: &'a mut value::Factory,
+        debug_vm: bool,
+    ) -> Result<Value> {
+        let mut instance = Self::new(None, stack_size, toplevel, values, debug_vm);
+        instance.push(Value::Procedure(transformer))?;
+        instance.push(exp)?;
+        instance.push(Value::Procedure(rename))?;
+        instance.push(Value::Procedure(compare))?;
+        instance.apply(3)?;
+        if let Some(value) = instance._return()? {
+            Ok(value)
+        } else {
+            instance.runtime_error(
+                error::runtime_error("Transformer returned without value"),
+                None,
+            )
+        }
     }
 
     fn run(&mut self) -> Result<Value> {

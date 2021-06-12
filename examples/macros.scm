@@ -1,7 +1,7 @@
-(define-syntax my-begin
-  (sc-macro-transformer
-   (lambda (exp env)
-     `((lambda () ,@exp)))))
+(define-syntax define-procedure 
+  (er-macro-transformer
+   (lambda (exp rename compare) #t)))
 
 
-(define (foo x y z) (+ x y))
+(define-procedure (foo (x y) y))
+

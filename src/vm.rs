@@ -11,7 +11,9 @@ use self::value::error;
 use self::value::procedure::foreign;
 use self::value::procedure::native;
 use crate::compiler;
+use crate::compiler::frontend::parser::sexp::datum::Datum;
 use crate::compiler::source::*;
+use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use crate::vm::disassembler::Disassembler;
@@ -38,6 +40,9 @@ pub enum Error {
     ),
     #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
+
+    #[error("TransformerError")]
+    TransformerError,
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -122,6 +127,10 @@ impl VM {
         }
     }
 
+    pub fn for_macro_expansion() -> VM {
+        Self::new(256)
+    }
+
     pub fn binding_names(&self) -> Vec<String> {
         self.toplevel.binding_names()
     }
@@ -156,6 +165,32 @@ impl VM {
 
         dissassembler.disassemble(&proc.chunk, &proc.name.clone().unwrap_or(String::from("")));
         Ok(())
+    }
+
+    pub fn interprete_macro_transformer(
+        &mut self,
+        transformer: value::procedure::Procedure,
+        rename: value::procedure::Procedure,
+        compare: value::procedure::Procedure,
+        exp: &Datum,
+    ) -> Result<Datum> {
+        let exp_value = self.values.from_datum(exp);
+        let value = Instance::interprete_macro_transformer(
+            transformer,
+            rename,
+            compare,
+            exp_value,
+            self.stack_size,
+            &mut self.toplevel,
+            &mut self.values,
+            true,
+        )?;
+
+        if let Some(transformed) = Datum::from_value(&value, exp.source_location().clone()) {
+            Ok(transformed)
+        } else {
+            Err(Error::TransformerError)
+        }
     }
 
     fn interprete(&mut self, unit: CompilationUnit) -> Result<Value> {

@@ -28,6 +28,7 @@ pub fn execute(opts: &Opts) -> anyhow::Result<()> {
         }
 
         Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
+        Err(other) => eprintln!("{}", other),
     }
     Ok(())
 }
