@@ -33,6 +33,9 @@ impl UserMessage for ReadError {
 impl UserMessage for expression::error::Error {
     fn print_user_friendly_message(&self) {
         match self {
+            expression::error::Error::MacroExpansionError(e) => {
+                eprintln!("MacroExpansionError: {}", e)
+            }
             expression::error::Error::ReadError(e) => e.print_user_friendly_message(),
             expression::error::Error::ParseError(message, location) => {
                 eprintln!("ParseError: {}", message);

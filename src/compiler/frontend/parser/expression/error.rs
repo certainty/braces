@@ -1,3 +1,4 @@
+use crate::compiler::frontend::macro_expand;
 use crate::compiler::frontend::parser::sexp;
 use crate::compiler::source_location::SourceLocation;
 use thiserror::Error;
@@ -10,6 +11,9 @@ pub enum Error {
     ParseError(String, SourceLocation),
     #[error("DomainError")]
     DomainError(String, SourceLocation),
+
+    #[error(transparent)]
+    MacroExpansionError(#[from] macro_expand::Error),
 }
 
 impl Error {

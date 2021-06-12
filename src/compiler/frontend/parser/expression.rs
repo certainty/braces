@@ -13,6 +13,7 @@ pub mod sequence;
 use std::iter::FromIterator;
 
 use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
+use crate::compiler::frontend::macro_expand::MacroExpander;
 use crate::compiler::frontend::parser::{
     sexp::datum::{Datum, Sexp},
     Parser,
@@ -207,8 +208,10 @@ impl HasSourceLocation for Expression {
 impl Expression {
     pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
         let ast = Parser.parse_datum_sequence(source)?;
-        //println!("{:?}", ast);
-        ast.iter().map(Self::parse).collect()
+        //println!("{:#?}", ast);
+        let expanded_ast = MacroExpander::expand(ast)?;
+        //println!("{:#?}", expanded_ast);
+        expanded_ast.iter().map(Self::parse).collect()
     }
 
     /// Parse a single datum into a an expression.
