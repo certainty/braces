@@ -1,4 +1,4 @@
-use crate::compiler::frontend::parser::sexp;
+use crate::compiler::frontend::reader::sexp;
 use crate::vm::value::number::fixnum::Fixnum;
 use crate::vm::value::number::flonum::Flonum;
 use crate::vm::value::number::{real::RealNumber, Number, SchemeNumber};

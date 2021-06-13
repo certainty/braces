@@ -30,7 +30,7 @@ use crate::compiler::frontend::parser::expression::{
 use crate::compiler::frontend::parser::expression::{
     conditional::IfExpression, define::DefinitionExpression,
 };
-use crate::compiler::frontend::parser::sexp::datum;
+use crate::compiler::frontend::reader::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::Chunk;

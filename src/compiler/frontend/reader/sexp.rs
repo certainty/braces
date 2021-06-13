@@ -9,11 +9,11 @@ mod string;
 pub mod symbol;
 mod whitespace;
 
+use super::Error;
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
 use datum::Datum;
 use datum::Sexp;
-use error::ReadError;
 use nom::branch::alt;
 use nom::combinator::value;
 use nom::error::{context, VerboseError};
@@ -34,7 +34,7 @@ use nom_locate::{position, LocatedSpan};
 pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
 type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
 
-pub type Result<T> = std::result::Result<T, ReadError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Datum> {
     let source_type = source.source_type();

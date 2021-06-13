@@ -9,7 +9,7 @@ pub mod procedure;
 pub mod string;
 pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
-use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::utils::string_table::StringTable;
 use crate::vm::value::number::real::RealNumber;
 use std::cell::Ref;

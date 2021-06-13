@@ -23,10 +23,7 @@
 // We maintain metadata to increase the ergonomic properties of the compiler and give better error messages.
 
 use crate::compiler::backend::variables::{Variables, VariablesRef};
-use crate::compiler::frontend::parser::{
-    sexp::datum::{Datum, Sexp},
-    Parser,
-};
+use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::Compiler;
 use crate::vm::scheme::ffi;
 use crate::vm::value::procedure;

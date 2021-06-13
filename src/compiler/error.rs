@@ -1,5 +1,5 @@
-use super::frontend::parser::expression;
-use super::frontend::parser::sexp::error::ReadError;
+use super::frontend::parser;
+use super::frontend::reader;
 use super::source::SourceType;
 use super::source_location::SourceLocation;
 
@@ -7,12 +7,12 @@ pub trait UserMessage {
     fn print_user_friendly_message(&self);
 }
 
-impl UserMessage for ReadError {
+impl UserMessage for reader::Error {
     fn print_user_friendly_message(&self) {
         match self {
-            ReadError::IncompleteInput => eprintln!("ReadError: unexpected end of input"),
-            ReadError::IoError(e) => eprintln!("ReadError: error during read caused by: {}", e),
-            ReadError::ReadError(details) => {
+            reader::Error::IncompleteInput => eprintln!("ReadError: unexpected end of input"),
+            reader::Error::IoError(e) => eprintln!("ReadError: error during read caused by: {}", e),
+            reader::Error::ReadError(details) => {
                 eprintln!("ReadError: error while parsing the next datum");
                 if let Some(detail) = details.first() {
                     eprintln!(
@@ -30,18 +30,18 @@ impl UserMessage for ReadError {
     }
 }
 
-impl UserMessage for expression::error::Error {
+impl UserMessage for parser::Error {
     fn print_user_friendly_message(&self) {
         match self {
-            expression::error::Error::MacroExpansionError(e) => {
+            parser::Error::MacroExpansionError(e) => {
                 eprintln!("MacroExpansionError: {}", e)
             }
-            expression::error::Error::ReadError(e) => e.print_user_friendly_message(),
-            expression::error::Error::ParseError(message, location) => {
+            parser::Error::ReadError(e) => e.print_user_friendly_message(),
+            parser::Error::ParseError(message, location) => {
                 eprintln!("ParseError: {}", message);
                 eprintln!("--> {} ", source_location_string(location))
             }
-            expression::error::Error::DomainError(message, location) => {
+            parser::Error::DomainError(message, location) => {
                 eprintln!("DomainError: {}", message);
                 eprintln!("--> {} ", source_location_string(location))
             }
@@ -54,7 +54,6 @@ impl UserMessage for super::Error {
         match self {
             super::Error::ParseError(e) => e.print_user_friendly_message(),
             super::Error::GenerationError(e) => eprintln!("Failed to generate code: {:?}", e),
-            super::Error::ReadError(e) => eprintln!("Failed to sexps: {:?}", e),
         }
     }
 }

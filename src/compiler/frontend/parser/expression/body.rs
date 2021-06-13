@@ -1,10 +1,10 @@
 use super::define;
 use super::define::DefinitionExpression;
-use super::error::Error;
+use super::Error;
 use super::Expression;
 use super::Result;
 use crate::compiler::source_location::SourceLocation;
-use crate::compiler::{frontend::parser::sexp::datum::Datum, source_location::HasSourceLocation};
+use crate::compiler::{frontend::reader::sexp::datum::Datum, source_location::HasSourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BodyExpression {

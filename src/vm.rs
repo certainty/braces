@@ -11,7 +11,7 @@ use self::value::error;
 use self::value::procedure::foreign;
 use self::value::procedure::native;
 use crate::compiler;
-use crate::compiler::frontend::parser::sexp::datum::Datum;
+use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::*;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;

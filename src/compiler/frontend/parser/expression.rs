@@ -3,165 +3,30 @@ pub mod assignment;
 pub mod body;
 pub mod conditional;
 pub mod define;
-pub mod error;
 pub mod identifier;
 pub mod lambda;
 pub mod letexp;
 pub mod literal;
+pub mod parse_result;
 pub mod quotation;
 pub mod sequence;
-use std::iter::FromIterator;
 
 use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
+use super::Error;
 use crate::compiler::frontend::macro_expand::MacroExpander;
-use crate::compiler::frontend::parser::{
-    sexp::datum::{Datum, Sexp},
-    Parser,
-};
-use crate::compiler::source::Source;
+use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use apply::ApplicationExpression;
 use body::BodyExpression;
 use define::DefinitionExpression;
-use error::Error;
 use identifier::Identifier;
 use lambda::LambdaExpression;
 use letexp::{BindingSpec, LetExpression};
 use literal::LiteralExpression;
+use parse_result::ParseResult;
 use sequence::BeginExpression;
 
 type Result<T> = std::result::Result<T, Error>;
-
-pub enum ParseResult<T> {
-    Applicable(Result<T>),
-    NonApplicable(String, SourceLocation),
-}
-
-impl<T> ParseResult<T> {
-    pub fn collect_res(results: Vec<ParseResult<T>>) -> Vec<Result<T>> {
-        let mut total = vec![];
-
-        for res in results {
-            match res {
-                ParseResult::Applicable(res) => total.push(res),
-                _ => (),
-            }
-        }
-
-        total
-    }
-
-    pub fn accept(v: T) -> ParseResult<T> {
-        ParseResult::Applicable(Ok(v))
-    }
-
-    pub fn error(e: Error) -> ParseResult<T> {
-        ParseResult::Applicable(Err(e))
-    }
-
-    pub fn ignore<S: Into<String>>(message: S, location: SourceLocation) -> ParseResult<T> {
-        ParseResult::NonApplicable(message.into(), location)
-    }
-
-    pub fn or<F: FnOnce() -> ParseResult<T>>(self, op: F) -> ParseResult<T> {
-        match self {
-            Self::NonApplicable(_, _) => op(),
-            other => other,
-        }
-    }
-
-    pub fn and<F: FnOnce() -> ParseResult<T>>(self, op: F) -> ParseResult<T> {
-        match self {
-            Self::Applicable(_ignored) => op(),
-            other => other,
-        }
-    }
-
-    pub fn is_err(self) -> bool {
-        match self {
-            Self::NonApplicable(_, _) => false,
-            Self::Applicable(res) => res.is_err(),
-        }
-    }
-
-    pub fn is_ok(self) -> bool {
-        match self {
-            Self::NonApplicable(_, _) => false,
-            Self::Applicable(res) => res.is_ok(),
-        }
-    }
-
-    pub fn map<R, F: FnOnce(T) -> R>(self, op: F) -> ParseResult<R> {
-        match self {
-            Self::Applicable(v) => ParseResult::<R>::Applicable(v.map(op)),
-            Self::NonApplicable(m, l) => ParseResult::<R>::NonApplicable(m, l),
-        }
-    }
-
-    pub fn flat_map<F: FnOnce(T) -> ParseResult<T>>(self, op: F) -> ParseResult<T> {
-        match self {
-            Self::Applicable(Ok(v)) => op(v),
-            other => other,
-        }
-    }
-
-    pub fn res(self) -> Result<T> {
-        match self {
-            Self::NonApplicable(message, location) => Error::parse_error(&message, location),
-            Self::Applicable(res) => res,
-        }
-    }
-
-    #[inline]
-    pub fn is_applicable(self) -> bool {
-        match self {
-            Self::Applicable(_) => true,
-            _ => false,
-        }
-    }
-
-    #[inline]
-    pub fn is_non_applicable(self) -> bool {
-        !self.is_applicable()
-    }
-
-    pub fn map_non_applicable(self, v: Result<T>) -> Result<T> {
-        match self {
-            Self::NonApplicable(_, _) => v,
-            Self::Applicable(other) => other,
-        }
-    }
-}
-
-impl<T> From<Result<T>> for ParseResult<T> {
-    fn from(value: Result<T>) -> Self {
-        Self::Applicable(value)
-    }
-}
-
-impl<T> From<T> for ParseResult<T> {
-    fn from(value: T) -> Self {
-        Self::Applicable(Ok(value))
-    }
-}
-
-impl<T> From<ParseResult<T>> for Result<T> {
-    fn from(res: ParseResult<T>) -> Self {
-        res.res()
-    }
-}
-
-impl<T> FromIterator<ParseResult<T>> for Result<Vec<T>> {
-    fn from_iter<I: IntoIterator<Item = ParseResult<T>>>(iter: I) -> Self {
-        iter.into_iter().map(|i| i.res()).collect()
-    }
-}
-
-impl<T> FromIterator<ParseResult<T>> for Vec<Result<T>> {
-    fn from_iter<I: IntoIterator<Item = ParseResult<T>>>(iter: I) -> Self {
-        iter.into_iter().map(|i| i.res()).collect()
-    }
-}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct MacroUseExpression {
@@ -206,35 +71,6 @@ impl HasSourceLocation for Expression {
 }
 
 impl Expression {
-    pub fn parse_program<T: Source>(source: &mut T) -> Result<Vec<Self>> {
-        let ast = Parser.parse_datum_sequence(source)?;
-        //   println!("{:#?}", ast);
-        let expanded_ast = MacroExpander::expand(ast)?;
-        //    println!("{:#?}", expanded_ast);
-        expanded_ast.iter().map(Self::parse).collect()
-    }
-
-    /// Parse a single datum into a an expression.
-    ///
-    /// It either succeeds or returns an error indicating
-    /// what went wrong.
-    pub fn parse_one<T: Source>(source: &mut T) -> Result<Self> {
-        let ast = Parser.parse_datum(source)?;
-        Self::parse(&ast)
-    }
-
-    pub fn parse_lambda(datum: &Datum) -> Result<lambda::LambdaExpression> {
-        let expr = Self::parse(datum)?;
-        if let Expression::Lambda(lambda_expr) = expr {
-            Ok(lambda_expr)
-        } else {
-            Error::parse_error(
-                "Expected datum to parse as lambda",
-                datum.source_location().clone(),
-            )
-        }
-    }
-
     pub fn constant(datum: Datum) -> Expression {
         Expression::Literal(literal::build(datum))
     }
@@ -325,7 +161,16 @@ impl Expression {
     ///   <includer>           |
     /// ```
 
-    fn parse(datum: &Datum) -> Result<Expression> {
+    pub fn parse_all(data: Vec<Datum>) -> Result<Vec<Expression>> {
+        // macro expansion will be interleaved with parsing later
+        let expanded_ast = MacroExpander::expand(data)?;
+        expanded_ast.iter().map(Self::parse).collect()
+    }
+
+    pub fn parse(datum: &Datum) -> Result<Expression> {
+        // expand datum?
+
+        // now let's see where we're at
         identifier::parse(datum)
             .or(|| literal::parse(datum))
             .or(|| lambda::parse(datum))
@@ -338,6 +183,18 @@ impl Expression {
                 "Invalid expression",
                 datum.source_location().clone(),
             ))
+    }
+
+    pub fn parse_lambda(datum: &Datum) -> Result<lambda::LambdaExpression> {
+        let expr = Self::parse(datum)?;
+        if let Expression::Lambda(lambda_expr) = expr {
+            Ok(lambda_expr)
+        } else {
+            Error::parse_error(
+                "Expected datum to parse as lambda",
+                datum.source_location().clone(),
+            )
+        }
     }
 
     fn parse_derived(datum: &Datum) -> ParseResult<Expression> {

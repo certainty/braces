@@ -8,9 +8,7 @@ use crate::vm::value;
 use backend::code_generator;
 use backend::code_generator::{CodeGenerator, Target};
 use frontend::parser::expression::Expression;
-use frontend::parser::sexp::datum::Datum;
-use frontend::parser::sexp::error::ReadError;
-use frontend::parser::Parser;
+use frontend::reader::sexp::datum::Datum;
 use source::Source;
 use thiserror::Error;
 
@@ -19,18 +17,13 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    ParseError(#[from] frontend::parser::expression::error::Error),
+    ParseError(#[from] frontend::parser::Error),
 
     #[error(transparent)]
     GenerationError(#[from] code_generator::Error),
-
-    #[error(transparent)]
-    ReadError(#[from] ReadError),
 }
 
-pub struct Compiler {
-    parser: Parser,
-}
+pub struct Compiler;
 
 #[derive(Clone, Debug)]
 pub struct CompilationUnit {
@@ -46,7 +39,20 @@ impl CompilationUnit {
 
 impl Compiler {
     pub fn new() -> Self {
-        Compiler { parser: Parser }
+        Compiler
+    }
+
+    pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
+        self.compile(frontend::parse_all(source)?)
+    }
+
+    pub fn compile_expression<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
+        self.compile(frontend::parse(source)?)
+    }
+
+    fn compile(&mut self, ast: frontend::parser::ast::Ast) -> Result<CompilationUnit> {
+        let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
+        Ok(code_gen.generate(ast.expressions)?)
     }
 
     pub fn compile_lambda(&mut self, datum: &Datum) -> Result<value::procedure::Procedure> {
@@ -59,18 +65,5 @@ impl Compiler {
         )?;
 
         Ok(value::procedure::Procedure::native(proc))
-    }
-
-    pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
-        let ast = self.parser.parse_program(source)?;
-        let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
-        Ok(code_gen.generate(ast)?)
-    }
-
-    pub fn compile_expression<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
-        let ast = self.parser.parse_expression(source)?;
-        let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
-
-        Ok(code_gen.generate(vec![ast])?)
     }
 }

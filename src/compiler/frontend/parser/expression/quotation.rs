@@ -1,8 +1,8 @@
-use super::error::Error;
+use super::Error;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
-use crate::compiler::frontend::parser::sexp::datum::Datum;
+use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,32 +1,45 @@
+pub mod ast;
 pub mod expression;
-pub mod sexp;
-use crate::compiler::source::Source;
-use expression::error::Error;
-use rustc_hash::FxHashMap;
-use sexp::datum::{Datum, Sexp};
-use sexp::error::ReadError;
+pub mod syntax;
+use super::reader;
+use super::reader::sexp::datum::Datum;
+use crate::compiler::source_location::SourceLocation;
+use ast::Ast;
+use thiserror::Error;
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub struct Parser;
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    ReadError(#[from] reader::Error),
+    #[error("ParseError")]
+    ParseError(String, SourceLocation),
+    #[error("DomainError")]
+    DomainError(String, SourceLocation),
 
-impl Parser {
-    pub fn parse_datum<T: Source>(&self, source: &mut T) -> std::result::Result<Datum, ReadError> {
-        sexp::parse(source)
+    #[error(transparent)]
+    MacroExpansionError(#[from] syntax::Error),
+}
+
+impl Error {
+    pub fn parse_error<T>(message: &str, source: SourceLocation) -> Result<T> {
+        Err(Error::ParseError(message.to_string(), source))
     }
 
-    pub fn parse_datum_sequence<T: Source>(
-        &self,
-        source: &mut T,
-    ) -> std::result::Result<Vec<Datum>, ReadError> {
-        sexp::parse_sequence(source)
+    pub fn domain_error<T>(message: &str, source: SourceLocation) -> Result<T> {
+        Err(Error::DomainError(message.to_string(), source))
     }
+}
 
-    pub fn parse_program<T: Source>(&self, source: &mut T) -> Result<Vec<expression::Expression>> {
-        expression::Expression::parse_program(source)
-    }
+pub fn parse(datum: &Datum) -> Result<Ast> {
+    Ok(Ast {
+        expressions: vec![expression::Expression::parse(datum)?],
+    })
+}
 
-    pub fn parse_expression<T: Source>(&self, source: &mut T) -> Result<expression::Expression> {
-        expression::Expression::parse_one(source)
-    }
+pub fn parse_all(data: Vec<Datum>) -> Result<Ast> {
+    Ok(Ast {
+        expressions: expression::Expression::parse_all(data)?,
+    })
 }
