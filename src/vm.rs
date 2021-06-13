@@ -186,6 +186,8 @@ impl VM {
             true,
         )?;
 
+        println!("transformer returned: {:?}", value);
+
         if let Some(transformed) = Datum::from_value(&value, exp.source_location().clone()) {
             Ok(transformed)
         } else {

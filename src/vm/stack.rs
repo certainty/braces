@@ -36,10 +36,15 @@ impl<V> Stack<V> {
         &self.repr[idx]
     }
 
+    #[inline]
+    pub fn pop_safe(&mut self) -> Option<V> {
+        self.repr.pop()
+    }
+
     // Pop from the top of the stack.
     // The caller has to make sure that the stack is not empty.
     pub fn pop(&mut self) -> V {
-        self.repr.pop().unwrap()
+        self.pop_safe().unwrap()
     }
 
     pub fn pop_n(&mut self, n: usize) -> Vec<V> {

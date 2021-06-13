@@ -99,6 +99,7 @@ impl<'a> Instance<'a> {
         }
 
         let active_frame = call_stack.top_mut_ptr();
+
         Self {
             values,
             stack,
@@ -143,14 +144,7 @@ impl<'a> Instance<'a> {
         instance.push(Value::Procedure(rename))?;
         instance.push(Value::Procedure(compare))?;
         instance.apply(3)?;
-        if let Some(value) = instance._return()? {
-            Ok(value)
-        } else {
-            instance.runtime_error(
-                error::runtime_error("Transformer returned without value"),
-                None,
-            )
-        }
+        instance.run()
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -636,7 +630,6 @@ impl<'a> Instance<'a> {
         proc: Rc<procedure::native::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
-        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
         self.check_arity(&proc.arity, arg_count)?;
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();
