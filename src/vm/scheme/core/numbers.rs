@@ -18,25 +18,25 @@ macro_rules! define_predicate {
 }
 
 pub fn register(vm: &mut VM) {
-    super::register_core!(vm, "number?", number_p, Arity::Exactly(1));
-    super::register_core!(vm, "complex?", complex_p, Arity::Exactly(1));
-    super::register_core!(vm, "real?", real_p, Arity::Exactly(1));
-    super::register_core!(vm, "rational?", rational_p, Arity::Exactly(1));
-    super::register_core!(vm, "integer?", integer_p, Arity::Exactly(1));
-    super::register_core!(vm, "nan?", nan_p, Arity::Exactly(1));
-    super::register_core!(vm, "finite?", finite_p, Arity::Exactly(1));
-    super::register_core!(vm, "infinite?", inf_p, Arity::Exactly(1));
-    super::register_core!(vm, "exact?", exact_p, Arity::Exactly(1));
-    super::register_core!(vm, "inexact?", inexact_p, Arity::Exactly(1));
-    super::register_core!(vm, "+", add, Arity::Many);
-    super::register_core!(vm, "-", sub, Arity::AtLeast(1));
-    super::register_core!(vm, "*", mul, Arity::Many);
-    super::register_core!(vm, "/", div, Arity::AtLeast(1));
-    super::register_core!(vm, "<", lt, Arity::Many);
-    super::register_core!(vm, "<=", lt_eq, Arity::Many);
-    super::register_core!(vm, ">", gt, Arity::Many);
-    super::register_core!(vm, ">=", gt_eq, Arity::Many);
-    super::register_core!(vm, "=", num_eq, Arity::Many);
+    super::register_procedure!(vm, "number?", number_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "complex?", complex_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "real?", real_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "rational?", rational_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "integer?", integer_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "nan?", nan_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "finite?", finite_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "infinite?", inf_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "exact?", exact_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "inexact?", inexact_p, Arity::Exactly(1));
+    super::register_procedure!(vm, "+", add, Arity::Many);
+    super::register_procedure!(vm, "-", sub, Arity::AtLeast(1));
+    super::register_procedure!(vm, "*", mul, Arity::Many);
+    super::register_procedure!(vm, "/", div, Arity::AtLeast(1));
+    super::register_procedure!(vm, "<", lt, Arity::Many);
+    super::register_procedure!(vm, "<=", lt_eq, Arity::Many);
+    super::register_procedure!(vm, ">", gt, Arity::Many);
+    super::register_procedure!(vm, ">=", gt_eq, Arity::Many);
+    super::register_procedure!(vm, "=", num_eq, Arity::Many);
 }
 
 // R7RS 6.2.6 Numerical operations

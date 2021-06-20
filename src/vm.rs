@@ -17,6 +17,7 @@ use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use crate::vm::disassembler::Disassembler;
+use compiler::frontend::parser::expression::identifier::Identifier;
 use global::TopLevel;
 use instance::Instance;
 use rustc_hash::FxHashMap;
@@ -25,7 +26,7 @@ use scheme::writer::Writer;
 use std::io::stdout;
 use std::path::PathBuf;
 use thiserror::Error;
-use value::Value;
+use value::{closure::Closure, Value};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -160,6 +161,14 @@ impl VM {
         Ok(())
     }
 
+    pub fn register_foreign_syntax_transformer(
+        &mut self,
+        name: Identifier,
+        transformer: foreign::Procedure,
+    ) -> Result<()> {
+        todo!()
+    }
+
     pub fn disassemble(&self, proc: &native::Procedure) -> Result<()> {
         let mut dissassembler = Disassembler::new(stdout());
 
@@ -167,32 +176,9 @@ impl VM {
         Ok(())
     }
 
-    pub fn interprete_macro_transformer(
-        &mut self,
-        transformer: value::procedure::Procedure,
-        rename: value::procedure::Procedure,
-        compare: value::procedure::Procedure,
-        exp: &Datum,
-    ) -> Result<Datum> {
-        let exp_value = self.values.from_datum(exp);
-        let value = Instance::interprete_macro_transformer(
-            transformer,
-            rename,
-            compare,
-            exp_value,
-            self.stack_size,
-            &mut self.toplevel,
-            &mut self.values,
-            true,
-        )?;
-
-        println!("transformer returned: {:?}", value);
-
-        if let Some(transformed) = Datum::from_value(&value, exp.source_location().clone()) {
-            Ok(transformed)
-        } else {
-            Err(Error::TransformerError)
-        }
+    fn interprete_procedure(&mut self, closure: Closure, arguments: Vec<Value>) -> Result<Value> {
+        // run the closure with the arguments and return the result
+        todo!()
     }
 
     fn interprete(&mut self, unit: CompilationUnit) -> Result<Value> {
