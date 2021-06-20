@@ -30,7 +30,6 @@ use crate::vm::value::procedure;
 use crate::vm::value::procedure::Arity;
 use crate::vm::value::{self, Value};
 use crate::vm::VM;
-use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -51,42 +50,6 @@ pub struct MacroExpander {
     compiler: Compiler,
     expansion_env: Environment,
     variables: VariablesRef,
-}
-
-pub struct Environment {
-    bindings: FxHashMap<String, Value>,
-    parent: Option<Box<Environment>>,
-}
-
-impl Environment {
-    pub fn new() -> Self {
-        Environment {
-            bindings: FxHashMap::default(),
-            parent: None,
-        }
-    }
-
-    pub fn child(parent: Environment) -> Self {
-        Environment {
-            bindings: FxHashMap::default(),
-            parent: Some(Box::new(parent)),
-        }
-    }
-
-    pub fn bind(&mut self, name: String, value: Value) {
-        self.bindings.insert(name, value);
-    }
-
-    pub fn get(&self, k: &String) -> Option<&Value> {
-        match (self.bindings.get(k), &self.parent) {
-            (None, Some(p)) => p.get(k),
-            (None, None) => None,
-            (v, _) => v,
-        }
-    }
-    pub fn is_bound(&self, k: &String) -> bool {
-        self.get(k).is_some()
-    }
 }
 
 impl MacroExpander {
