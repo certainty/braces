@@ -13,7 +13,9 @@ Start the REPL and play around with it
 make repl 
 ```
 
-## TODO
+## State 
+
+### Language Support 
 
 - [ ] literals
   - [x] bool
@@ -32,39 +34,42 @@ make repl
 - [x] procedure call
 - [x] assignment
 
-### Repl
-
-- [x] command support
-- [x] bracket matching
-- [x] completion of bound identifiers
-
-### TCO
+### Compiler 
+- [x] sexp parser
+- [x] expression parser 
+- [x] basic code generator 
+- [ ] collect all errors in sexp parser 
+- [ ] collect all errors in expr parser 
+- [ ] bytecode serialization
+- [ ] Module System 
+- [ ] optimization pass 
 - [x] identify tail calls
-- [x] optimise tail calls
+- [ ] quasiquote / Quote 
 
-### Errors
+#### Macros
+- [ ] add macro expansion phase
+- [ ] add syntactic closure macro system
+
+#### Errors
 - [ ] fix backtraces 
 - [ ] improve error reporting for sexp parser
 - [ ] improve error reporting for expressions
 
-### Macros
-- [ ] add macro expansion phase
-- [ ] add syntactic closure macro system
+### VM
+
+- [x] optimise tail calls
+- [x] closures 
+- [ ] continuations 
+- [ ] optimize stack 
+
+### Debugger 
+- [ ] generate DWARF debug information 
+
+
+### Repl
+- [x] command support
+- [x] bracket matching
+- [x] completion of bound identifiers
 
 ### Continuations
 - [ ] figure out how to implement them
-
-### Language features
-- [ ] fully fledged define for procedures
-- [ ] more list procedures
-
-
-### Closures
-- [x] close up values `(define test ((let x #t)) (let ((closure (lambda () (set! x (not x))))) (set! x (not x)) closure))`
-- [x] make mutual reference of two procedures work with closures
-- [x] make sure we don't create a memory leak
-
-
-## Bugs
-
-- [x] set! unbound variables should create an error
