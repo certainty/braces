@@ -80,7 +80,7 @@ pub fn parse_mnemonic_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::sexp::tests::*;
 
     #[test]
     fn test_read_char_hex_literal() {

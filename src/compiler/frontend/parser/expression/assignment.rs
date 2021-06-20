@@ -58,7 +58,7 @@ pub fn do_parse_set(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Resu
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::expression::tests::*;
-    use crate::compiler::frontend::parser::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
 
     #[test]
     fn test_parse_assignment() {

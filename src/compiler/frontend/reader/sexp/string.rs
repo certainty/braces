@@ -91,7 +91,7 @@ fn parse_string_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::sexp::tests::*;
 
     #[test]
     fn test_read_string() {

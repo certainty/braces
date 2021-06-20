@@ -29,7 +29,7 @@ pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::sexp::tests::*;
 
     #[test]
     fn test_read_boolean_literal() {

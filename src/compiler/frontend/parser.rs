@@ -3,6 +3,7 @@ pub mod expression;
 pub mod syntax;
 use super::reader;
 use super::reader::sexp::datum::Datum;
+use crate::compiler::frontend::macro_expand;
 use crate::compiler::source_location::SourceLocation;
 use ast::Ast;
 use thiserror::Error;
@@ -19,7 +20,7 @@ pub enum Error {
     DomainError(String, SourceLocation),
 
     #[error(transparent)]
-    MacroExpansionError(#[from] syntax::Error),
+    MacroExpansionError(#[from] macro_expand::Error),
 }
 
 impl Error {

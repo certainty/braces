@@ -237,6 +237,7 @@ impl Expression {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::frontend;
     use crate::compiler::source::{SourceType, StringSource};
 
     #[test]
@@ -318,14 +319,14 @@ mod tests {
 
     pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut source = StringSource::new(inp, "datum-parser-test");
-        let parsed_exp = Expression::parse_one(&mut source).unwrap();
+        let ast = frontend::parse(&mut source).unwrap();
 
-        assert_eq!(parsed_exp, exp)
+        assert_eq!(ast.singleton().unwrap(), &exp)
     }
 
     pub fn assert_parse_error(inp: &str) {
         let mut source = StringSource::new(inp, "datum-parser-test");
-        let result = Expression::parse_one(&mut source);
+        let result = frontend::parse(&mut source);
         let message = format!("expected parse error but got {:?}", result);
 
         assert!(result.is_err(), message)

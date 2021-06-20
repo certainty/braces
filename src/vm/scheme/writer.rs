@@ -207,7 +207,7 @@ impl Writer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp;
+    use crate::compiler::frontend::reader::sexp;
     use crate::compiler::source::StringSource;
     use crate::vm::value::arbitrary::SymbolString;
     use crate::vm::value::Value;

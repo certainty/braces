@@ -285,7 +285,7 @@ pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Sign> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::sexp::tests::*;
     use crate::vm::value::number::Number;
 
     #[test]

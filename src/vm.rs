@@ -169,6 +169,34 @@ impl VM {
         todo!()
     }
 
+    pub fn interprete_macro_transformer(
+        &mut self,
+        transformer: value::procedure::Procedure,
+        rename: value::procedure::Procedure,
+        compare: value::procedure::Procedure,
+        exp: &Datum,
+    ) -> Result<Datum> {
+        let exp_value = self.values.from_datum(exp);
+        let value = Instance::interprete_macro_transformer(
+            transformer,
+            rename,
+            compare,
+            exp_value,
+            self.stack_size,
+            &mut self.toplevel,
+            &mut self.values,
+            true,
+        )?;
+
+        println!("transformer returned: {:?}", value);
+
+        if let Some(transformed) = Datum::from_value(&value, exp.source_location().clone()) {
+            Ok(transformed)
+        } else {
+            Err(Error::TransformerError)
+        }
+    }
+
     pub fn disassemble(&self, proc: &native::Procedure) -> Result<()> {
         let mut dissassembler = Disassembler::new(stdout());
 

@@ -1,5 +1,13 @@
 use rustc_hash::FxHashMap;
 
+type Identifier = String;
+
+pub enum Denotation {
+    Special(String),
+    Macro,
+    Identifier,
+}
+
 type SyntaxInformation = ();
 
 pub struct Environment {

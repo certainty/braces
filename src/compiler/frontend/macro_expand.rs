@@ -23,6 +23,7 @@
 // We maintain metadata to increase the ergonomic properties of the compiler and give better error messages.
 
 use crate::compiler::backend::variables::{Variables, VariablesRef};
+use crate::compiler::frontend::parser::syntax::environment::Environment;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::Compiler;
 use crate::vm::scheme::ffi;
@@ -171,8 +172,8 @@ impl MacroExpander {
                             match self.compiler.compile_lambda(lambda_def) {
                                 Ok(procedure) => {
                                     println!("Transformer closure: {:#?}", procedure);
-                                    self.expansion_env
-                                        .bind(name.clone(), Value::Procedure(procedure));
+                                    //self.expansion_env
+                                    //   .bind(name.clone(), Value::Procedure(procedure));
                                     Ok(())
                                 }
                                 Err(_) => Err(Error::CompileError),
@@ -201,12 +202,15 @@ impl MacroExpander {
         match Self::match_symbol(name) {
             Some(name) => {
                 let transformer = self.expansion_env.get(&name.to_string()).clone();
+                todo!()
 
-                if let Some(Value::Procedure(procedure)) = transformer {
-                    self.run_transformer(procedure.clone(), form)
-                } else {
-                    Err(Error::InvalidTransformer)
-                }
+                /*
+                match transformer {
+                    Some(Value::Procedure(procedure)) => {
+                        self.run_transformer(procedure.clone(), form)
+                    }
+                    _ => Err(Error::InvalidTransformer),
+                }*/
             }
             other => {
                 println!("{:#?}", other);

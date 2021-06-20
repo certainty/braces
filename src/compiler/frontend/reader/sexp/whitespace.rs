@@ -72,8 +72,8 @@ pub fn parse_directive<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::datum::Sexp;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::sexp::tests::*;
 
     #[test]
     fn test_read_comments() {

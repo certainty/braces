@@ -131,7 +131,7 @@ fn parse_binding_spec(datum: &Datum) -> Result<BindingSpec> {
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::expression::tests::*;
-    use crate::compiler::frontend::parser::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
 
     #[test]
     fn test_parse_let_simple() {

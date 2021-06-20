@@ -163,7 +163,7 @@ fn parse_explicit_sign<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::sexp::tests::*;
 
     #[test]
     fn test_read_symbol() {
