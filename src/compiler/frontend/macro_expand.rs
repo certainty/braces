@@ -23,7 +23,7 @@
 // We maintain metadata to increase the ergonomic properties of the compiler and give better error messages.
 
 use crate::compiler::backend::variables::{Variables, VariablesRef};
-use crate::compiler::frontend::parser::syntax::environment::Environment;
+use crate::compiler::frontend::parser::syntax::environment::SyntaxEnvironment;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::Compiler;
 use crate::vm::scheme::ffi;
@@ -49,7 +49,7 @@ pub enum Error {
 
 pub struct MacroExpander {
     compiler: Compiler,
-    expansion_env: Environment,
+    expansion_env: SyntaxEnvironment,
     variables: VariablesRef,
 }
 
@@ -57,7 +57,7 @@ impl MacroExpander {
     pub fn new() -> MacroExpander {
         MacroExpander {
             compiler: Compiler::new(),
-            expansion_env: Environment::new(),
+            expansion_env: SyntaxEnvironment::new(),
             variables: Variables::top_level(),
         }
     }
@@ -142,7 +142,7 @@ impl MacroExpander {
 
     fn is_macro_use(&self, op: &Datum) -> bool {
         match Self::match_symbol(op) {
-            Some(name) => self.expansion_env.is_bound(&name.to_string()),
+            Some(name) => self.expansion_env.is_bound(&name.into()),
             _ => false,
         }
     }
@@ -201,7 +201,7 @@ impl MacroExpander {
     fn apply_macro(&mut self, name: &Datum, form: &Datum) -> Result<Option<Datum>> {
         match Self::match_symbol(name) {
             Some(name) => {
-                let transformer = self.expansion_env.get(&name.to_string()).clone();
+                let transformer = self.expansion_env.get(&name.into()).clone();
                 todo!()
 
                 /*
