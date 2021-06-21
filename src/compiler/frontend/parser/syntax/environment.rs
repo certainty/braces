@@ -43,43 +43,78 @@ impl<T: Into<String>> From<T> for Identifier {
 
 #[derive(Debug, Clone)]
 pub enum Denotation {
-    Special(Identifier),
+    Special(Special),
     Macro,
     Id,
 }
 
+#[derive(Debug, Clone)]
+pub enum Special {
+    Lambda,
+    Quote,
+    Set,
+    Begin,
+    Define,
+    DefineSyntax,
+    LetSyntax,
+    LetrecSyntax,
+    SyntaxRules,
+}
+
 pub struct SyntaxEnvironment {
     bindings: FxHashMap<Identifier, Denotation>,
-    parent: Option<Box<Self>>,
 }
 
 impl SyntaxEnvironment {
     pub fn standard() -> Self {
-        let mut env = Self::new();
-        env.extend("quote", Denotation::Special("quote".into()));
-
+        let mut env = Self::empty();
+        env.extend("quote", Denotation::Special(Special::Quote));
+        env.extend("lambda", Denotation::Special(Special::Lambda));
+        env.extend("set!", Denotation::Special(Special::Set));
+        env.extend("begin", Denotation::Special(Special::Begin));
+        env.extend("define", Denotation::Special(Special::Define));
+        env.extend("define-syntax", Denotation::Special(Special::DefineSyntax));
+        env.extend("let-syntax", Denotation::Special(Special::LetSyntax));
+        env.extend("letrec-syntax", Denotation::Special(Special::LetrecSyntax));
+        env.extend("syntax-rules", Denotation::Special(Special::SyntaxRules));
         env
     }
 
+    // the basic environment is the standard environment
+    // extended with the unforgable set! and lambda
     pub fn basic() -> Self {
-        todo!()
+        let mut env = Self::standard();
+        env.extend(
+            Identifier::SpecialLambda,
+            Denotation::Special(Special::Lambda),
+        );
+        env.extend(Identifier::SpecialSet, Denotation::Special(Special::Set));
+        env
     }
 
+    // minimal is just the unforgable set! and lambda
     pub fn minimal() -> Self {
-        todo!()
+        let mut env = Self::empty();
+        env.extend(
+            Identifier::SpecialLambda,
+            Denotation::Special(Special::Lambda),
+        );
+        env.extend(Identifier::SpecialSet, Denotation::Special(Special::Set));
+        env
     }
 
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
             bindings: FxHashMap::default(),
-            parent: None,
         }
     }
 
-    pub fn child(parent: Self) -> Self {
+    pub fn divert(env_lhs: Self, env_rhs: Self) -> Self {
+        let mut bindings = env_lhs.bindings;
+        bindings.extend(env_lhs.bindings.into_iter());
+
         Self {
-            bindings: FxHashMap::default(),
-            parent: Some(Box::new(parent)),
+            bindings: env_lhs.bindings,
         }
     }
 
@@ -88,14 +123,15 @@ impl SyntaxEnvironment {
     }
 
     pub fn get(&self, id: &Identifier) -> Option<&Denotation> {
-        match (self.bindings.get(id), &self.parent) {
-            (None, Some(p)) => p.get(id),
-            (None, None) => None,
-            (v, _) => v,
-        }
+        self.bindings.get(id)
     }
 
     pub fn is_bound(&self, id: &Identifier) -> bool {
         self.bindings.get(id).is_some()
     }
+}
+
+pub struct SyntacticContext {
+    pub global: SyntaxEnvironment,
+    pub standard: SyntaxEnvironment,
 }
