@@ -13,7 +13,6 @@ pub mod sequence;
 
 use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
 use super::Error;
-use crate::compiler::frontend::macro_expand::MacroExpander;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use apply::ApplicationExpression;
@@ -162,9 +161,7 @@ impl Expression {
     /// ```
 
     pub fn parse_all(data: Vec<Datum>) -> Result<Vec<Expression>> {
-        // macro expansion will be interleaved with parsing later
-        let expanded_ast = MacroExpander::expand(data)?;
-        expanded_ast.iter().map(Self::parse).collect()
+        data.iter().map(Self::parse).collect()
     }
 
     pub fn parse(datum: &Datum) -> Result<Expression> {

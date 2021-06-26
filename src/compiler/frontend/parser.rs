@@ -3,14 +3,14 @@ pub mod expression;
 pub mod syntax;
 use super::reader;
 use super::reader::sexp::datum::Datum;
-use crate::compiler::frontend::macro_expand;
+use crate::compiler::frontend::expander;
 use crate::compiler::source_location::SourceLocation;
 use ast::Ast;
 use thiserror::Error;
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum Error {
     #[error(transparent)]
     ReadError(#[from] reader::Error),
@@ -18,9 +18,6 @@ pub enum Error {
     ParseError(String, SourceLocation),
     #[error("DomainError")]
     DomainError(String, SourceLocation),
-
-    #[error(transparent)]
-    MacroExpansionError(#[from] macro_expand::Error),
 }
 
 impl Error {

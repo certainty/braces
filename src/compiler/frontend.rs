@@ -1,4 +1,4 @@
-pub mod macro_expand;
+pub mod expander;
 pub mod parser;
 pub mod reader;
 use crate::compiler::source::Source;
@@ -16,9 +16,11 @@ pub fn read_all<T: Source>(source: &mut T) -> std::result::Result<Vec<Datum>, re
 
 // Read sexps as programs and create an AST of expressions
 pub fn parse<T: Source>(source: &mut T) -> std::result::Result<Ast, parser::Error> {
+    // TODO: use expander instead (which in turn parses to the core scheme forms)
     parser::parse(&read(source)?)
 }
 
 pub fn parse_all<T: Source>(source: &mut T) -> std::result::Result<Ast, parser::Error> {
+    // TODO: use expander instead (which in turn parses to the core scheme forms)
     parser::parse_all(read_all(source)?)
 }

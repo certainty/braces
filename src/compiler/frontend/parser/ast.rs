@@ -3,7 +3,6 @@ use super::expression;
 #[derive(Debug, Clone)]
 pub struct Ast {
     pub expressions: Vec<expression::Expression>,
-    // syntactic information?
 }
 
 impl Ast {

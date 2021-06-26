@@ -7,10 +7,10 @@ use sexp::datum::Datum;
 use sexp::Input;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum Error {
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    #[error("IoError: {}", 0)]
+    IoError(String),
     #[error("ReadError: {}", 0)]
     ReadError(Vec<ParserErrorDetail>),
     #[error("Incomplete Input")]

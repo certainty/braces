@@ -37,23 +37,30 @@ type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Datum> {
-    let source_type = source.source_type();
-    let mut source_str = String::new();
-    source.read_to_string(&mut source_str)?;
-    let input = Input::new_extra(&source_str, source_type);
+    let mut data = slurp_source(source)?;
+    let mut input = Input::new_extra(&data, source.source_type());
     let (_, datum) = parse_datum(input)?;
-
     Ok(datum)
 }
 
 pub fn parse_sequence<'a, T: Source>(source: &'a mut T) -> Result<Vec<Datum>> {
+    let mut data = slurp_source(source)?;
+    let mut input = Input::new_extra(&data, source.source_type());
+    let (_rest, datum) = context("program", many1(parse_datum))(input)?;
+    Ok(datum)
+}
+
+fn slurp_source<'a, T: Source>(source: &'a mut T) -> Result<String> {
     let source_type = source.source_type();
     let mut source_str = String::new();
-    source.read_to_string(&mut source_str)?;
-    let input = Input::new_extra(&source_str, source_type);
-    let (_rest, datum) = context("program", many1(parse_datum))(input)?;
-
-    Ok(datum)
+    if let Err(_) = source.read_to_string(&mut source_str) {
+        Err(Error::IoError(format!(
+            "Failed to read from source {:?}",
+            source.source_type()
+        )))
+    } else {
+        Ok(source_str)
+    }
 }
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {

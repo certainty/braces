@@ -21,9 +21,16 @@
 // Macro expansion interleaves the whole compilation chain and execution with parsing.
 // When this phase is done, it yields and AST of containing only core-forms where every lambda has been alpha converted.
 // We maintain metadata to increase the ergonomic properties of the compiler and give better error messages.
+//
+// ## Implementation and design
+// The expander is essentially a port of larcancie's macro expander: https://github.com/larcenists/larceny/blob/master/src/Compiler/expand.sch
+// At least it borrows the same data structures and algorithms. Of course they are translated to a version that fits rust
 
-use crate::compiler::backend::variables::{Variables, VariablesRef};
-use crate::compiler::frontend::parser::syntax::environment::SyntaxEnvironment;
+use crate::compiler::frontend::parser::ast::Ast;
+use crate::compiler::frontend::parser::expression::Expression;
+use crate::compiler::frontend::parser::syntax::environment::{
+    Denotation, Renamer, Special, SyntacticContext, SyntaxEnvironment,
+};
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::Compiler;
 use crate::vm::scheme::ffi;
@@ -45,43 +52,109 @@ pub enum Error {
     CompileError,
     #[error("UnsupportedExpander")]
     UnsupportedExpander,
+    #[error("ParseError")]
+    ParseError(#[from] crate::compiler::frontend::parser::Error),
 }
 
 pub struct MacroExpander {
     compiler: Compiler,
-    expansion_env: SyntaxEnvironment,
-    variables: VariablesRef,
+    renamer: Renamer,
+    syntactic_context: SyntacticContext,
 }
 
 impl MacroExpander {
-    pub fn new() -> MacroExpander {
+    pub fn new(global_syntactic_environment: SyntaxEnvironment) -> MacroExpander {
         MacroExpander {
             compiler: Compiler::new(),
-            expansion_env: SyntaxEnvironment::new(),
-            variables: Variables::top_level(),
+            renamer: Renamer::new(),
+            syntactic_context: SyntacticContext::new(global_syntactic_environment),
         }
     }
 
-    // main function converts a program into another program
-    // macro definitions and macro uses will be removed from the AST
-    // TODO: should we return a core-ast already?
-    pub fn expand(program: Vec<Datum>) -> Result<Vec<Datum>> {
-        let mut expander = Self::new();
-        expander.expand_all(program)
-    }
-
-    pub fn expand_all(&mut self, data: Vec<Datum>) -> Result<Vec<Datum>> {
-        let mut expanded = vec![];
+    // Main entry point
+    pub fn expand(&mut self, data: Vec<Datum>) -> Result<Ast> {
+        let mut expanded: Vec<Expression> = vec![];
 
         for datum in data {
-            if let Some(expanded_datum) = self.expand_datum(datum)? {
-                expanded.push(expanded_datum)
+            if let Some(core_expression) = self.desugar_definition(datum)? {
+                expanded.push(core_expression)
             }
         }
 
-        Ok(expanded)
+        Ok(Ast {
+            expressions: expanded,
+        })
     }
 
+    // expand top level definitions
+    // * define
+    // * begin
+    fn desugar_definition(&mut self, datum: Datum) -> Result<Option<Expression>> {
+        match datum.sexp() {
+            Sexp::List(ls) => match &ls[..] {
+                [operator, tail @ ..] if operator.is_symbol() => {
+                    match self.denotation_of(operator) {
+                        Some(Denotation::Special(Special::Begin)) => {
+                            // flatten toplevel begin
+                            todo!()
+                        }
+                        Some(Denotation::Special(Special::Define)) => {
+                            let core = self.desugar_define(&datum)?;
+                            Ok(Some(core))
+                        }
+                        Some(Denotation::Special(Special::DefineSyntax)) => {
+                            // define and register syntax
+                            self.define_syntax(&datum)?;
+                            // remove from ast
+                            Ok(None)
+                        }
+                        Some(Denotation::Macro) => {
+                            let core = self.transcribe(&datum)?;
+                            Ok(Some(core))
+                        }
+                        _ => self.expand_to_core(&datum),
+                    }
+                }
+                _ => self.expand_to_core(&datum),
+            },
+            _ => self.expand_to_core(&datum),
+        }
+    }
+
+    fn denotation_of(&mut self, symbol: &Datum) -> Option<&Denotation> {
+        if let Sexp::Symbol(sym) = symbol.sexp() {
+            self.syntactic_context
+                .current_env()
+                .get(&sym.clone().into())
+        } else {
+            None
+        }
+    }
+
+    // returns the expression in core scheme
+    fn expand_to_core(&mut self, datum: &Datum) -> Result<Option<Expression>> {
+        if datum.is_atom() {
+            let exp = Expression::parse(datum)?;
+            Ok(Some(exp))
+        } else {
+            todo!()
+        }
+    }
+
+    fn desugar_define(&mut self, datum: &Datum) -> Result<Expression> {
+        todo!()
+    }
+
+    fn define_syntax(&mut self, datum: &Datum) -> Result<()> {
+        todo!()
+    }
+
+    // transcribe the datum and return its core form
+    fn transcribe(&mut self, datum: &Datum) -> Result<Expression> {
+        todo!()
+    }
+
+    /*
     fn expand_datum(&mut self, datum: Datum) -> Result<Option<Datum>> {
         // there are really 3 main cases
         // 1. it's a syntax definition => we compile the definition and register it in the current expansion env
@@ -254,6 +327,7 @@ impl MacroExpander {
         value::procedure::Procedure::foreign(compare_proc)
     }
 
+     */
     fn match_symbol<'a>(datum: &'a Datum) -> Option<&'a str> {
         match datum.sexp() {
             Sexp::Symbol(s) => Some(s.as_str()),

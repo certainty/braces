@@ -121,6 +121,13 @@ impl Datum {
             _ => true,
         }
     }
+
+    pub fn is_symbol(&self) -> bool {
+        match self.sexp() {
+            Sexp::Symbol(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl HasSourceLocation for Datum {
