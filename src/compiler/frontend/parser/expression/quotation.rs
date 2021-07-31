@@ -3,6 +3,7 @@ use super::Expression;
 use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,18 +37,19 @@ pub fn build_quote(datum: Datum) -> QuotationExpression {
 /// to the quote `Datum`. They're treated as unevaluated expressions.
 
 #[inline]
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_quote(datum).map(Expression::Quotation)
+pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
+    parse_quote(datum, ctx).map(Expression::Quotation)
 }
 
-pub fn parse_quote(datum: &Datum) -> ParseResult<QuotationExpression> {
-    Expression::parse_apply_special(datum, "quote", do_parse_quote)
+pub fn parse_quote(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<QuotationExpression> {
+    Expression::parse_apply_special(datum, "quote", ctx, do_parse_quote)
 }
 
 pub fn do_parse_quote(
     _op: &str,
     operands: &[Datum],
     loc: &SourceLocation,
+    ctx: &mut ParserContext,
 ) -> Result<QuotationExpression> {
     match operands {
         [value] => Ok(build_quote(value.clone())),

@@ -5,6 +5,7 @@ use super::Error;
 use super::Expression;
 use super::Result;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -35,19 +36,24 @@ pub fn build(id: Identifier, expr: Expression, loc: SourceLocation) -> SetExpres
 /// ```grammar
 /// <assignment> -> (set! <IDENTIFIER> <expression>)
 /// ```
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_set(datum).map(Expression::Assign)
+pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
+    parse_set(datum, ctx).map(Expression::Assign)
 }
 
-pub fn parse_set(datum: &Datum) -> ParseResult<SetExpression> {
-    Expression::parse_apply_special(datum, "set!", do_parse_set)
+pub fn parse_set(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<SetExpression> {
+    Expression::parse_apply_special(datum, "set!", ctx, do_parse_set)
 }
 
-pub fn do_parse_set(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Result<SetExpression> {
+pub fn do_parse_set(
+    _op: &str,
+    operands: &[Datum],
+    loc: &SourceLocation,
+    ctx: &mut ParserContext,
+) -> Result<SetExpression> {
     match operands {
         [identifier, expr] => Ok(build(
             identifier::parse_identifier(identifier).res()?,
-            Expression::parse(expr)?,
+            Expression::parse(expr, ctx)?,
             loc.clone(),
         )),
 

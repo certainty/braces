@@ -6,8 +6,12 @@ use super::Expression;
 use super::Result;
 use super::{body, lambda};
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
+// TODO: simplify to just the core define form
+// Procedure transcription takes place in the expander / parser already
+// Begin is parsed separately
 #[derive(Clone, PartialEq, Debug)]
 pub enum DefinitionExpression {
     DefineSimple(Identifier, Box<Expression>, SourceLocation),
@@ -43,35 +47,38 @@ pub fn build_simple(id: Identifier, expr: Expression, loc: SourceLocation) -> De
 ///   (begin <definition>*)
 /// ```
 
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_definition(datum).map(Expression::Define)
+pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
+    parse_definition(datum, ctx).map(Expression::Define)
 }
 
-pub fn parse_definition(datum: &Datum) -> ParseResult<DefinitionExpression> {
-    Expression::parse_apply_special(datum, "define", do_parse_definition)
+pub fn parse_definition(
+    datum: &Datum,
+    ctx: &mut ParserContext,
+) -> ParseResult<DefinitionExpression> {
+    Expression::parse_apply_special(datum, "define", ctx, do_parse_definition)
 }
 
 pub fn do_parse_definition(
     _op: &str,
     operands: &[Datum],
     loc: &SourceLocation,
+    ctx: &mut ParserContext,
 ) -> Result<DefinitionExpression> {
     match operands {
         // (define (<IDENTIFIER> <def formals>) <body>)
         [definition, exprs @ ..] if definition.sexp().is_proper_list() => {
-            parse_procedure_definition(definition, exprs)
+            parse_procedure_definition(definition, exprs, ctx)
         }
         // (define  <IDENTIFIER> <expression>)
         [identifier, expr] => Ok(DefinitionExpression::DefineSimple(
             identifier::parse_identifier(&identifier).res()?,
-            Box::new(Expression::parse(&expr)?),
+            Box::new(Expression::parse(&expr, ctx)?),
             loc.clone(),
         )),
         rest => {
             let exprs: Result<Vec<Box<DefinitionExpression>>> = rest
                 .iter()
-                .map(parse_definition)
-                .map(|e| e.map(Box::new))
+                .map(|e| parse_definition(e, ctx).map(Box::new))
                 .collect();
 
             Ok(DefinitionExpression::Begin(exprs?, loc.clone()))
@@ -79,14 +86,18 @@ pub fn do_parse_definition(
     }
 }
 
-fn parse_procedure_definition(definition: &Datum, body: &[Datum]) -> Result<DefinitionExpression> {
+fn parse_procedure_definition(
+    definition: &Datum,
+    body: &[Datum],
+    ctx: &mut ParserContext,
+) -> Result<DefinitionExpression> {
     match definition.sexp() {
         Sexp::List(ls) => match &ls[..] {
             [identifier, def_formals @ ..] => {
                 let name = identifier::parse_identifier(&identifier).res()?;
                 let label = name.string().clone();
                 let formals = lambda::parse_formals(&Datum::new(Sexp::List(def_formals.to_vec()), definition.source_location().clone()))?;
-                let body = body::parse(body, definition.source_location())?;
+                let body = body::parse(body, definition.source_location(), ctx)?;
 
                 Ok(DefinitionExpression::DefineProcedure(
                     name,

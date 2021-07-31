@@ -15,7 +15,6 @@
 //    since all the machinery you need to build the macros you need will be pre-defined (all the list procedures and quasi-quotes, etc)
 // 3. We implement explicit renaming macros which are so called procedural macros. Syntax rules may come later and can be defined in terms of ER macros.
 //
-//
 // ## Technical notes
 //
 // Macro expansion interleaves the whole compilation chain and execution with parsing.
@@ -46,8 +45,8 @@ type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error("InvalidTransformer")]
     InvalidTransformer,
-    #[error("SyntaxError")]
-    ExpansionError,
+    #[error("ExpansionError: {} {:#?}", 0, 1)]
+    ExpansionError(String, Datum),
     #[error("CompileError")]
     CompileError,
     #[error("UnsupportedExpander")]
@@ -86,10 +85,29 @@ impl MacroExpander {
         })
     }
 
-    // expand top level definitions
-    // * define
-    // * begin
+    // Expand form to core form
+    //
+    // The code has to keep track of the lexical scope while it's walking the datum.
+    // This is required to identify operators correctly and accurately decided if we're dealing
+    // with a core form or a user defined operator. As an example considere the following valid form
+    //
+    // (let ((if (lambda (x) x)))
+    //   (if #f))
+    //
+    // The application of `if` at that point refers to the binding introduced by `let`
+    // and not the core `if` form. This is the same for every other operator.
+    //
+    // So what this does is:
+    // 1: if `datum` is a list
+    //    1a: determine if `car` of list is a special form, a macro or an identifier
+    //    1b: if it's a special form, transform it and parse it as a special form
+    //    1c: if it's a macro, apply the macro to the datum and desugar the resuling definition
+    //    1d: if it's an identifier parse it as an application or a quote
+    // 2: if `datum` is not a list
+    //    2a: parse it as to core form
     fn desugar_definition(&mut self, datum: Datum) -> Result<Option<Expression>> {
+        todo!()
+        /*
         match datum.sexp() {
             Sexp::List(ls) => match &ls[..] {
                 [operator, tail @ ..] if operator.is_symbol() => {
@@ -112,46 +130,60 @@ impl MacroExpander {
                             let core = self.transcribe(&datum)?;
                             Ok(Some(core))
                         }
-                        _ => self.expand_to_core(&datum),
+                        _ => Ok(Some(self.expand_to_core(&datum)?)),
                     }
                 }
-                _ => self.expand_to_core(&datum),
+                _ => Ok(Some(self.expand_to_core(&datum)?)),
             },
-            _ => self.expand_to_core(&datum),
+            _ => Ok(Some(self.expand_to_core(&datum)?)),
         }
+            */
     }
 
     fn denotation_of(&mut self, symbol: &Datum) -> Option<&Denotation> {
-        if let Sexp::Symbol(sym) = symbol.sexp() {
-            self.syntactic_context
-                .current_env()
-                .get(&sym.clone().into())
-        } else {
-            None
-        }
+        None
     }
 
     // returns the expression in core scheme
-    fn expand_to_core(&mut self, datum: &Datum) -> Result<Option<Expression>> {
-        if datum.is_atom() {
-            let exp = Expression::parse(datum)?;
-            Ok(Some(exp))
-        } else {
-            todo!()
-        }
-    }
 
-    fn desugar_define(&mut self, datum: &Datum) -> Result<Expression> {
+    fn expand_to_core(&mut self, datum: &Datum) -> Result<Expression> {
         todo!()
-    }
-
-    fn define_syntax(&mut self, datum: &Datum) -> Result<()> {
-        todo!()
-    }
-
-    // transcribe the datum and return its core form
-    fn transcribe(&mut self, datum: &Datum) -> Result<Expression> {
-        todo!()
+        /*
+        match datum.sexp() {
+            Sexp::List(ls) => match &ls[..] {
+                [operator, _operands @ ..] if operator.is_symbol() => {
+                    match self.denotation_of(operator) {
+                        Some(Denotation::Special(Special::Quote)) => self.expand_quote(&datum),
+                        Some(Denotation::Special(Special::Lambda)) => self.expand_lambda(&datum),
+                        Some(Denotation::Special(Special::LetSyntax)) => {
+                            self.expand_let_syntax(&datum)
+                        }
+                        Some(Denotation::Special(Special::LetrecSyntax)) => {
+                            self.expand_letrec_syntax(&datum)
+                        }
+                        Some(Denotation::Special(Special::Set)) => self.expand_set(&datum),
+                        Some(Denotation::Special(Special::Begin)) => self.expand_begin(&datum),
+                        Some(Denotation::Special(Special::If)) => self.expand_if(&datum),
+                        Some(Denotation::Special(_)) => Err(Error::ExpansionError(
+                            "Definition out of context".to_string(),
+                            datum.clone(),
+                        )),
+                        Some(Denotation::Macro) => self.expand_macro(&datum),
+                        Some(Denotation::Id(_)) => self.expand_application(&datum),
+                        None => todo!(),
+                    }
+                }
+                [operator, operands @ ..] => self.expand_application(&datum),
+                _ => Err(Error::ExpansionError(
+                    "Invalid definition".to_string(),
+                    datum.clone(),
+                )), //empty unquoted list list
+            },
+            _atom => {
+                let core = Expression::parse(datum)?;
+                Ok(core)
+            }
+        }*/
     }
 
     /*
@@ -328,10 +360,4 @@ impl MacroExpander {
     }
 
      */
-    fn match_symbol<'a>(datum: &'a Datum) -> Option<&'a str> {
-        match datum.sexp() {
-            Sexp::Symbol(s) => Some(s.as_str()),
-            _ => None,
-        }
-    }
 }

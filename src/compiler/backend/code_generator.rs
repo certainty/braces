@@ -223,13 +223,11 @@ impl CodeGenerator {
 
     fn emit_instructions(&mut self, ast: &Expression, context: &Context) -> Result<()> {
         match ast {
-            Expression::MacroUse(_) => (), // all work done in a previous phase
             Expression::Identifier(id) => self.emit_get_variable(id)?,
             Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr, context)?,
-            Expression::Let(let_exp) => self.emit_instructions(&let_exp.to_lambda(), context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(expr) => self.emit_begin(expr, context)?,

@@ -7,6 +7,7 @@ use super::Error;
 use super::Expression;
 use super::Result;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::vm::value::procedure::Arity;
 
@@ -72,23 +73,24 @@ pub fn build(
 }
 
 #[inline]
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_lambda(datum).map(Expression::Lambda)
+pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
+    parse_lambda(datum, ctx).map(Expression::Lambda)
 }
 
-pub fn parse_lambda(datum: &Datum) -> ParseResult<LambdaExpression> {
-    Expression::parse_apply_special(datum, "lambda", do_parse_lambda)
+pub fn parse_lambda(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<LambdaExpression> {
+    Expression::parse_apply_special(datum, "lambda", ctx, do_parse_lambda)
 }
 
 pub fn do_parse_lambda(
     _op: &str,
     operands: &[Datum],
     loc: &SourceLocation,
+    ctx: &mut ParserContext,
 ) -> Result<LambdaExpression> {
     match &operands {
         [formals, body @ ..] => {
             let formals = parse_formals(formals)?;
-            let body = body::parse(body, loc)?;
+            let body = body::parse(body, loc, ctx)?;
             Ok(LambdaExpression {
                 formals,
                 body,

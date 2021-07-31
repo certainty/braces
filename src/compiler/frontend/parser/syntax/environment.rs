@@ -48,11 +48,16 @@ pub enum Denotation {
     Special(Special),
     Macro,
     Id(Identifier),
+    Global(Identifier),
 }
 
 impl Denotation {
     pub fn identifier(id: Identifier) -> Self {
         Self::Id(id)
+    }
+
+    pub fn global(id: Identifier) -> Self {
+        Self::Global(id)
     }
 }
 
@@ -61,12 +66,12 @@ pub enum Special {
     Lambda,
     Quote,
     Set,
+    If,
     Begin,
     Define,
     DefineSyntax,
     LetSyntax,
     LetrecSyntax,
-    SyntaxRules,
 }
 
 type Renaming = (Identifier, Identifier); // from, to
@@ -81,12 +86,12 @@ impl SyntaxEnvironment {
         env.extend("quote", Denotation::Special(Special::Quote));
         env.extend("lambda", Denotation::Special(Special::Lambda));
         env.extend("set!", Denotation::Special(Special::Set));
+        env.extend("if", Denotation::Special(Special::If));
         env.extend("begin", Denotation::Special(Special::Begin));
         env.extend("define", Denotation::Special(Special::Define));
         env.extend("define-syntax", Denotation::Special(Special::DefineSyntax));
         env.extend("let-syntax", Denotation::Special(Special::LetSyntax));
         env.extend("letrec-syntax", Denotation::Special(Special::LetrecSyntax));
-        env.extend("syntax-rules", Denotation::Special(Special::SyntaxRules));
         env
     }
 
@@ -129,12 +134,11 @@ impl SyntaxEnvironment {
         self.bindings.insert(id.into(), denotation);
     }
 
-    pub fn get(&self, id: &Identifier) -> Option<&Denotation> {
-        self.bindings.get(id)
-    }
-
-    pub fn is_bound(&self, id: &Identifier) -> bool {
-        self.bindings.get(id).is_some()
+    pub fn get(&self, id: &Identifier) -> Denotation {
+        match self.bindings.get(id) {
+            Some(denotation) => denotation.clone(),
+            _ => Denotation::Global(id.clone()),
+        }
     }
 
     // Given a syntactic environment env to be extended, an alist returned
@@ -143,9 +147,8 @@ impl SyntaxEnvironment {
     // identifiers in env2.
     pub fn alias(&mut self, source: SyntaxEnvironment, renamed_ids: Vec<Renaming>) {
         for (old, new) in renamed_ids {
-            if let Some(denotation) = source.get(&old) {
-                self.extend(new, denotation.clone());
-            }
+            let denotation = source.get(&old);
+            self.extend(new, denotation.clone());
         }
     }
 

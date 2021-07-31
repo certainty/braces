@@ -3,6 +3,7 @@ use super::Error;
 use super::Expression;
 use super::Result;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -45,20 +46,25 @@ pub fn build(
 /// ```
 
 #[inline]
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_if(datum).map(Expression::If)
+pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
+    parse_if(datum, ctx).map(Expression::If)
 }
 
-pub fn parse_if(datum: &Datum) -> ParseResult<IfExpression> {
-    Expression::parse_apply_special(datum, "if", do_parse_if)
+pub fn parse_if(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<IfExpression> {
+    Expression::parse_apply_special(datum, "if", ctx, do_parse_if)
 }
 
-pub fn do_parse_if(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Result<IfExpression> {
+pub fn do_parse_if(
+    _op: &str,
+    operands: &[Datum],
+    loc: &SourceLocation,
+    ctx: &mut ParserContext,
+) -> Result<IfExpression> {
     match operands {
         [test, consequent, alternate] => {
-            let test_expr = Expression::parse(&test)?;
-            let consequent_expr = Expression::parse(&consequent)?;
-            let alternate_expr = Expression::parse(&alternate)?;
+            let test_expr = Expression::parse(&test, ctx)?;
+            let consequent_expr = Expression::parse(&consequent, ctx)?;
+            let alternate_expr = Expression::parse(&alternate, ctx)?;
 
             Ok(build(
                 test_expr,
@@ -68,8 +74,8 @@ pub fn do_parse_if(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Resul
             ))
         }
         [test, consequent] => {
-            let test_expr = Expression::parse(&test)?;
-            let consequent_expr = Expression::parse(&consequent)?;
+            let test_expr = Expression::parse(&test, ctx)?;
+            let consequent_expr = Expression::parse(&consequent, ctx)?;
 
             Ok(build(test_expr, consequent_expr, None, loc.clone()))
         }

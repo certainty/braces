@@ -2,6 +2,7 @@ use super::parse_result::ParseResult;
 use super::Error;
 use super::Expression;
 use super::Result;
+use crate::compiler::frontend::parser::ParserContext;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
@@ -32,21 +33,21 @@ pub fn build(
 }
 
 #[inline]
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_apply(datum).map(Expression::Apply)
+pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
+    parse_apply(datum, ctx).map(Expression::Apply)
 }
 
-pub fn parse_apply(datum: &Datum) -> ParseResult<ApplicationExpression> {
-    do_parse_apply(datum).into()
+pub fn parse_apply(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<ApplicationExpression> {
+    parse_apply0(datum, ctx).into()
 }
 
-pub fn do_parse_apply(datum: &Datum) -> Result<ApplicationExpression> {
+pub fn parse_apply0(datum: &Datum, ctx: &mut ParserContext) -> Result<ApplicationExpression> {
     match datum.sexp() {
         Sexp::List(ls) => {
             if let [operator, operands @ ..] = &ls[..] {
-                let operator_expr = Expression::parse(&operator)?;
+                let operator_expr = Expression::parse(&operator, ctx)?;
                 let operands_expr: Result<Vec<Expression>> =
-                    operands.iter().map(Expression::parse).collect();
+                    operands.iter().map(|i| Expression::parse(i, ctx)).collect();
 
                 Ok(build(
                     operator_expr,

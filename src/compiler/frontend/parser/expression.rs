@@ -13,6 +13,7 @@ pub mod sequence;
 
 use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
 use super::Error;
+use super::ParserContext;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use apply::ApplicationExpression;
@@ -20,7 +21,6 @@ use body::BodyExpression;
 use define::DefinitionExpression;
 use identifier::Identifier;
 use lambda::LambdaExpression;
-use letexp::{BindingSpec, LetExpression};
 use literal::LiteralExpression;
 use parse_result::ParseResult;
 use sequence::BeginExpression;
@@ -37,15 +37,15 @@ pub struct MacroUseExpression {
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(Identifier),
+    // TODO: remove?
     Quotation(QuotationExpression),
     Literal(LiteralExpression),
     Define(DefinitionExpression),
     Lambda(LambdaExpression),
     Assign(SetExpression),
-    Let(LetExpression),
     If(IfExpression),
     Apply(ApplicationExpression),
-    MacroUse(MacroUseExpression),
+    // TODO: remove?
     Command(Box<Expression>),
     Begin(BeginExpression),
 }
@@ -58,13 +58,11 @@ impl HasSourceLocation for Expression {
             Self::Quotation(exp) => exp.source_location(),
             Self::Assign(exp) => exp.source_location(),
             Self::Define(def) => def.source_location(),
-            Self::Let(exp) => exp.source_location(),
             Self::If(expr) => expr.source_location(),
             Self::Lambda(proc) => proc.source_location(),
             Self::Apply(exp) => exp.source_location(),
             Self::Command(exp) => exp.source_location(),
             Self::Begin(exp) => exp.source_location(),
-            Self::MacroUse(exp) => &exp.source_location,
         }
     }
 }
@@ -99,6 +97,15 @@ impl Expression {
         Expression::Begin(sequence::build(first, rest, loc))
     }
 
+    pub fn conditional(
+        test: Expression,
+        consequent: Expression,
+        alternate: Option<Expression>,
+        loc: SourceLocation,
+    ) -> Expression {
+        Expression::If(conditional::build(test, consequent, alternate, loc))
+    }
+
     pub fn identifier(str: String, loc: SourceLocation) -> Expression {
         Expression::Identifier(Identifier::new(str, loc))
     }
@@ -115,31 +122,10 @@ impl Expression {
         Expression::Apply(apply::build(operator, operands, loc))
     }
 
-    pub fn macro_use(
-        name: Identifier,
-        sexps: Vec<Datum>,
-        source_location: SourceLocation,
-    ) -> Expression {
-        Expression::MacroUse(MacroUseExpression {
-            name,
-            sexps,
-            source_location,
-        })
-    }
-
     /// Create body expression, which is used in expressions introducing new
     /// scopes like <let>, <begin> and <lambda>
     pub fn to_body_expression(&self) -> BodyExpression {
         BodyExpression::from(self)
-    }
-
-    /// Create and expression for core-let
-    pub fn let_bind(
-        bindings: Vec<BindingSpec>,
-        body: BodyExpression,
-        loc: SourceLocation,
-    ) -> Expression {
-        Expression::Let(letexp::build_let(bindings, body, loc))
     }
 
     /// Parse a single datum into an expression
@@ -154,36 +140,30 @@ impl Expression {
     ///   <lambda expression>  |
     ///   <conditional>        |
     ///   <assignment>         |
-    ///   <derived expression> |
-    ///   <macro use>          |
-    ///   <macro block>        |
-    ///   <includer>           |
     /// ```
 
-    pub fn parse_all(data: Vec<Datum>) -> Result<Vec<Expression>> {
-        data.iter().map(Self::parse).collect()
+    pub fn parse_all(data: Vec<Datum>, ctx: &mut ParserContext) -> Result<Vec<Expression>> {
+        data.iter().map(|i| Self::parse(i, ctx)).collect()
     }
 
-    pub fn parse(datum: &Datum) -> Result<Expression> {
-        // expand datum?
-
-        // now let's see where we're at
+    pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
         identifier::parse(datum)
             .or(|| literal::parse(datum))
-            .or(|| lambda::parse(datum))
-            .or(|| assignment::parse(datum))
-            .or(|| quotation::parse(datum))
-            .or(|| conditional::parse(datum))
-            .or(|| Self::parse_derived(datum))
-            .or(|| apply::parse(datum))
+            .or(|| lambda::parse(datum, ctx))
+            .or(|| assignment::parse(datum, ctx))
+            .or(|| conditional::parse(datum, ctx))
+            .or(|| sequence::parse(datum, ctx))
             .map_non_applicable(Error::parse_error(
                 "Invalid expression",
                 datum.source_location().clone(),
             ))
     }
 
-    pub fn parse_lambda(datum: &Datum) -> Result<lambda::LambdaExpression> {
-        let expr = Self::parse(datum)?;
+    pub fn parse_lambda(
+        datum: &Datum,
+        ctx: &mut ParserContext,
+    ) -> Result<lambda::LambdaExpression> {
+        let expr = Self::parse(datum, ctx)?;
         if let Expression::Lambda(lambda_expr) = expr {
             Ok(lambda_expr)
         } else {
@@ -194,23 +174,18 @@ impl Expression {
         }
     }
 
-    fn parse_derived(datum: &Datum) -> ParseResult<Expression> {
-        letexp::parse(datum)
-            .or(|| sequence::parse(datum))
-            .or(|| define::parse(datum))
-    }
-
     pub fn parse_apply_special<'a, T, F>(
         datum: &'a Datum,
         operator: &'a str,
+        ctx: &mut ParserContext,
         parse: F,
     ) -> ParseResult<T>
     where
-        F: FnOnce(&'a str, &'a [Datum], &'a SourceLocation) -> Result<T>,
+        F: FnOnce(&'a str, &'a [Datum], &'a SourceLocation, &mut ParserContext) -> Result<T>,
     {
         match datum.sexp() {
             Sexp::List(ls) => match Self::head_symbol(ls) {
-                Some(s) if s == operator => parse(s, &ls[1..], datum.source_location()).into(),
+                Some(s) if s == operator => parse(s, &ls[1..], datum.source_location(), ctx).into(),
                 _ => ParseResult::ignore(
                     "Expected (<special> <operands>*)",
                     datum.source_location().clone(),

@@ -163,8 +163,8 @@ impl VM {
 
     pub fn register_foreign_syntax_transformer(
         &mut self,
-        name: Identifier,
-        transformer: foreign::Procedure,
+        _name: Identifier,
+        _transformer: foreign::Procedure,
     ) -> Result<()> {
         todo!()
     }
@@ -204,7 +204,7 @@ impl VM {
         Ok(())
     }
 
-    fn interprete_procedure(&mut self, closure: Closure, arguments: Vec<Value>) -> Result<Value> {
+    fn interprete_procedure(&mut self, _closure: Closure, _arguments: Vec<Value>) -> Result<Value> {
         // run the closure with the arguments and return the result
         todo!()
     }

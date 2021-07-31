@@ -4,6 +4,7 @@ use super::Expression;
 use super::ParseResult;
 use super::Result;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -27,24 +28,27 @@ pub fn build(first: Expression, rest: Vec<Expression>, loc: SourceLocation) -> B
     }
 }
 
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_begin(datum).map(Expression::Begin)
+pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
+    parse_begin(datum, ctx).map(Expression::Begin)
 }
 
-pub fn parse_begin(datum: &Datum) -> ParseResult<BeginExpression> {
-    Expression::parse_apply_special(datum, "begin", do_parse_begin)
+pub fn parse_begin(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<BeginExpression> {
+    Expression::parse_apply_special(datum, "begin", ctx, do_parse_begin)
 }
 
 pub fn do_parse_begin(
     _op: &str,
     operands: &[Datum],
     loc: &SourceLocation,
+    ctx: &mut ParserContext,
 ) -> Result<BeginExpression> {
     match operands {
         [first, rest @ ..] => {
-            let parsed_first = parse_command_or_definition(first).res();
-            let parsed_exprs: Result<Vec<Expression>> =
-                rest.iter().map(parse_command_or_definition).collect();
+            let parsed_first = parse_command_or_definition(first, ctx).res();
+            let parsed_exprs: Result<Vec<Expression>> = rest
+                .iter()
+                .map(|i| parse_command_or_definition(i, ctx))
+                .collect();
 
             Ok(build(parsed_first?, parsed_exprs?, loc.clone()))
         }
@@ -52,8 +56,11 @@ pub fn do_parse_begin(
     }
 }
 
-pub fn parse_command_or_definition(datum: &Datum) -> ParseResult<Expression> {
-    define::parse(datum).or(|| Expression::parse(datum).into())
+pub fn parse_command_or_definition(
+    datum: &Datum,
+    ctx: &mut ParserContext,
+) -> ParseResult<Expression> {
+    define::parse(datum, ctx).or(|| Expression::parse(datum, ctx).into())
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use super::define::DefinitionExpression;
 use super::Error;
 use super::Expression;
 use super::Result;
+use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::SourceLocation;
 use crate::compiler::{frontend::reader::sexp::datum::Datum, source_location::HasSourceLocation};
 
@@ -58,14 +59,18 @@ impl HasSourceLocation for BodyExpression {
 /// <sequence>     -> <command>* <expression>
 /// <command>      -> <expression>
 /// ```
-pub fn parse(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
+pub fn parse(
+    datum: &[Datum],
+    loc: &SourceLocation,
+    ctx: &mut ParserContext,
+) -> Result<BodyExpression> {
     let mut definitions: Vec<DefinitionExpression> = vec![];
     let mut iter = datum.iter();
     let mut cur = iter.next();
 
     // parse definitions*
     while cur.is_some() {
-        match define::parse_definition(cur.unwrap()).res() {
+        match define::parse_definition(cur.unwrap(), ctx).res() {
             Ok(expr) => {
                 definitions.push(expr);
                 cur = iter.next();
@@ -83,8 +88,8 @@ pub fn parse(datum: &[Datum], loc: &SourceLocation) -> Result<BodyExpression> {
     }
 
     //parse the rest as sequence
-    let mut sequence = vec![Expression::parse(cur.unwrap())?];
-    let rest: Result<Vec<Expression>> = iter.map(Expression::parse).collect();
+    let mut sequence = vec![Expression::parse(cur.unwrap(), ctx)?];
+    let rest: Result<Vec<Expression>> = iter.map(|i| Expression::parse(i, ctx)).collect();
     sequence.extend(rest?);
 
     Ok(BodyExpression {

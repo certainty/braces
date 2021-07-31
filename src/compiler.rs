@@ -4,6 +4,7 @@ pub mod frontend;
 pub mod source;
 pub mod source_location;
 pub mod utils;
+use crate::compiler::frontend::parser::ParserContext;
 use crate::vm::value;
 use backend::code_generator;
 use backend::code_generator::{CodeGenerator, Target};
@@ -56,7 +57,8 @@ impl Compiler {
     }
 
     pub fn compile_lambda(&mut self, datum: &Datum) -> Result<value::procedure::Procedure> {
-        let lambda_expr = Expression::parse_lambda(datum)?;
+        let mut ctx = ParserContext::default();
+        let lambda_expr = Expression::parse_lambda(datum, &mut ctx)?;
         let proc = CodeGenerator::generate_procedure(
             None,
             Target::Procedure(None),

@@ -42,6 +42,9 @@ impl UserMessage for parser::Error {
                 eprintln!("DomainError: {}", message);
                 eprintln!("--> {} ", source_location_string(location))
             }
+            parser::Error::ExpansionError(message, _datum) => {
+                eprintln!("ExpansionError: {}", message);
+            }
         }
     }
 }

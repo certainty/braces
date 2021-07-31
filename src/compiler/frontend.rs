@@ -1,6 +1,11 @@
 pub mod expander;
 pub mod parser;
 pub mod reader;
+
+#[cfg(test)]
+pub mod test_helpers;
+
+use crate::compiler::frontend::parser::ParserContext;
 use crate::compiler::source::Source;
 use parser::ast::Ast;
 use reader::sexp::datum::Datum;
@@ -14,13 +19,13 @@ pub fn read_all<T: Source>(source: &mut T) -> std::result::Result<Vec<Datum>, re
     reader::parse_sequence(source)
 }
 
-// Read sexps as programs and create an AST of expressions
 pub fn parse<T: Source>(source: &mut T) -> std::result::Result<Ast, parser::Error> {
-    // TODO: use expander instead (which in turn parses to the core scheme forms)
-    parser::parse(&read(source)?)
+    let mut ctx = ParserContext::default();
+    let sexps = read(source)?;
+    parser::parse(sexps, &mut ctx)
 }
 
 pub fn parse_all<T: Source>(source: &mut T) -> std::result::Result<Ast, parser::Error> {
-    // TODO: use expander instead (which in turn parses to the core scheme forms)
-    parser::parse_all(read_all(source)?)
+    let mut ctx = ParserContext::default();
+    parser::parse_all(read_all(source)?, &mut ctx)
 }
