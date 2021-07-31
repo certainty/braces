@@ -48,6 +48,9 @@ impl UserMessage for parser::Error {
             }
 
             parser::Error::ExpanderError(e) => e.print_user_friendly_message(),
+            parser::Error::Bug(e) => {
+                eprintln!("ParserBug: {}", e)
+            }
         }
     }
 }

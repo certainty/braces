@@ -14,6 +14,8 @@ type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
+    #[error("ParserBug: {}", 0)]
+    Bug(String),
     #[error(transparent)]
     ReadError(#[from] reader::Error),
     #[error("ParseError")]
@@ -33,6 +35,10 @@ impl Error {
 
     pub fn domain_error<T>(message: &str, source: SourceLocation) -> Result<T> {
         Err(Error::DomainError(message.to_string(), source))
+    }
+
+    pub fn parser_bug<T>(message: &str) -> Result<T> {
+        Err(Error::Bug(message.to_string()))
     }
 }
 
@@ -152,7 +158,46 @@ fn exparse_apply(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
 }
 
 fn transcribe_define(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
-    todo!()
+    match datum.sexp() {
+        Sexp::List(ls) => match &ls[..] {
+            //(define (foo x y z))
+            [define, procedure_head, body @ ..] => match procedure_head.sexp() {
+                Sexp::List(definition_ls) => match &definition_ls[..] {
+                    [procedure_name, formals @ ..] => {
+                        let mut lambda_sexp = vec![Datum::new(
+                            // TODO: should that be the unforgable lambda?
+                            Sexp::symbol("lambda"),
+                            // TODO: compute source location properly
+                            datum.source_location().clone(),
+                        )];
+
+                        lambda_sexp.extend_from_slice(formals);
+
+                        let expanded = Datum::new(
+                            Sexp::List(vec![
+                                define.clone(),
+                                procedure_name.clone(),
+                                Datum::new(
+                                    Sexp::list(lambda_sexp),
+                                    datum.source_location().clone(),
+                                ),
+                            ]),
+                            datum.source_location().clone(),
+                        );
+
+                        transcribe_define(&expanded, ctx)
+                    }
+                    other => {
+                        println!("{:#?}", other);
+                        Error::parse_error("Invalid define form 1", datum.source_location().clone())
+                    }
+                },
+                _ => expression::define::parse(&datum, ctx).res(),
+            },
+            _ => Error::parse_error("Invalid define form 3", datum.source_location().clone()),
+        },
+        _ => Error::parser_bug("Expected definition"),
+    }
 }
 
 #[cfg(test)]
