@@ -196,7 +196,7 @@ impl Repl {
 
     #[inline]
     fn prompt(&self) -> String {
-        String::from(">> ")
+        String::from("λ ")
     }
 
     fn default_config() -> rustyline::config::Config {

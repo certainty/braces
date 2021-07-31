@@ -3,6 +3,7 @@ pub mod expression;
 pub mod syntax;
 use super::reader;
 use super::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::expander::MacroExpander;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use ast::Ast;
 use expression::Expression;
@@ -21,6 +22,8 @@ pub enum Error {
     DomainError(String, SourceLocation),
     #[error("ExpansionError: {} {:#?}", 0, 1)]
     ExpansionError(String, Datum),
+    #[error(transparent)]
+    ExpanderError(#[from] super::expander::Error),
 }
 
 impl Error {
@@ -35,18 +38,24 @@ impl Error {
 
 pub struct ParserContext {
     syntax_ctx: SyntacticContext,
+    expander: MacroExpander,
 }
 
 impl ParserContext {
     pub fn denotation_of(&mut self, datum: &Datum) -> Denotation {
         if let Sexp::Symbol(sym) = datum.sexp() {
-            self.syntax_ctx.current_env().get(&sym.clone().into())
+            self.syntax_ctx.usual_env().get(&sym.clone().into())
         } else {
             panic!("[BUG] expected symbol")
         }
     }
 
-    pub fn define_syntax(&mut self, op: &Datum, operands: &[Datum]) -> Result<()> {
+    pub fn expand_macro(&mut self, datum: &Datum) -> Result<Expression> {
+        let expr = self.expander.expand(&datum)?;
+        Ok(expr)
+    }
+
+    pub fn define_syntax(&mut self, definition: &Datum) -> Result<()> {
         todo!()
     }
 }
@@ -55,6 +64,7 @@ impl Default for ParserContext {
     fn default() -> Self {
         ParserContext {
             syntax_ctx: SyntacticContext::default(),
+            expander: MacroExpander::new(),
         }
     }
 }
@@ -89,17 +99,17 @@ pub fn parse(datum: Datum, ctx: &mut ParserContext) -> Result<Ast> {
 fn exparse0(datum: Datum, ctx: &mut ParserContext) -> Result<Option<Expression>> {
     match datum.sexp() {
         Sexp::List(ls) => match &ls[..] {
-            [operator, operands @ ..] if operator.is_symbol() => {
-                match ctx.denotation_of(operator) {
-                    Denotation::Special(special) => {
-                        exparse_special(special, operator, operands, ctx)
-                    }
-                    Denotation::Macro => Ok(Some(transcribe(&datum, ctx)?)),
-                    Denotation::Global(id) => Ok(Some(exparse_apply(&datum, ctx)?)),
-                    Denotation::Id(id) => Ok(Some(exparse_apply(&datum, ctx)?)),
+            [operator, _operands @ ..] if operator.is_symbol() => {
+                let denotation = ctx.denotation_of(operator);
+                println!("Denotation is: {:?}", denotation);
+                match denotation {
+                    Denotation::Special(special) => exparse_special(special, &datum, ctx),
+                    Denotation::Macro => Ok(Some(ctx.expand_macro(&datum)?)),
+                    Denotation::Global(_) => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
+                    Denotation::Id(_) => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
                 }
             }
-            [_operator, _operands @ ..] => Ok(Some(exparse_apply(&datum, ctx)?)),
+            [_operator, _operands @ ..] => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
             _ => Err(Error::ExpansionError(
                 "Unexpected unquoted list".to_string(),
                 datum.clone(),
@@ -111,19 +121,18 @@ fn exparse0(datum: Datum, ctx: &mut ParserContext) -> Result<Option<Expression>>
 
 fn exparse_special(
     special_form: Special,
-    operator: &Datum,
-    operands: &[Datum],
+    datum: &Datum,
     ctx: &mut ParserContext,
 ) -> Result<Option<Expression>> {
     match special_form {
-        Special::Define => Ok(Some(transcribe_define(&operator, &operands, ctx)?)),
-        Special::Quote => Ok(Some(exparse_quote(&operator, &operands)?)),
-        Special::Lambda => todo!(),
-        Special::Set => todo!(),
-        Special::Begin => todo!(),
-        Special::If => todo!(),
+        Special::Define => Ok(Some(transcribe_define(&datum, ctx)?)),
+        Special::Quote => Ok(Some(exparse_quote(&datum)?)),
+        Special::Lambda => Ok(Some(expression::lambda::parse(&datum, ctx).res()?)),
+        Special::Set => Ok(Some(expression::assignment::parse(&datum, ctx).res()?)),
+        Special::Begin => Ok(Some(expression::sequence::parse(&datum, ctx).res()?)),
+        Special::If => Ok(Some(expression::conditional::parse(&datum, ctx).res()?)),
         Special::DefineSyntax => {
-            ctx.define_syntax(&operator, &operands)?;
+            ctx.define_syntax(&datum)?;
             Ok(None)
         }
         Special::LetSyntax => todo!(),
@@ -131,7 +140,7 @@ fn exparse_special(
     }
 }
 
-fn exparse_quote(operator: &Datum, operands: &[Datum]) -> Result<Expression> {
+fn exparse_quote(datum: &Datum) -> Result<Expression> {
     todo!()
 }
 
@@ -142,15 +151,7 @@ fn exparse_apply(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
     ))
 }
 
-fn transcribe(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
-    todo!()
-}
-
-fn transcribe_define(
-    operator: &Datum,
-    operands: &[Datum],
-    ctx: &mut ParserContext,
-) -> Result<Expression> {
+fn transcribe_define(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
     todo!()
 }
 

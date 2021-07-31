@@ -51,38 +51,24 @@ pub enum Error {
     CompileError,
     #[error("UnsupportedExpander")]
     UnsupportedExpander,
-    #[error("ParseError")]
-    ParseError(#[from] crate::compiler::frontend::parser::Error),
 }
 
 pub struct MacroExpander {
     compiler: Compiler,
     renamer: Renamer,
-    syntactic_context: SyntacticContext,
 }
 
 impl MacroExpander {
-    pub fn new(global_syntactic_environment: SyntaxEnvironment) -> MacroExpander {
+    pub fn new() -> MacroExpander {
         MacroExpander {
             compiler: Compiler::new(),
             renamer: Renamer::new(),
-            syntactic_context: SyntacticContext::new(global_syntactic_environment),
         }
     }
 
     // Main entry point
-    pub fn expand(&mut self, data: Vec<Datum>) -> Result<Ast> {
-        let mut expanded: Vec<Expression> = vec![];
-
-        for datum in data {
-            if let Some(core_expression) = self.desugar_definition(datum)? {
-                expanded.push(core_expression)
-            }
-        }
-
-        Ok(Ast {
-            expressions: expanded,
-        })
+    pub fn expand(&mut self, data: &Datum) -> Result<Expression> {
+        todo!()
     }
 
     // Expand form to core form

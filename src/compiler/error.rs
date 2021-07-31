@@ -1,3 +1,4 @@
+use super::frontend::expander;
 use super::frontend::parser;
 use super::frontend::reader;
 use super::source::SourceType;
@@ -45,6 +46,16 @@ impl UserMessage for parser::Error {
             parser::Error::ExpansionError(message, _datum) => {
                 eprintln!("ExpansionError: {}", message);
             }
+
+            parser::Error::ExpanderError(e) => e.print_user_friendly_message(),
+        }
+    }
+}
+
+impl UserMessage for expander::Error {
+    fn print_user_friendly_message(&self) {
+        match self {
+            _ => eprintln!("Failed to expand  [TODO: better error message]"),
         }
     }
 }

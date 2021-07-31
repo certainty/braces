@@ -194,8 +194,8 @@ impl SyntacticContext {
         }
     }
 
-    pub fn current_env(&mut self) -> &mut SyntaxEnvironment {
-        &mut self.global
+    pub fn usual_env(&mut self) -> &mut SyntaxEnvironment {
+        &mut self.usual
     }
 }
 
