@@ -1,4 +1,5 @@
 use super::Symbol;
+use super::Transformer;
 use rustc_hash::FxHashMap;
 
 /*
@@ -31,7 +32,7 @@ use rustc_hash::FxHashMap;
 #[derive(Debug, Clone)]
 pub enum Denotation {
     Special(Special),
-    Macro,
+    Macro(Transformer),
     Id(Symbol),
     Global(Symbol),
 }

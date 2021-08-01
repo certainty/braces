@@ -161,14 +161,6 @@ impl VM {
         Ok(())
     }
 
-    pub fn register_foreign_syntax_transformer(
-        &mut self,
-        _name: Identifier,
-        _transformer: foreign::Procedure,
-    ) -> Result<()> {
-        todo!()
-    }
-
     pub fn interprete_macro_transformer(
         &mut self,
         transformer: value::procedure::Procedure,
@@ -176,7 +168,10 @@ impl VM {
         compare: value::procedure::Procedure,
         exp: &Datum,
     ) -> Result<Datum> {
+        println!("Interpreting macro transformer");
         let exp_value = self.values.from_datum(exp);
+
+        println!("Value: {:?}", exp_value);
         let value = Instance::interprete_macro_transformer(
             transformer,
             rename,

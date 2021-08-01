@@ -1,3 +1,4 @@
+use crate::vm::value::procedure;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 pub mod environment;
@@ -104,7 +105,10 @@ impl From<&Symbol> for String {
     }
 }
 
-// equality is going to be defined a bit special I guess
+#[derive(Debug, Clone)]
+pub enum Transformer {
+    ExplicitRenaming(procedure::Procedure),
+}
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {}

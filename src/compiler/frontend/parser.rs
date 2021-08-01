@@ -5,6 +5,7 @@ use super::reader;
 use super::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::frontend::expander::MacroExpander;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::Compiler;
 use ast::Ast;
 use expression::Expression;
 use syntax::environment::{Denotation, Special, SyntacticContext, SyntaxEnvironment};
@@ -42,12 +43,38 @@ impl Error {
     }
 }
 
+// TODO: design this properly
+//
+// The Parser, ParserContext and Expander are currently weiredly intertwined with no
+// clear boundaries for responsibilities. This needs untangling to be easier to understand.
+// A few things for thought:
+// 1. the parser context is handed into every parser function at this level. Why not make parser have state and have associated functions?
+// 2. What state does the expander need? How is it different from the parser state?
+//
+//
+
 pub struct ParserContext {
     syntax_ctx: SyntacticContext,
     expander: MacroExpander,
+    compiler: Compiler,
 }
 
 impl ParserContext {
+    pub fn new(ctx: SyntacticContext, expander: MacroExpander, compiler: Compiler) -> Self {
+        let mut parser_ctx = ParserContext {
+            syntax_ctx: ctx,
+            expander: expander,
+            compiler: compiler,
+        };
+        parser_ctx.register_transformers();
+        parser_ctx
+    }
+
+    fn register_transformers(&mut self) {
+        self.expander
+            .register_transformers(self.syntax_ctx.usual_env());
+    }
+
     pub fn denotation_of(&mut self, datum: &Datum) -> Denotation {
         if let Sexp::Symbol(sym) = datum.sexp() {
             self.syntax_ctx.usual_env().get(&sym.clone().into())
@@ -56,22 +83,33 @@ impl ParserContext {
         }
     }
 
-    pub fn expand_macro(&mut self, datum: &Datum) -> Result<Expression> {
-        let expr = self.expander.expand(&datum)?;
-        Ok(expr)
+    pub fn expand_macro(
+        &mut self,
+        datum: &Datum,
+        transformer: syntax::Transformer,
+    ) -> Result<Datum> {
+        let transformed = self.expander.expand(&datum, transformer)?;
+        Ok(transformed)
     }
 
-    pub fn define_syntax(&mut self, definition: &Datum) -> Result<()> {
-        todo!()
+    pub fn define_syntax(
+        &mut self,
+        name: syntax::Symbol,
+        transformer: syntax::Transformer,
+    ) -> Result<()> {
+        let denotation = Denotation::Macro(transformer);
+        self.syntax_ctx.usual.extend(name, denotation);
+        Ok(())
     }
 }
 
 impl Default for ParserContext {
     fn default() -> Self {
-        ParserContext {
-            syntax_ctx: SyntacticContext::default(),
-            expander: MacroExpander::new(),
-        }
+        ParserContext::new(
+            SyntacticContext::default(),
+            MacroExpander::new(),
+            Compiler::new(),
+        )
     }
 }
 
@@ -131,7 +169,10 @@ fn exparse0(datum: Datum, ctx: &mut ParserContext) -> Result<Option<Expression>>
                 println!("Denotation is: {:?}", denotation);
                 match denotation {
                     Denotation::Special(special) => exparse_special(special, &datum, ctx),
-                    Denotation::Macro => Ok(Some(ctx.expand_macro(&datum)?)),
+                    Denotation::Macro(transformer) => {
+                        let expanded = ctx.expand_macro(&datum, transformer)?;
+                        exparse0(expanded, ctx)
+                    }
                     Denotation::Global(_) => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
                     Denotation::Id(_) => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
                 }
@@ -159,11 +200,81 @@ fn exparse_special(
         Special::Begin => Ok(Some(expression::sequence::parse(&datum, ctx).res()?)),
         Special::If => Ok(Some(expression::conditional::parse(&datum, ctx).res()?)),
         Special::DefineSyntax => {
-            ctx.define_syntax(&datum)?;
+            define_syntax(&datum, ctx)?;
             Ok(None)
         }
         Special::LetSyntax => todo!(),
         Special::LetrecSyntax => todo!(),
+    }
+}
+
+fn define_syntax(datum: &Datum, ctx: &mut ParserContext) -> Result<()> {
+    match datum.sexp() {
+        Sexp::List(ls) => match &ls[..] {
+            [_, definition @ ..] => define_syntax0(datum, definition, ctx),
+            _ => Error::parse_error(
+                "Invalid (define-syntax) form",
+                datum.source_location().clone(),
+            ),
+        },
+        _ => Error::parser_bug("Unrecognized (define-syntax)"),
+    }
+}
+
+fn define_syntax0(
+    definition: &Datum,
+    macro_definition: &[Datum],
+    ctx: &mut ParserContext,
+) -> Result<()> {
+    match macro_definition {
+        // (define-syntax foo (er-macro-transformer (lambda (exp rename compare?) ...))
+        [macro_def, name, def] => match (name.sexp(), def.sexp()) {
+            (Sexp::Symbol(name), Sexp::List(ls)) => match &ls[..] {
+                [expander, lambda_def] => {
+                    if let Some("er-macro-transformer") = self::match_symbol(expander) {
+                        println!("Compiling lambda def: {:#?}", lambda_def);
+                        match ctx.compiler.compile_lambda(lambda_def) {
+                            Ok(procedure) => {
+                                println!("Transformer closure: {:#?}", procedure);
+                                ctx.define_syntax(
+                                    name.clone(),
+                                    syntax::Transformer::ExplicitRenaming(procedure),
+                                )?;
+                                Ok(())
+                            }
+                            Err(_) => Error::parse_error(
+                                "Couldn't compile transformer procedure",
+                                definition.source_location().clone(),
+                            ),
+                        }
+                    } else {
+                        Error::parse_error(
+                            "Invalid macro expander",
+                            definition.source_location().clone(),
+                        )
+                    }
+                }
+                _ => Error::parse_error(
+                    "Invalid macro definition",
+                    macro_def.source_location().clone(),
+                ),
+            },
+            _ => Error::parse_error(
+                "Invalid macro definition",
+                macro_def.source_location().clone(),
+            ),
+        },
+        _ => Error::parse_error(
+            "Invalid macro definition",
+            definition.source_location().clone(),
+        ),
+    }
+}
+
+fn match_symbol<'a>(datum: &'a Datum) -> Option<&'a str> {
+    match datum.sexp() {
+        Sexp::Symbol(s) => Some(s.as_str()),
+        _ => None,
     }
 }
 
@@ -267,6 +378,32 @@ mod tests {
                     location(1, 10)
                 ),
                 location(1, 2)
+            ))
+        )
+    }
+
+    #[test]
+    fn test_parse_let_simple() {
+        let expr = exparse_form("(let ((x 1) (y 2)) x)");
+        let expected_lambda = Expression::lambda(
+            expression::lambda::Formals::ArgList(vec![
+                Identifier::synthetic("x"),
+                Identifier::synthetic("y"),
+            ]),
+            Expression::identifier("x", location(1, 10)).to_body_expression(),
+            Some(String::from("let")),
+            location(1, 10),
+        );
+
+        assert_eq!(
+            expr,
+            Some(Expression::apply(
+                expected_lambda,
+                vec![
+                    Expression::constant(make_datum(Sexp::number(1), 1, 7)),
+                    Expression::constant(make_datum(Sexp::number(2), 1, 13))
+                ],
+                location(1, 1)
             ))
         )
     }

@@ -25,18 +25,15 @@
 // The expander is essentially a port of larcancie's macro expander: https://github.com/larcenists/larceny/blob/master/src/Compiler/expand.sch
 // At least it borrows the same data structures and algorithms. Of course they are translated to a version that fits rust
 
-use crate::compiler::frontend::parser::ast::Ast;
-use crate::compiler::frontend::parser::expression::Expression;
-use crate::compiler::frontend::parser::syntax::environment::{
-    Denotation, Renamer, Special, SyntacticContext, SyntaxEnvironment,
-};
+use crate::compiler::frontend::parser::syntax::environment::Denotation;
+use crate::compiler::frontend::parser::syntax::environment::{Renamer, SyntaxEnvironment};
+use crate::compiler::frontend::parser::syntax::Transformer;
+use crate::compiler::Expression;
+use crate::vm::scheme::ffi::FunctionResult;
 
 use crate::compiler::frontend::parser::syntax::Symbol;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
-use crate::compiler::Compiler;
-use crate::vm::scheme::ffi;
-use crate::vm::value::procedure;
 use crate::vm::value::procedure::Arity;
 use crate::vm::value::{self, Value};
 use crate::vm::VM;
@@ -69,21 +66,31 @@ impl Error {
 }
 
 pub struct MacroExpander {
-    compiler: Compiler,
     renamer: Renamer,
 }
 
 impl MacroExpander {
     pub fn new() -> MacroExpander {
         MacroExpander {
-            compiler: Compiler::new(),
             renamer: Renamer::new(),
         }
     }
 
-    // Main entry point
-    pub fn expand(&mut self, data: &Datum) -> Result<Expression> {
-        todo!()
+    pub fn register_transformers(&self, env: &mut SyntaxEnvironment) {
+        let transformer = Transformer::ExplicitRenaming(value::procedure::Procedure::foreign(
+            value::procedure::foreign::Procedure::new(
+                "transformer_let",
+                Self::let_transformer,
+                Arity::Exactly(3),
+            ),
+        ));
+        env.extend(Symbol::forged("let"), Denotation::Macro(transformer))
+    }
+
+    pub fn expand(&mut self, data: &Datum, transformer: Transformer) -> Result<Datum> {
+        match transformer {
+            Transformer::ExplicitRenaming(proc) => self.run_transformer(proc, &data),
+        }
     }
 
     pub fn expand_define(&mut self, datum: &Datum) -> Result<Datum> {
@@ -265,35 +272,9 @@ impl MacroExpander {
             _ => false,
         }
     }
+    */
 
-    fn define_macro(&mut self, datum: &[Datum]) -> Result<()> {
-        match datum {
-            // (define-syntax foo (er-macro-transformer (lambda (exp rename compare?) ...))
-            [_macro_def, name, def] => match (name.sexp(), def.sexp()) {
-                (Sexp::Symbol(name), Sexp::List(ls)) => match &ls[..] {
-                    [expander, lambda_def] => {
-                        if let Some("er-macro-transformer") = Self::match_symbol(expander) {
-                            println!("Compiling lambda def: {:#?}", lambda_def);
-                            match self.compiler.compile_lambda(lambda_def) {
-                                Ok(procedure) => {
-                                    println!("Transformer closure: {:#?}", procedure);
-                                    //self.expansion_env
-                                    //   .bind(name.clone(), Value::Procedure(procedure));
-                                    Ok(())
-                                }
-                                Err(_) => Err(Error::CompileError),
-                            }
-                        } else {
-                            Err(Error::UnsupportedExpander)
-                        }
-                    }
-                    _ => Err(Error::ExpansionError),
-                },
-                _ => Err(Error::ExpansionError),
-            },
-            _ => Err(Error::ExpansionError),
-        }
-    }
+    /*
 
     fn expand_lambda(&mut self, lambda: Datum) -> Result<Datum> {
         Ok(lambda)
@@ -324,18 +305,31 @@ impl MacroExpander {
         }
     }
 
+    */
+
     fn run_transformer(
         &mut self,
         transformer: value::procedure::Procedure,
         exp: &Datum,
-    ) -> Result<Option<Datum>> {
+    ) -> Result<Datum> {
         let mut vm = VM::for_macro_expansion();
         match vm.interprete_macro_transformer(transformer, self.renamer(), self.comparator(), exp) {
-            Ok(v) => Ok(Some(v)),
+            Ok(v) => Ok(v),
             Err(e) => {
                 eprintln!("OH OH: {}", e);
-                Err(Error::ExpansionError)
+                Error::expansion_error("Couldn't expand", exp.clone())
             }
+        }
+    }
+
+    fn let_transformer(args: Vec<Value>) -> FunctionResult<Value> {
+        println!("Running transformer");
+        match &args[..] {
+            [datum, rename, compare] => Ok(Value::Bool(true)),
+            _ => Err(crate::vm::value::error::arity_mismatch(
+                Arity::Exactly(3),
+                args.len(),
+            )),
         }
     }
 
@@ -358,6 +352,4 @@ impl MacroExpander {
 
         value::procedure::Procedure::foreign(compare_proc)
     }
-
-     */
 }

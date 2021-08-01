@@ -138,13 +138,13 @@ impl<'a> Instance<'a> {
         values: &'a mut value::Factory,
         debug_vm: bool,
     ) -> Result<Value> {
-        let mut instance = Self::new(None, stack_size, toplevel, values, debug_vm);
+        let mut instance = Self::new(None, stack_size, toplevel, values, true);
         instance.push(Value::Procedure(transformer))?;
         instance.push(exp)?;
         instance.push(Value::Procedure(rename))?;
         instance.push(Value::Procedure(compare))?;
         instance.apply(3)?;
-        instance.run()
+        Ok(instance.pop())
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -666,10 +666,7 @@ impl<'a> Instance<'a> {
                 self.push(v)?;
                 Ok(())
             }
-            Err(e) => {
-                println!("Error in foreign function: {}", proc.name.clone());
-                self.runtime_error(e, Some(proc.name.clone()))
-            }
+            Err(e) => self.runtime_error(e, Some(proc.name.clone())),
         }
     }
 
@@ -749,7 +746,6 @@ impl<'a> Instance<'a> {
         proc: Rc<procedure::native::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
-        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
         self.check_arity(&proc.arity, arg_count)?;
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();
