@@ -4,27 +4,19 @@ use super::parse_result::ParseResult;
 use super::Error;
 use super::Expression;
 use super::Result;
-use super::{body, lambda};
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::frontend::ParserContext;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
-// TODO: simplify to just the core define form
-// Procedure transcription takes place in the expander / parser already
-// Begin is parsed separately
 #[derive(Clone, PartialEq, Debug)]
 pub enum DefinitionExpression {
     DefineSimple(Identifier, Box<Expression>, SourceLocation),
-    DefineProcedure(Identifier, lambda::LambdaExpression, SourceLocation),
-    Begin(Vec<Box<DefinitionExpression>>, SourceLocation),
 }
 
 impl HasSourceLocation for DefinitionExpression {
     fn source_location<'a>(&'a self) -> &'a SourceLocation {
         match self {
             DefinitionExpression::DefineSimple(_, _, loc) => loc,
-            DefinitionExpression::DefineProcedure(_, _, loc) => loc,
-            DefinitionExpression::Begin(_, loc) => loc,
         }
     }
 }
@@ -40,11 +32,8 @@ pub fn build_simple(id: Identifier, expr: Expression, loc: SourceLocation) -> De
 /// ```grammar
 /// <definition> ->
 ///   (define <IDENTIFIER> <expression>)                                         |
-///   (define (<IDENTIFIER> <def formals>) <body>)                               |
-///   <syntax definition>                                                        |
 ///   (define-values <formals> <body>)                                           |
 ///   (define-record-type <IDENTIFIER> <constructor> <IDENTIFIER> <field spec>*) |
-///   (begin <definition>*)
 /// ```
 
 pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> {
@@ -65,52 +54,13 @@ pub fn do_parse_definition(
     ctx: &mut ParserContext,
 ) -> Result<DefinitionExpression> {
     match operands {
-        // (define (<IDENTIFIER> <def formals>) <body>)
-        [definition, exprs @ ..] if definition.sexp().is_proper_list() => {
-            parse_procedure_definition(definition, exprs, ctx)
-        }
         // (define  <IDENTIFIER> <expression>)
         [identifier, expr] => Ok(DefinitionExpression::DefineSimple(
             identifier::parse_identifier(&identifier).res()?,
             Box::new(Expression::parse(&expr, ctx)?),
             loc.clone(),
         )),
-        rest => {
-            let exprs: Result<Vec<Box<DefinitionExpression>>> = rest
-                .iter()
-                .map(|e| parse_definition(e, ctx).map(Box::new))
-                .collect();
-
-            Ok(DefinitionExpression::Begin(exprs?, loc.clone()))
-        }
-    }
-}
-
-fn parse_procedure_definition(
-    definition: &Datum,
-    body: &[Datum],
-    ctx: &mut ParserContext,
-) -> Result<DefinitionExpression> {
-    match definition.sexp() {
-        Sexp::List(ls) => match &ls[..] {
-            [identifier, def_formals @ ..] => {
-                let name = identifier::parse_identifier(&identifier).res()?;
-                let label = name.string().clone();
-                let formals = lambda::parse_formals(&Datum::new(Sexp::List(def_formals.to_vec()), definition.source_location().clone()))?;
-                let body = body::parse(body, definition.source_location(), ctx)?;
-
-                Ok(DefinitionExpression::DefineProcedure(
-                    name,
-                    lambda::build(formals, body, Some(label), definition.source_location().clone()),
-                    definition.source_location().clone()
-                ))
-            },
-            _ => Error::parse_error("Invalid precedure definition. Expected (define (<IDENTIFIER> <def formals>) <body>)", definition.source_location().clone())
-        },
-        _ => Error::parse_error(
-            "Invalid procedure definition. Expected (define (<IDENTIFIER> <def formals>) <body>)",
-            definition.source_location().clone(),
-        ),
+        _ => Error::parse_error("Invalid definitiion", loc.clone()),
     }
 }
 

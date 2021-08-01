@@ -90,6 +90,27 @@ pub fn parse_all(data: Vec<Datum>, ctx: &mut ParserContext) -> Result<Ast> {
     })
 }
 
+// Expand and parse form to core form
+//
+// The code has to keep track of the lexical scope while it's walking the datum.
+// This is required to identify operators correctly and accurately decided if we're dealing
+// with a core form or a user defined operator. As an example considere the following valid form
+//
+// (let ((if (lambda (x) x)))
+//   (if #f))
+//
+// The application of `if` at that point refers to the binding introduced by `let`
+// and not the core `if` form. This is the same for every other operator.
+//
+// So what this does is:
+// 1: if `datum` is a list
+//    1a: determine if `car` of list is a special form, a macro or an identifier
+//    1b: if it's a special form, transform it and parse it as a special form
+//    1c: if it's a macro, apply the macro to the datum and desugar the resuling definition
+//    1d: if it's an identifier parse it as an application or a quote
+// 2: if `datum` is not a list
+//    2a: parse it as to core form
+//
 pub fn parse(datum: Datum, ctx: &mut ParserContext) -> Result<Ast> {
     if let Some(parsed) = exparse0(datum, ctx)? {
         Ok(Ast {
@@ -158,51 +179,14 @@ fn exparse_apply(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
 }
 
 fn transcribe_define(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
-    match datum.sexp() {
-        Sexp::List(ls) => match &ls[..] {
-            //(define (foo x y z))
-            [define, procedure_head, body @ ..] => match procedure_head.sexp() {
-                Sexp::List(definition_ls) => match &definition_ls[..] {
-                    [procedure_name, formals @ ..] => {
-                        let mut lambda_sexp = vec![Datum::new(
-                            // TODO: should that be the unforgable lambda?
-                            Sexp::symbol("lambda"),
-                            // TODO: compute source location properly
-                            datum.source_location().clone(),
-                        )];
-
-                        lambda_sexp.extend_from_slice(formals);
-
-                        let expanded = Datum::new(
-                            Sexp::List(vec![
-                                define.clone(),
-                                procedure_name.clone(),
-                                Datum::new(
-                                    Sexp::list(lambda_sexp),
-                                    datum.source_location().clone(),
-                                ),
-                            ]),
-                            datum.source_location().clone(),
-                        );
-
-                        transcribe_define(&expanded, ctx)
-                    }
-                    other => {
-                        println!("{:#?}", other);
-                        Error::parse_error("Invalid define form 1", datum.source_location().clone())
-                    }
-                },
-                _ => expression::define::parse(&datum, ctx).res(),
-            },
-            _ => Error::parse_error("Invalid define form 3", datum.source_location().clone()),
-        },
-        _ => Error::parser_bug("Expected definition"),
-    }
+    let transcribed = ctx.expander.expand_define(&datum)?;
+    expression::define::parse(&transcribed, ctx).res()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::frontend::parser::expression::identifier::Identifier;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
     use crate::compiler::frontend::test_helpers::expressions::*;
 
@@ -228,9 +212,37 @@ mod tests {
         assert_eq!(
             expr,
             Some(Expression::conditional(
-                Expression::constant(make_datum(Sexp::Bool(true), 1, 3)),
-                Expression::constant(make_datum(Sexp::number(0), 1, 4)),
-                Some(Expression::constant(make_datum(Sexp::number(1), 1, 4))),
+                Expression::constant(make_datum(Sexp::Bool(true), 1, 5)),
+                Expression::constant(make_datum(Sexp::number(0), 1, 8)),
+                Some(Expression::constant(make_datum(Sexp::number(1), 1, 10))),
+                location(1, 1)
+            ))
+        )
+    }
+
+    #[test]
+    fn test_parse_define_simple() {
+        let expr = exparse_form("(define x 10)");
+
+        assert_eq!(
+            expr,
+            Some(Expression::define(
+                Identifier::synthetic("x"),
+                Expression::constant(make_datum(Sexp::number(10), 1, 11)),
+                location(1, 1)
+            ))
+        )
+    }
+
+    #[test]
+    fn test_parse_define_simple_symbol() {
+        let expr = exparse_form("(define x 'foo)");
+
+        assert_eq!(
+            expr,
+            Some(Expression::define(
+                Identifier::synthetic("x"),
+                Expression::quoted_value(make_datum(Sexp::symbol("foo"), 1, 12)),
                 location(1, 1)
             ))
         )

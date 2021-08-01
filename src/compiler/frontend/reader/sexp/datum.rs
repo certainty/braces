@@ -1,3 +1,4 @@
+use crate::compiler::frontend::parser::syntax::Symbol;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::vm::value::number;
 use crate::vm::value::Value;
@@ -5,7 +6,7 @@ use crate::vm::value::Value;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Sexp {
     Bool(bool),
-    Symbol(String),
+    Symbol(Symbol),
     String(String),
     Char(char),
     Number(number::Number),
@@ -20,8 +21,12 @@ impl Sexp {
         Sexp::Bool(val)
     }
 
-    pub fn symbol(val: impl Into<String>) -> Self {
-        Sexp::Symbol(val.into())
+    pub fn symbol<T: Into<String>>(val: T) -> Self {
+        Sexp::Symbol(Symbol::from_code(val))
+    }
+
+    pub fn forged_symbol<T: Into<String>>(val: T) -> Self {
+        Sexp::Symbol(Symbol::forged(val))
     }
 
     pub fn character(val: char) -> Self {
@@ -87,7 +92,7 @@ impl Datum {
     pub fn from_value(v: &Value, location: SourceLocation) -> Option<Self> {
         match v {
             Value::Char(c) => Some(Self::new(Sexp::character(c.clone()), location)),
-            Value::Symbol(sym) => Some(Self::new(Sexp::symbol(sym.as_str()), location)),
+            Value::Symbol(sym) => Some(Self::new(Sexp::forged_symbol(sym.as_str()), location)),
             Value::InternedString(s) => Some(Self::new(Sexp::string(s.as_str()), location)),
             Value::UninternedString(s) => Some(Self::new(Sexp::string(s), location)),
             Value::Number(n) => Some(Self::new(Sexp::number(n.clone()), location)),

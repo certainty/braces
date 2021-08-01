@@ -403,6 +403,7 @@ impl CodeGenerator {
 
     fn emit_definition(&mut self, definition: &DefinitionExpression) -> Result<()> {
         match definition {
+            /*
             DefinitionExpression::DefineProcedure(id, lambda_expr, _loc) => {
                 // name of procedure is part is the label of the lambda expression
                 self.emit_lambda(lambda_expr)?;
@@ -419,6 +420,7 @@ impl CodeGenerator {
                     todo!()
                 }
             }
+            */
             DefinitionExpression::DefineSimple(id, expr, _loc) => {
                 self.emit_instructions(expr, &Context::NonTail)?;
                 let id_sym = self.sym(&id.string());
@@ -434,7 +436,6 @@ impl CodeGenerator {
                     todo!()
                 }
             }
-            DefinitionExpression::Begin(_inner, _loc) => todo!(),
         }
     }
 

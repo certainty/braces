@@ -138,6 +138,7 @@ impl Expression {
     ///   <literal>            |
     ///   <procedure call>     |
     ///   <lambda expression>  |
+    //    <definition>         |
     ///   <conditional>        |
     ///   <assignment>         |
     /// ```
@@ -149,9 +150,11 @@ impl Expression {
     pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
         identifier::parse(datum)
             .or(|| literal::parse(datum))
+            .or(|| quotation::parse(datum, ctx))
             .or(|| lambda::parse(datum, ctx))
             .or(|| assignment::parse(datum, ctx))
             .or(|| conditional::parse(datum, ctx))
+            .or(|| define::parse(datum, ctx))
             .or(|| sequence::parse(datum, ctx))
             .map_non_applicable(Error::parse_error(
                 "Invalid expression",

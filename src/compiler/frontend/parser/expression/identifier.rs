@@ -1,5 +1,6 @@
 use super::parse_result::ParseResult;
 use super::Expression;
+use crate::compiler::frontend::parser::syntax::Symbol;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::SourceType;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -50,7 +51,10 @@ pub fn parse(datum: &Datum) -> ParseResult<Expression> {
 
 pub fn parse_identifier(datum: &Datum) -> ParseResult<Identifier> {
     match datum.sexp() {
-        Sexp::Symbol(s) => ParseResult::accept(Identifier::new(s, datum.source_location().clone())),
+        Sexp::Symbol(s) => ParseResult::accept(Identifier::new(
+            String::from(s),
+            datum.source_location().clone(),
+        )),
         _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),
     }
 }

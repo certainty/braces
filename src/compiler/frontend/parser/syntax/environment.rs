@@ -1,3 +1,4 @@
+use super::Symbol;
 use rustc_hash::FxHashMap;
 
 /*
@@ -27,36 +28,20 @@ use rustc_hash::FxHashMap;
  <env> is a syntactic environment, and <id> is an identifier.
 */
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
-pub enum Identifier {
-    Id(String),
-    // A renamed identifier is disjunct from any other identifier
-    Renamed(Box<Identifier>, u64),
-    // Unforgeable identifier which is only equal to itself
-    SpecialLambda,
-    SpecialSet,
-}
-
-impl<T: Into<String>> From<T> for Identifier {
-    fn from(id: T) -> Identifier {
-        Identifier::Id(id.into())
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum Denotation {
     Special(Special),
     Macro,
-    Id(Identifier),
-    Global(Identifier),
+    Id(Symbol),
+    Global(Symbol),
 }
 
 impl Denotation {
-    pub fn identifier(id: Identifier) -> Self {
+    pub fn identifier(id: Symbol) -> Self {
         Self::Id(id)
     }
 
-    pub fn global(id: Identifier) -> Self {
+    pub fn global(id: Symbol) -> Self {
         Self::Global(id)
     }
 }
@@ -74,24 +59,39 @@ pub enum Special {
     LetrecSyntax,
 }
 
-type Renaming = (Identifier, Identifier); // from, to
+type Renaming = (Symbol, Symbol); // from, to
 
 pub struct SyntaxEnvironment {
-    bindings: FxHashMap<Identifier, Denotation>,
+    bindings: FxHashMap<Symbol, Denotation>,
 }
 
 impl SyntaxEnvironment {
     pub fn standard() -> Self {
         let mut env = Self::empty();
-        env.extend("quote", Denotation::Special(Special::Quote));
-        env.extend("lambda", Denotation::Special(Special::Lambda));
-        env.extend("set!", Denotation::Special(Special::Set));
-        env.extend("if", Denotation::Special(Special::If));
-        env.extend("begin", Denotation::Special(Special::Begin));
-        env.extend("define", Denotation::Special(Special::Define));
-        env.extend("define-syntax", Denotation::Special(Special::DefineSyntax));
-        env.extend("let-syntax", Denotation::Special(Special::LetSyntax));
-        env.extend("letrec-syntax", Denotation::Special(Special::LetrecSyntax));
+        env.extend(Symbol::forged("quote"), Denotation::Special(Special::Quote));
+        env.extend(
+            Symbol::forged("lambda"),
+            Denotation::Special(Special::Lambda),
+        );
+        env.extend(Symbol::forged("set!"), Denotation::Special(Special::Set));
+        env.extend(Symbol::forged("if"), Denotation::Special(Special::If));
+        env.extend(Symbol::forged("begin"), Denotation::Special(Special::Begin));
+        env.extend(
+            Symbol::forged("define"),
+            Denotation::Special(Special::Define),
+        );
+        env.extend(
+            Symbol::forged("define-syntax"),
+            Denotation::Special(Special::DefineSyntax),
+        );
+        env.extend(
+            Symbol::forged("let-syntax"),
+            Denotation::Special(Special::LetSyntax),
+        );
+        env.extend(
+            Symbol::forged("letrec-syntax"),
+            Denotation::Special(Special::LetrecSyntax),
+        );
         env
     }
 
@@ -100,10 +100,13 @@ impl SyntaxEnvironment {
     pub fn basic() -> Self {
         let mut env = Self::standard();
         env.extend(
-            Identifier::SpecialLambda,
+            Symbol::unforgeable("lambda"),
             Denotation::Special(Special::Lambda),
         );
-        env.extend(Identifier::SpecialSet, Denotation::Special(Special::Set));
+        env.extend(
+            Symbol::unforgeable("set!"),
+            Denotation::Special(Special::Set),
+        );
         env
     }
 
@@ -111,10 +114,13 @@ impl SyntaxEnvironment {
     pub fn minimal() -> Self {
         let mut env = Self::empty();
         env.extend(
-            Identifier::SpecialLambda,
+            Symbol::unforgeable("lambda"),
             Denotation::Special(Special::Lambda),
         );
-        env.extend(Identifier::SpecialSet, Denotation::Special(Special::Set));
+        env.extend(
+            Symbol::unforgeable("set!"),
+            Denotation::Special(Special::Set),
+        );
         env
     }
 
@@ -130,11 +136,11 @@ impl SyntaxEnvironment {
         Self { bindings }
     }
 
-    pub fn extend<T: Into<Identifier>>(&mut self, id: T, denotation: Denotation) {
+    pub fn extend<T: Into<Symbol>>(&mut self, id: T, denotation: Denotation) {
         self.bindings.insert(id.into(), denotation);
     }
 
-    pub fn get(&self, id: &Identifier) -> Denotation {
+    pub fn get(&self, id: &Symbol) -> Denotation {
         match self.bindings.get(id) {
             Some(denotation) => denotation.clone(),
             _ => Denotation::Global(id.clone()),
@@ -173,9 +179,9 @@ impl Renamer {
         Renamer { counter: 0 }
     }
 
-    pub fn rename(&mut self, id: Identifier) -> Identifier {
+    pub fn rename(&mut self, id: Symbol) -> Symbol {
         self.counter += 1;
-        Identifier::Renamed(Box::new(id), self.counter)
+        Symbol::renamed(id.string().clone(), self.counter)
     }
 }
 

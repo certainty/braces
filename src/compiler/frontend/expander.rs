@@ -30,7 +30,10 @@ use crate::compiler::frontend::parser::expression::Expression;
 use crate::compiler::frontend::parser::syntax::environment::{
     Denotation, Renamer, Special, SyntacticContext, SyntaxEnvironment,
 };
+
+use crate::compiler::frontend::parser::syntax::Symbol;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use crate::compiler::Compiler;
 use crate::vm::scheme::ffi;
 use crate::vm::value::procedure;
@@ -51,6 +54,18 @@ pub enum Error {
     CompileError,
     #[error("UnsupportedExpander")]
     UnsupportedExpander,
+    #[error("ExpanderBug")]
+    ExpanderBug(String),
+}
+
+impl Error {
+    pub fn expansion_error<T: Into<String>, Out>(msg: T, datum: Datum) -> Result<Out> {
+        Err(Error::ExpansionError(msg.into(), datum))
+    }
+
+    pub fn bug<T: Into<String>, Out>(msg: T) -> Result<Out> {
+        Err(Error::ExpanderBug(msg.into()))
+    }
 }
 
 pub struct MacroExpander {
@@ -71,67 +86,61 @@ impl MacroExpander {
         todo!()
     }
 
-    // Expand form to core form
-    //
-    // The code has to keep track of the lexical scope while it's walking the datum.
-    // This is required to identify operators correctly and accurately decided if we're dealing
-    // with a core form or a user defined operator. As an example considere the following valid form
-    //
-    // (let ((if (lambda (x) x)))
-    //   (if #f))
-    //
-    // The application of `if` at that point refers to the binding introduced by `let`
-    // and not the core `if` form. This is the same for every other operator.
-    //
-    // So what this does is:
-    // 1: if `datum` is a list
-    //    1a: determine if `car` of list is a special form, a macro or an identifier
-    //    1b: if it's a special form, transform it and parse it as a special form
-    //    1c: if it's a macro, apply the macro to the datum and desugar the resuling definition
-    //    1d: if it's an identifier parse it as an application or a quote
-    // 2: if `datum` is not a list
-    //    2a: parse it as to core form
-    fn desugar_definition(&mut self, datum: Datum) -> Result<Option<Expression>> {
-        todo!()
-        /*
+    pub fn expand_define(&mut self, datum: &Datum) -> Result<Datum> {
         match datum.sexp() {
             Sexp::List(ls) => match &ls[..] {
-                [operator, tail @ ..] if operator.is_symbol() => {
-                    match self.denotation_of(operator) {
-                        Some(Denotation::Special(Special::Begin)) => {
-                            // flatten toplevel begin
-                            todo!()
-                        }
-                        Some(Denotation::Special(Special::Define)) => {
-                            let core = self.desugar_define(&datum)?;
-                            Ok(Some(core))
-                        }
-                        Some(Denotation::Special(Special::DefineSyntax)) => {
-                            // define and register syntax
-                            self.define_syntax(&datum)?;
-                            // remove from ast
-                            Ok(None)
-                        }
-                        Some(Denotation::Macro) => {
-                            let core = self.transcribe(&datum)?;
-                            Ok(Some(core))
-                        }
-                        _ => Ok(Some(self.expand_to_core(&datum)?)),
-                    }
+                //(define (<IDENTIFIER> <def formals>) <body>)
+                [define, definition, exprs @ ..] if definition.sexp().is_proper_list() => {
+                    self.expand_procedure_definition(define, definition, exprs)
                 }
-                _ => Ok(Some(self.expand_to_core(&datum)?)),
+                _ => Ok(datum.clone()),
             },
-            _ => Ok(Some(self.expand_to_core(&datum)?)),
+            _ => Error::expansion_error("Expected definition", datum.clone()),
         }
-            */
     }
 
-    fn denotation_of(&mut self, symbol: &Datum) -> Option<&Denotation> {
-        None
+    fn expand_procedure_definition(
+        &mut self,
+        define: &Datum,
+        definition: &Datum,
+        body: &[Datum],
+    ) -> Result<Datum> {
+        match definition.sexp() {
+            Sexp::List(ls) => match &ls[..] {
+                [identifier, def_formals @ ..] => {
+                    let mut lambda = vec![Datum::new(
+                        Sexp::Symbol(Self::unforgeable_lambda()),
+                        definition.source_location().clone(),
+                    )];
+                    lambda.extend_from_slice(def_formals);
+                    lambda.extend_from_slice(body);
+
+                    let lambda_datum =
+                        Datum::new(Sexp::List(lambda), identifier.source_location().clone());
+
+                    Ok(Datum::new(
+                        Sexp::List(vec![define.clone(), identifier.clone(), lambda_datum]),
+                        define.source_location().clone(),
+                    ))
+                }
+                _ => Error::expansion_error(
+                    "Invalid definition. Expected (define (<IDENTIFIER> <def formals>) <body>) ",
+                    define.clone(),
+                ),
+            },
+            _ => Error::bug("Invalid procedure definition in expander"),
+        }
+    }
+
+    fn unforgeable_lambda() -> Symbol {
+        Symbol::unforgeable("lambda")
+    }
+
+    fn unforgeable_set() -> Symbol {
+        Symbol::unforgeable("set!")
     }
 
     // returns the expression in core scheme
-
     fn expand_to_core(&mut self, datum: &Datum) -> Result<Expression> {
         todo!()
         /*
