@@ -106,8 +106,8 @@ impl Expression {
         Expression::If(conditional::build(test, consequent, alternate, loc))
     }
 
-    pub fn identifier(str: String, loc: SourceLocation) -> Expression {
-        Expression::Identifier(Identifier::new(str, loc))
+    pub fn identifier<T: Into<String>>(str: T, loc: SourceLocation) -> Expression {
+        Expression::Identifier(Identifier::new(str.into(), loc))
     }
 
     pub fn body(sequence: Vec<Expression>) -> BodyExpression {

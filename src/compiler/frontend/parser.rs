@@ -180,6 +180,7 @@ fn exparse_apply(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
 
 fn transcribe_define(datum: &Datum, ctx: &mut ParserContext) -> Result<Expression> {
     let transcribed = ctx.expander.expand_define(&datum)?;
+    println!("transcribed define {:#?}", transcribed);
     expression::define::parse(&transcribed, ctx).res()
 }
 
@@ -244,6 +245,28 @@ mod tests {
                 Identifier::synthetic("x"),
                 Expression::quoted_value(make_datum(Sexp::symbol("foo"), 1, 12)),
                 location(1, 1)
+            ))
+        )
+    }
+
+    #[test]
+    fn test_parse_define_procedure() {
+        let expr = exparse_form("(define (foo x y) x)");
+
+        assert_eq!(
+            expr,
+            Some(Expression::define(
+                Identifier::synthetic("foo"),
+                Expression::lambda(
+                    expression::lambda::Formals::ArgList(vec![
+                        Identifier::synthetic("x"),
+                        Identifier::synthetic("y")
+                    ]),
+                    Expression::identifier("x", location(1, 19)).to_body_expression(),
+                    Some(String::from("lambda")),
+                    location(1, 10)
+                ),
+                location(1, 2)
             ))
         )
     }

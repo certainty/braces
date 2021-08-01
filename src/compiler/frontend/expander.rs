@@ -108,11 +108,16 @@ impl MacroExpander {
         match definition.sexp() {
             Sexp::List(ls) => match &ls[..] {
                 [identifier, def_formals @ ..] => {
-                    let mut lambda = vec![Datum::new(
-                        Sexp::Symbol(Self::unforgeable_lambda()),
-                        definition.source_location().clone(),
-                    )];
-                    lambda.extend_from_slice(def_formals);
+                    let mut lambda = vec![
+                        Datum::new(
+                            Sexp::Symbol(Self::unforgeable_lambda()),
+                            definition.source_location().clone(),
+                        ),
+                        Datum::new(
+                            Sexp::List(def_formals.to_vec()),
+                            definition.source_location().clone(),
+                        ),
+                    ];
                     lambda.extend_from_slice(body);
 
                     let lambda_datum =
