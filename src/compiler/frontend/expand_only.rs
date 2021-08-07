@@ -37,6 +37,14 @@ struct Expander {
 }
 
 impl Expander {
+    pub fn new() -> Self {
+        Expander {
+            compiler: Compiler::new(),
+            // TODO: SyntacticContext::for_expander()?
+            syntax_ctx: SyntacticContext::default(),
+        }
+    }
+
     pub fn expand(&mut self, datum: &Datum) -> Result<Datum> {
         match datum.list_slice() {
             Some([operator, operands @ ..]) if operator.is_symbol() => {
@@ -149,5 +157,44 @@ impl Expander {
         } else {
             Error::bug("expected symbol")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compiler::frontend::parser::expression::identifier::Identifier;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
+    use crate::compiler::frontend::test_helpers::expressions::*;
+
+    #[test]
+    fn test_expand_atoms() {
+        let expanded = expand_form("#t").unwrap();
+        assert_eq!(expanded, make_datum(Sexp::boolean(true), 1, 1));
+
+        let expanded = expand_form("#\\a").unwrap();
+        assert_eq!(expanded, make_datum(Sexp::character('a'), 1, 1));
+    }
+
+    #[test]
+    fn test_expand_define_simple() {
+        let expanded = expand_form("(define x #t)").unwrap();
+        assert_eq!(
+            expanded,
+            make_datum(
+                Sexp::List(vec![
+                    make_datum(Sexp::symbol("define"), 1, 1),
+                    make_datum(Sexp::symbol("x"), 1, 9),
+                    make_datum(Sexp::boolean(true), 1, 11)
+                ]),
+                1,
+                1
+            )
+        )
+    }
+
+    fn expand_form(form: &str) -> Result<Datum> {
+        let mut exp = Expander::new();
+        exp.expand(&parse_datum(form))
     }
 }
