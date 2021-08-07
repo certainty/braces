@@ -133,6 +133,13 @@ impl Datum {
             _ => false,
         }
     }
+
+    pub fn list_slice<'a>(&'a self) -> Option<&'a [Datum]> {
+        match self.sexp() {
+            Sexp::List(ls) => Some(&ls[..]),
+            _ => None,
+        }
+    }
 }
 
 impl HasSourceLocation for Datum {
