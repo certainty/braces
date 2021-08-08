@@ -169,61 +169,32 @@ mod tests {
     use crate::compiler::frontend::test_helpers::expressions::*;
 
     #[test]
-    fn test_expand_atoms() {
-        let expanded = expand_form("#t").unwrap();
-        assert_eq!(expanded, make_datum(Sexp::boolean(true), 1, 1));
-
-        let expanded = expand_form("#\\a").unwrap();
-        assert_eq!(expanded, make_datum(Sexp::character('a'), 1, 1));
+    fn test_expand_atoms() -> Result<()> {
+        assert_expands_equal("#t", "#t")?;
+        assert_expands_equal("#\\a", "#\\a")?;
+        Ok(())
     }
 
     #[test]
-    fn test_expand_define_simple() {
-        let expanded = expand_form("(define x #t)").unwrap();
-        assert_eq!(
-            expanded,
-            make_datum(
-                Sexp::List(vec![
-                    make_datum(Sexp::symbol("define"), 1, 1),
-                    make_datum(Sexp::symbol("x"), 1, 9),
-                    make_datum(Sexp::boolean(true), 1, 11)
-                ]),
-                1,
-                1
-            )
-        )
+    fn test_expand_define_simple() -> Result<()> {
+        assert_expands_equal("(define x #t)", "(define x #t)")?;
+        Ok(())
     }
 
     #[test]
-    fn test_parse_define_procedure() {
-        let expanded = expand_form("(define (foo x y) x)").unwrap();
-        assert_eq!(
-            expanded,
-            make_datum(
-                Sexp::List(vec![
-                    make_datum(Sexp::symbol("define"), 1, 1),
-                    make_datum(Sexp::symbol("foo"), 1, 10),
-                    make_datum(
-                        Sexp::List(vec![
-                            make_datum(Sexp::Symbol(Symbol::unforgeable("lambda")), 1, 1),
-                            make_datum(
-                                Sexp::List(vec![
-                                    make_datum(Sexp::symbol("x"), 1, 16),
-                                    make_datum(Sexp::symbol("y"), 1, 19),
-                                ]),
-                                1,
-                                1
-                            ),
-                            make_datum(Sexp::symbol("x"), 1, 2)
-                        ]),
-                        1,
-                        1
-                    )
-                ],),
-                1,
-                1
-            )
-        )
+    fn test_parse_define_procedure() -> Result<()> {
+        assert_expands_equal("(define (foo x y) x)", "(define foo (lambda (x y) x))")?;
+        Ok(())
+    }
+
+    fn assert_expands_equal(lhs: &str, rhs: &str) -> Result<()> {
+        let mut exp = Expander::new();
+        let actual_sexp = parse_datum(lhs);
+        let expected_sexp = parse_datum(rhs);
+        let expanded = exp.expand(&actual_sexp)?;
+
+        assert_struct_eq(&expanded, &expected_sexp);
+        Ok(())
     }
 
     fn expand_form(form: &str) -> Result<Datum> {
@@ -231,11 +202,32 @@ mod tests {
         exp.expand(&parse_datum(form))
     }
 
-    fn structurally_equal(lhs: &Datum, rhs: &Datum) -> bool {
+    fn assert_struct_eq(lhs: &Datum, rhs: &Datum) {
         match (lhs.sexp(), rhs.sexp()) {
-            (Sexp::List(inner_lhs), Sexp::List(inner_rhs)) => todo!(),
+            (Sexp::List(inner_lhs), Sexp::List(inner_rhs)) => {
+                assert_vec_eq(&inner_lhs, &inner_rhs, assert_struct_eq)
+            }
+            (Sexp::ImproperList(head_lhs, tail_lhs), Sexp::ImproperList(head_rhs, tail_rhs)) => {
+                assert_vec_eq(&head_lhs, &head_rhs, assert_struct_eq);
+                assert_struct_eq(&tail_lhs, &tail_rhs);
+            }
+            (Sexp::Vector(inner_lhs), Sexp::Vector(inner_rhs)) => {
+                assert_vec_eq(&inner_lhs, &inner_rhs, assert_struct_eq)
+            }
+            (sexp_lhs, sexp_rhs) => assert_eq!(sexp_lhs, sexp_rhs),
         }
     }
 
-    fn structurally_equal_vec<T>(lhs: Vec<T>, rhs: Vec<T>) -> bool {}
+    fn assert_vec_eq<T, F>(lhs: &Vec<T>, rhs: &Vec<T>, assertion: F)
+    where
+        F: Copy + FnOnce(&T, &T),
+    {
+        if lhs.len() == 0 {
+            assert_eq!(0, rhs.len(), "expected length of both vectors to be 0")
+        } else {
+            for i in 0..(lhs.len() - 1) {
+                assertion(&lhs[i], &rhs[i])
+            }
+        }
+    }
 }
