@@ -51,6 +51,9 @@ impl Denotation {
 pub enum Special {
     Lambda,
     Quote,
+    QuasiQuote,
+    Unquote,
+    UnquoteSplicing,
     Set,
     If,
     Begin,
@@ -71,12 +74,26 @@ impl SyntaxEnvironment {
         let mut env = Self::empty();
         env.extend(Symbol::forged("quote"), Denotation::Special(Special::Quote));
         env.extend(
+            Symbol::forged("quasi-quote"),
+            Denotation::Special(Special::QuasiQuote),
+        );
+        env.extend(
+            Symbol::forged("unquote"),
+            Denotation::Special(Special::Unquote),
+        );
+        env.extend(
+            Symbol::forged("unquote-splicing"),
+            Denotation::Special(Special::UnquoteSplicing),
+        );
+
+        env.extend(
             Symbol::forged("lambda"),
             Denotation::Special(Special::Lambda),
         );
         env.extend(Symbol::forged("set!"), Denotation::Special(Special::Set));
         env.extend(Symbol::forged("if"), Denotation::Special(Special::If));
         env.extend(Symbol::forged("begin"), Denotation::Special(Special::Begin));
+
         env.extend(
             Symbol::forged("define"),
             Denotation::Special(Special::Define),

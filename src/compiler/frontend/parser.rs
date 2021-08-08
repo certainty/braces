@@ -205,6 +205,7 @@ fn exparse_special(
         }
         Special::LetSyntax => todo!(),
         Special::LetrecSyntax => todo!(),
+        _ => todo!(),
     }
 }
 
