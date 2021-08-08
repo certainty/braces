@@ -34,7 +34,6 @@ type Result<T> = std::result::Result<T, Error>;
 struct Expander {
     compiler: Compiler,
     syntax_ctx: SyntacticContext,
-    quotation_level: u32,
 }
 
 impl Expander {
@@ -43,27 +42,53 @@ impl Expander {
             compiler: Compiler::new(),
             // TODO: SyntacticContext::for_expander()?
             syntax_ctx: SyntacticContext::default(),
-            quotation_level: 0,
         }
     }
 
     pub fn expand(&mut self, datum: &Datum) -> Result<Datum> {
+        self.phase0(datum).and_then(|d| self.phase1(&d))
+    }
+
+    #[inline]
+    fn phase0(&mut self, datum: &Datum) -> Result<Datum> {
+        self.expand_quotations(&datum)
+    }
+
+    #[inline]
+    fn phase1(&mut self, datum: &Datum) -> Result<Datum> {
+        self.expand_macros(&datum)
+    }
+
+    pub fn expand_quotations(&mut self, datum: &Datum) -> Result<Datum> {
+        match datum.list_slice() {
+            Some([operator, operands @ ..]) if operator.is_symbol() => {
+                match self.denotation_of(operator)? {
+                    Denotation::Special(Special::Quote) => self.expand_quote(&datum, &operands),
+                    Denotation::Special(Special::QuasiQuote) => {
+                        self.expand_quasi_quote(&datum, &operands)
+                    }
+                    Denotation::Special(Special::Unquote) => Error::expansion_error(
+                        "Unexpected unquote outside of quasi-quote",
+                        datum.clone(),
+                    ),
+                    Denotation::Special(Special::UnquoteSplicing) => Error::expansion_error(
+                        "Unexpected unquote-splicing outside of quasi-quote",
+                        datum.clone(),
+                    ),
+                    _ => Ok(datum.clone()),
+                }
+            }
+            _ => Ok(datum.clone()),
+        }
+    }
+
+    pub fn expand_macros(&mut self, datum: &Datum) -> Result<Datum> {
         match datum.list_slice() {
             Some([operator, operands @ ..]) if operator.is_symbol() => {
                 let denotation = self.denotation_of(operator)?;
                 match denotation {
                     Denotation::Special(special) => match special {
                         Special::Define => self.expand_define(&datum, &operands),
-                        Special::Quote => self.expand_quote(&datum, &operands),
-                        Special::QuasiQuote => self.expand_quasi_quote(&datum, &operands),
-                        Special::Unquote => Error::expansion_error(
-                            "Unexpected unquote outside of quasi-quote",
-                            datum.clone(),
-                        ),
-                        Special::UnquoteSplicing => Error::expansion_error(
-                            "Unexpected unquote-splicing outside of quasi-quote",
-                            datum.clone(),
-                        ),
                         Special::Lambda => todo!(),
                         Special::Set => todo!(),
                         Special::Begin => todo!(),
@@ -71,13 +96,21 @@ impl Expander {
                         Special::DefineSyntax => todo!(),
                         Special::LetSyntax => todo!(),
                         Special::LetrecSyntax => todo!(),
+                        Special::Quote => Ok(datum.clone()), // already expanded in phase 1
+                        Special::QuasiQuote => {
+                            Error::bug("Unexpected quasi-quote in macro-expansion")
+                        }
+                        Special::Unquote => Error::bug("Unexpected unquote in macro-expansion"),
+                        Special::UnquoteSplicing => {
+                            Error::bug("Unexpected unquote-splicing in macro-expansion")
+                        }
                     },
                     Denotation::Macro(transformer) => self.expand_macro(&datum, &transformer),
                     Denotation::Id(_) => {
                         self.expand_apply(operator, operands, datum.source_location().clone())
                     }
                     Denotation::Global(_) => {
-                        panic!("REMOVE GLOBAL")
+                        self.expand_apply(operator, operands, datum.source_location().clone())
                     }
                 }
             }
@@ -87,6 +120,131 @@ impl Expander {
             Some(_) => Error::expansion_error("Unexpected unquoted list", datum.clone()),
             None => Ok(datum.clone()),
         }
+    }
+
+    fn expand_quote(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
+        if operands.len() != 1 {
+            Error::expansion_error("Invalid quoted expression", datum.clone())
+        } else {
+            // just return the quoted expression as is
+            Ok(datum.clone())
+        }
+    }
+
+    // `3      -> (quasi-quote 3)               -> 3
+    // `,3     -> (quasi-quote (unquote 3))     -> 3
+    // `(1 2)  -> (quasi-quote (1 2))           -> (list 1 2)
+    // `(1 ,2) -> (quasi-quote (1 (unquote 2))) -> (list 1 2)
+    fn expand_quasi_quote(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
+        if operands.len() != 1 {
+            return Error::expansion_error("Invalid quasi-quoted expression", datum.clone());
+        }
+
+        let quasi_quoted_sexp = operands[0].clone();
+        match quasi_quoted_sexp.sexp() {
+            // (quasi-quote (..))
+            Sexp::List(elements) => {
+                let mut output = vec![Datum::new(
+                    Sexp::Symbol(Symbol::unforgeable("list")),
+                    datum.source_location().clone(),
+                )];
+                let expanded_elements = self.expand_quasi_quoted_elements(elements)?;
+                output.extend(expanded_elements);
+
+                Ok(Datum::new(
+                    Sexp::List(output),
+                    datum.source_location().clone(),
+                ))
+            }
+            // (quasi-quote (_ . _))
+            Sexp::ImproperList(head, tail) => {
+                let expanded_head = self.expand_quasi_quoted_elements(head)?;
+                let expanded_tail = self.expand_quasi_quoted_element(tail)?;
+
+                let mut output = vec![Datum::new(
+                    Sexp::Symbol(Symbol::unforgeable("cons")),
+                    datum.source_location().clone(),
+                )];
+                output.extend(expanded_head);
+                output.extend(expanded_tail);
+
+                Ok(self.quote_datum(Datum::new(
+                    Sexp::List(output),
+                    datum.source_location().clone(),
+                )))
+            }
+            // (quasi-quote #(..))
+            Sexp::Vector(elements) => {
+                let mut output = vec![Datum::new(
+                    Sexp::Symbol(Symbol::unforgeable("vector")),
+                    datum.source_location().clone(),
+                )];
+
+                let expanded_elements = self.expand_quasi_quoted_elements(elements)?;
+                output.extend(expanded_elements);
+
+                Ok(self.quote_datum(Datum::new(
+                    Sexp::List(output),
+                    datum.source_location().clone(),
+                )))
+            }
+            // (quasi-quote datum)
+            other => Ok(self.quote_datum(quasi_quoted_sexp)),
+        }
+    }
+
+    fn expand_quasi_quoted_elements(&mut self, elements: &Vec<Datum>) -> Result<Vec<Datum>> {
+        let mut output: Vec<Datum> = vec![];
+
+        for element in elements {
+            let expanded = self.expand_quasi_quoted_element(&element)?;
+            output.extend(expanded)
+        }
+
+        Ok(output)
+    }
+
+    // unquote an element in a quasi-quoted list/cons/vector
+    fn expand_quasi_quoted_element(&mut self, datum: &Datum) -> Result<Vec<Datum>> {
+        match datum.list_slice() {
+            Some([operator, operand]) if operator.is_symbol() => {
+                match self.denotation_of(operator)? {
+                    Denotation::Special(Special::QuasiQuote) => {
+                        Error::expansion_error("Quasiquote can't be nested", datum.clone())
+                    }
+                    Denotation::Special(Special::Unquote) => {
+                        Ok(vec![self.expand_quotations(operand)?])
+                    }
+                    Denotation::Special(Special::UnquoteSplicing) => {
+                        let expanded = self.expand_quotations(operand)?;
+
+                        match expanded.sexp() {
+                            Sexp::List(inner) => Ok(inner.to_vec()),
+                            Sexp::ImproperList(_, _) => {
+                                return Error::expansion_error(
+                                    "Unexpected improper list in unquote-splicing",
+                                    expanded,
+                                )
+                            }
+                            _ => Ok(vec![expanded]),
+                        }
+                    }
+                    _ => Ok(vec![datum.clone()]),
+                }
+            }
+            _ => Ok(vec![self.quote_datum(datum.clone())]),
+        }
+    }
+
+    fn quote_datum(&mut self, datum: Datum) -> Datum {
+        let loc = datum.source_location().clone();
+        Datum::new(
+            Sexp::List(vec![
+                Datum::new(Sexp::forged_symbol("quote"), loc.clone()),
+                datum,
+            ]),
+            loc,
+        )
     }
 
     fn expand_all(&mut self, all: &[Datum]) -> Result<Vec<Datum>> {
@@ -107,107 +265,6 @@ impl Expander {
 
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         todo!()
-    }
-
-    fn expand_quote(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
-        if operands.len() != 1 {
-            Error::expansion_error("Invalid quoted expression", datum.clone())
-        } else {
-            // just return the quoted expression
-            Ok(datum.clone())
-        }
-    }
-
-    // `3      -> (quasi-quote 3)               -> (quote 3)
-    // `,3     -> (quasi-quote (unquote 3))     -> 3
-    // `(1 2)  -> (quasi-quote (1 2))           -> (quote (1 2))
-    // `(1 ,2) -> (quasi-quote (1 (unquote 2))) -> (quote (1 2))
-    fn expand_quasi_quote(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
-        if operands.len() != 1 {
-            return Error::expansion_error("Invalid quasi-quoted expression", datum.clone());
-        }
-
-        let quasi_quoted_sexp = operands[0].clone();
-        match quasi_quoted_sexp.sexp() {
-            // (quasi-quote (..))
-            Sexp::List(elements) => {
-                let expanded_elements = self.expand_quasi_quoted_elements(elements)?;
-
-                Ok(self.quote_datum(Datum::new(
-                    Sexp::List(expanded_elements),
-                    datum.source_location().clone(),
-                )))
-            }
-            // (quasi-quote (_ . _))
-            Sexp::ImproperList(head, tail) => {
-                let expanded_head = self.expand_quasi_quoted_elements(head)?;
-                let expanded_tail = self.expand_quasi_quoted_element(tail)?;
-
-                Ok(self.quote_datum(Datum::new(
-                    Sexp::ImproperList(expanded_head, Box::new(expanded_tail[0].clone())),
-                    datum.source_location().clone(),
-                )))
-            }
-            // (quasi-quote #(..))
-            Sexp::Vector(elements) => {
-                let expanded_elements = self.expand_quasi_quoted_elements(elements)?;
-
-                Ok(self.quote_datum(Datum::new(
-                    Sexp::Vector(expanded_elements),
-                    datum.source_location().clone(),
-                )))
-            }
-            // (quasi-quote datum)
-            other => Ok(self.quote_datum(quasi_quoted_sexp)),
-        }
-    }
-
-    fn expand_quasi_quoted_elements(&mut self, elements: &Vec<Datum>) -> Result<Vec<Datum>> {
-        let mut output: Vec<Datum> = vec![];
-
-        for element in elements {
-            let expanded = self.expand_quasi_quoted_element(&element)?;
-            output.extend(expanded)
-        }
-
-        Ok(output)
-    }
-
-    fn expand_quasi_quoted_element(&mut self, datum: &Datum) -> Result<Vec<Datum>> {
-        match datum.list_slice() {
-            Some([operator, operand]) if operator.is_symbol() => {
-                match self.denotation_of(operator)? {
-                    Denotation::Special(Special::Unquote) => Ok(vec![self.expand(operand)?]),
-                    Denotation::Special(Special::UnquoteSplicing) => {
-                        let expanded = self.expand(operand)?;
-
-                        match expanded.sexp() {
-                            Sexp::List(inner) => Ok(inner.to_vec()),
-                            Sexp::ImproperList(_, _) => {
-                                return Error::expansion_error(
-                                    "Unexpected improper list in unquote-splicing",
-                                    expanded,
-                                )
-                            }
-                            _ => Ok(vec![expanded]),
-                        }
-                    }
-                    _ => Ok(vec![datum.clone()]),
-                }
-            }
-            _ => Ok(vec![datum.clone()]),
-        }
-    }
-
-    fn quote_datum(&mut self, datum: Datum) -> Datum {
-        let loc = datum.source_location().clone();
-        Datum::new(
-            Sexp::List(vec![
-                Datum::new(Sexp::forged_symbol("quote"), loc.clone()),
-                datum,
-            ]),
-            loc,
-        )
     }
 
     fn expand_define(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
@@ -314,9 +371,13 @@ mod tests {
     #[test]
     fn test_expand_quasi_quote() -> Result<()> {
         assert_expands_equal("`3", "'3", false)?;
-        //assert_expands_equal("`(3 4 ,5)", "(list '3 '4 '6)", false)?;
-        //assert_expands_equal("`(3 4 ,@(5 6 7 8))", "(list '3 '4 '5 '6 '7 '8)", false)?;
-        //assert_expands_equal("`(3 4 ,@(car x y))", "(list '3 '4 (car x z))", false)?;
+        assert_expands_equal("`(3 4 ,5)", "(list '3 '4 5)", false)?;
+        assert_expands_equal("`(3 4 ,@(5 6 7 8))", "(list '3 '4 5 6 7 8)", false)?;
+        assert_expands_equal("`(3 4 ,(car x y))", "(list '3 '4 (car x y))", false)?;
+        assert_expands_equal("`(3 4 ,'(1 2))", "(list '3 '4 '(1 2))", false)?;
+        assert_expands_equal("''foo", "'(quote foo)", false)?;
+
+        assert!(expand_form("`(1 2 `3)").is_err(), "expected error");
         Ok(())
     }
 
