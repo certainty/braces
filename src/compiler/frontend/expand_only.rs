@@ -164,6 +164,7 @@ impl Expander {
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::expression::identifier::Identifier;
+    use crate::compiler::frontend::parser::syntax::Symbol;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
     use crate::compiler::frontend::test_helpers::expressions::*;
 
@@ -193,8 +194,48 @@ mod tests {
         )
     }
 
+    #[test]
+    fn test_parse_define_procedure() {
+        let expanded = expand_form("(define (foo x y) x)").unwrap();
+        assert_eq!(
+            expanded,
+            make_datum(
+                Sexp::List(vec![
+                    make_datum(Sexp::symbol("define"), 1, 1),
+                    make_datum(Sexp::symbol("foo"), 1, 10),
+                    make_datum(
+                        Sexp::List(vec![
+                            make_datum(Sexp::Symbol(Symbol::unforgeable("lambda")), 1, 1),
+                            make_datum(
+                                Sexp::List(vec![
+                                    make_datum(Sexp::symbol("x"), 1, 16),
+                                    make_datum(Sexp::symbol("y"), 1, 19),
+                                ]),
+                                1,
+                                1
+                            ),
+                            make_datum(Sexp::symbol("x"), 1, 2)
+                        ]),
+                        1,
+                        1
+                    )
+                ],),
+                1,
+                1
+            )
+        )
+    }
+
     fn expand_form(form: &str) -> Result<Datum> {
         let mut exp = Expander::new();
         exp.expand(&parse_datum(form))
     }
+
+    fn structurally_equal(lhs: &Datum, rhs: &Datum) -> bool {
+        match (lhs.sexp(), rhs.sexp()) {
+            (Sexp::List(inner_lhs), Sexp::List(inner_rhs)) => todo!(),
+        }
+    }
+
+    fn structurally_equal_vec<T>(lhs: Vec<T>, rhs: Vec<T>) -> bool {}
 }
