@@ -66,7 +66,7 @@ pub enum Special {
 type Renaming = (Symbol, Symbol); // from, to
 
 pub struct SyntaxEnvironment {
-    bindings: FxHashMap<Symbol, Denotation>,
+    scopes: Vec<FxHashMap<Symbol, Denotation>>,
 }
 
 impl SyntaxEnvironment {
@@ -144,25 +144,33 @@ impl SyntaxEnvironment {
 
     pub fn empty() -> Self {
         Self {
-            bindings: FxHashMap::default(),
+            scopes: vec![FxHashMap::default()],
         }
     }
 
-    pub fn divert(env_lhs: Self, env_rhs: Self) -> Self {
-        let mut bindings = env_lhs.bindings;
-        bindings.extend(env_rhs.bindings.into_iter());
-        Self { bindings }
+    pub fn top_scope_mut<'a>(&'a mut self) -> &'a mut FxHashMap<Symbol, Denotation> {
+        self.scopes.last_mut().unwrap()
+    }
+
+    pub fn push_scope(&mut self) {
+        self.scopes.push(FxHashMap::default());
+    }
+
+    pub fn pop_scope(&mut self) {
+        self.scopes.pop();
     }
 
     pub fn extend<T: Into<Symbol>>(&mut self, id: T, denotation: Denotation) {
-        self.bindings.insert(id.into(), denotation);
+        self.top_scope_mut().insert(id.into(), denotation);
     }
 
     pub fn get(&self, id: &Symbol) -> Denotation {
-        match self.bindings.get(id) {
-            Some(denotation) => denotation.clone(),
-            _ => Denotation::Global(id.clone()),
+        for scope in &self.scopes {
+            if let Some(denotation) = scope.get(id) {
+                return denotation.clone();
+            }
         }
+        Denotation::Id(id.clone())
     }
 
     // Given a syntactic environment env to be extended, an alist returned
@@ -207,6 +215,7 @@ pub struct SyntacticContext {
     pub global: SyntaxEnvironment,
     pub standard: SyntaxEnvironment,
     pub usual: SyntaxEnvironment,
+    pub expansion: SyntaxEnvironment,
 }
 
 impl SyntacticContext {
@@ -215,6 +224,7 @@ impl SyntacticContext {
             global,
             standard: SyntaxEnvironment::standard(),
             usual: SyntaxEnvironment::basic(),
+            expansion: SyntaxEnvironment::basic(),
         }
     }
 
@@ -229,6 +239,7 @@ impl Default for SyntacticContext {
             global: SyntaxEnvironment::minimal(),
             standard: SyntaxEnvironment::standard(),
             usual: SyntaxEnvironment::basic(),
+            expansion: SyntaxEnvironment::basic(),
         }
     }
 }

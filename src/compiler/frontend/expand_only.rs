@@ -5,6 +5,7 @@ use super::parser::syntax;
 use super::parser::syntax::environment::{
     Denotation, Special, SyntacticContext, SyntaxEnvironment,
 };
+use crate::compiler::frontend::parser::expression;
 use crate::compiler::frontend::parser::syntax::Symbol;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
@@ -89,14 +90,14 @@ impl Expander {
                 match denotation {
                     Denotation::Special(special) => match special {
                         Special::Define => self.expand_define(&datum, &operands),
-                        Special::Lambda => todo!(),
+                        Special::Lambda => self.expand_lambda(&datum, &operands),
                         Special::Set => todo!(),
                         Special::Begin => todo!(),
                         Special::If => todo!(),
                         Special::DefineSyntax => todo!(),
                         Special::LetSyntax => todo!(),
                         Special::LetrecSyntax => todo!(),
-                        Special::Quote => Ok(datum.clone()), // already expanded in phase 1
+                        Special::Quote => Ok(datum.clone()), // already expanded in phase 0
                         Special::QuasiQuote => {
                             Error::bug("Unexpected quasi-quote in macro-expansion")
                         }
@@ -262,6 +263,36 @@ impl Expander {
 
         Ok(Datum::new(Sexp::list(new_ls.into_iter()), loc))
     }
+
+    // expand a lambda expression
+    fn expand_lambda(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
+        match operands {
+            [formals, body @ ..] => match expression::lambda::parse_formals(&formals) {
+                Ok(parsed_formals) => {
+                    self.syntax_ctx.expansion.push_scope();
+                    for identifier in parsed_formals.identifiers() {
+                        let sym = identifier.symbol().clone();
+                        self.syntax_ctx
+                            .expansion
+                            .extend(sym.clone(), Denotation::identifier(sym));
+                    }
+                    let expanded_body = self.expand_all(body)?;
+                    self.syntax_ctx.expansion.pop_scope();
+
+                    Ok(self.build_lambda(
+                        &[formals.clone()],
+                        &expanded_body,
+                        datum.source_location().clone(),
+                    ))
+                }
+                Err(_) => Error::expansion_error("Malformed formals of lambda", datum.clone()),
+            },
+            // ignore invalid form?
+            _ => Error::expansion_error("Malformed lambda expression", datum.clone()),
+        }
+    }
+
+    fn extend_expansion_env(sym: Symbol, denotation: Denotation) {}
 
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         todo!()

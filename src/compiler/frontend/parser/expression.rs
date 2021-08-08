@@ -14,6 +14,7 @@ pub mod sequence;
 use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
 use super::Error;
 use super::ParserContext;
+use crate::compiler::frontend::parser::syntax::Symbol;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 use apply::ApplicationExpression;
@@ -107,7 +108,7 @@ impl Expression {
     }
 
     pub fn identifier<T: Into<String>>(str: T, loc: SourceLocation) -> Expression {
-        Expression::Identifier(Identifier::new(str.into(), loc))
+        Expression::Identifier(Identifier::new(Symbol::forged(str.into()), loc))
     }
 
     pub fn body(sequence: Vec<Expression>) -> BodyExpression {
