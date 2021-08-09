@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod expression;
 pub mod syntax;
+use super::expand_only;
 use super::reader;
 use super::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::frontend::expander::MacroExpander;
@@ -26,7 +27,7 @@ pub enum Error {
     #[error("ExpansionError: {} {:#?}", 0, 1)]
     ExpansionError(String, Datum),
     #[error(transparent)]
-    ExpanderError(#[from] super::expander::Error),
+    ExpanderError(#[from] expand_only::Error),
 }
 
 impl Error {
@@ -54,25 +55,24 @@ impl Error {
 //
 
 pub struct ParserContext {
+    // for parser?
     syntax_ctx: SyntacticContext,
-    expander: MacroExpander,
-    compiler: Compiler,
+    expander: expand_only::Expander,
 }
 
 impl ParserContext {
     pub fn new(ctx: SyntacticContext, expander: MacroExpander, compiler: Compiler) -> Self {
         let mut parser_ctx = ParserContext {
             syntax_ctx: ctx,
-            expander: expander,
-            compiler: compiler,
+            expander: expand_only::Expander::new(),
         };
         parser_ctx.register_transformers();
         parser_ctx
     }
 
     fn register_transformers(&mut self) {
-        self.expander
-            .register_transformers(self.syntax_ctx.usual_env());
+        // register transformers
+        ()
     }
 
     pub fn denotation_of(&mut self, datum: &Datum) -> Denotation {
@@ -81,25 +81,6 @@ impl ParserContext {
         } else {
             panic!("[BUG] expected symbol")
         }
-    }
-
-    pub fn expand_macro(
-        &mut self,
-        datum: &Datum,
-        transformer: syntax::Transformer,
-    ) -> Result<Datum> {
-        let transformed = self.expander.expand(&datum, transformer)?;
-        Ok(transformed)
-    }
-
-    pub fn define_syntax(
-        &mut self,
-        name: syntax::Symbol,
-        transformer: syntax::Transformer,
-    ) -> Result<()> {
-        let denotation = Denotation::Macro(transformer);
-        self.syntax_ctx.usual.extend(name, denotation);
-        Ok(())
     }
 }
 
@@ -118,9 +99,7 @@ pub fn parse_all(data: Vec<Datum>, ctx: &mut ParserContext) -> Result<Ast> {
     let mut parsed: Vec<Expression> = vec![];
 
     for datum in data {
-        if let Some(core_expression) = exparse0(datum, ctx)? {
-            parsed.push(core_expression)
-        }
+        parsed.push(parse(datum, ctx)?);
     }
 
     Ok(Ast {
@@ -128,62 +107,35 @@ pub fn parse_all(data: Vec<Datum>, ctx: &mut ParserContext) -> Result<Ast> {
     })
 }
 
-// Expand and parse form to core form
-//
-// The code has to keep track of the lexical scope while it's walking the datum.
-// This is required to identify operators correctly and accurately decided if we're dealing
-// with a core form or a user defined operator. As an example considere the following valid form
-//
-// (let ((if (lambda (x) x)))
-//   (if #f))
-//
-// The application of `if` at that point refers to the binding introduced by `let`
-// and not the core `if` form. This is the same for every other operator.
-//
-// So what this does is:
-// 1: if `datum` is a list
-//    1a: determine if `car` of list is a special form, a macro or an identifier
-//    1b: if it's a special form, transform it and parse it as a special form
-//    1c: if it's a macro, apply the macro to the datum and desugar the resuling definition
-//    1d: if it's an identifier parse it as an application or a quote
-// 2: if `datum` is not a list
-//    2a: parse it as to core form
-//
-pub fn parse(datum: Datum, ctx: &mut ParserContext) -> Result<Ast> {
-    if let Some(parsed) = exparse0(datum, ctx)? {
-        Ok(Ast {
-            expressions: vec![parsed],
-        })
-    } else {
-        Ok(Ast {
-            expressions: vec![],
-        })
-    }
+pub fn parse(datum: Datum, ctx: &mut ParserContext) -> Result<Expression> {
+    let expanded = ctx.expander.expand(&datum)?;
+    parse_core(expanded, ctx)
 }
 
-fn exparse0(datum: Datum, ctx: &mut ParserContext) -> Result<Option<Expression>> {
+fn parse_core(datum: Datum, ctx: &mut ParserContext) -> Result<Expression> {
     match datum.sexp() {
         Sexp::List(ls) => match &ls[..] {
             [operator, _operands @ ..] if operator.is_symbol() => {
                 let denotation = ctx.denotation_of(operator);
-                println!("Denotation is: {:?}", denotation);
                 match denotation {
                     Denotation::Special(special) => exparse_special(special, &datum, ctx),
-                    Denotation::Macro(transformer) => {
-                        let expanded = ctx.expand_macro(&datum, transformer)?;
-                        exparse0(expanded, ctx)
+                    Denotation::Global(_) => expression::apply::parse(&datum, ctx).res(),
+                    Denotation::Id(_) => expression::apply::parse(&datum, ctx).res(),
+                    _ => {
+                        return Error::parser_bug(&format!(
+                            "Unexpected denotation for datum: {:?}",
+                            denotation.clone()
+                        ))
                     }
-                    Denotation::Global(_) => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
-                    Denotation::Id(_) => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
                 }
             }
-            [_operator, _operands @ ..] => Ok(Some(expression::apply::parse(&datum, ctx).res()?)),
+            [_operator, _operands @ ..] => expression::apply::parse(&datum, ctx).res(),
             _ => Err(Error::ExpansionError(
                 "Unexpected unquoted list".to_string(),
                 datum.clone(),
             )),
         },
-        _ => Ok(Some(Expression::parse(&datum, ctx)?)),
+        _ => Expression::parse(&datum, ctx),
     }
 }
 
@@ -191,24 +143,19 @@ fn exparse_special(
     special_form: Special,
     datum: &Datum,
     ctx: &mut ParserContext,
-) -> Result<Option<Expression>> {
+) -> Result<Expression> {
     match special_form {
-        Special::Define => Ok(Some(transcribe_define(&datum, ctx)?)),
-        Special::Quote => Ok(Some(exparse_quote(&datum)?)),
-        Special::Lambda => Ok(Some(expression::lambda::parse(&datum, ctx).res()?)),
-        Special::Set => Ok(Some(expression::assignment::parse(&datum, ctx).res()?)),
-        Special::Begin => Ok(Some(expression::sequence::parse(&datum, ctx).res()?)),
-        Special::If => Ok(Some(expression::conditional::parse(&datum, ctx).res()?)),
-        Special::DefineSyntax => {
-            define_syntax(&datum, ctx)?;
-            Ok(None)
-        }
-        Special::LetSyntax => todo!(),
-        Special::LetrecSyntax => todo!(),
-        _ => todo!(),
+        Special::Define => expression::define::parse(&datum, ctx).res(),
+        Special::Quote => expression::quotation::parse(&datum, ctx).res(),
+        Special::Lambda => expression::lambda::parse(&datum, ctx).res(),
+        Special::Set => expression::assignment::parse(&datum, ctx).res(),
+        Special::Begin => expression::sequence::parse(&datum, ctx).res(),
+        Special::If => expression::conditional::parse(&datum, ctx).res(),
+        _ => return Error::parser_bug("Unexpected special form"),
     }
 }
 
+/*
 fn define_syntax(datum: &Datum, ctx: &mut ParserContext) -> Result<()> {
     match datum.sexp() {
         Sexp::List(ls) => match &ls[..] {
@@ -295,6 +242,7 @@ fn transcribe_define(datum: &Datum, ctx: &mut ParserContext) -> Result<Expressio
     println!("transcribed define {:#?}", transcribed);
     expression::define::parse(&transcribed, ctx).res()
 }
+ */
 
 #[cfg(test)]
 mod tests {

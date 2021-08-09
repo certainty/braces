@@ -1,3 +1,4 @@
+use super::frontend::expand_only;
 use super::frontend::expander;
 use super::frontend::parser;
 use super::frontend::reader;
@@ -51,6 +52,14 @@ impl UserMessage for parser::Error {
             parser::Error::Bug(e) => {
                 eprintln!("ParserBug: {}", e)
             }
+        }
+    }
+}
+
+impl UserMessage for expand_only::Error {
+    fn print_user_friendly_message(&self) {
+        match self {
+            _ => eprintln!("Failed to expand  [TODO: better error message]"),
         }
     }
 }

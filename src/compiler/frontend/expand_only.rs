@@ -2,9 +2,7 @@
 // without duplicating too much parser logic
 
 use super::parser::syntax;
-use super::parser::syntax::environment::{
-    Denotation, Special, SyntacticContext, SyntaxEnvironment,
-};
+use super::parser::syntax::environment::{Denotation, Special, SyntacticContext};
 use crate::compiler::frontend::parser::expression;
 use crate::compiler::frontend::parser::syntax::Symbol;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
@@ -30,9 +28,9 @@ impl Error {
     }
 }
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-struct Expander {
+pub struct Expander {
     compiler: Compiler,
     syntax_ctx: SyntacticContext,
 }
@@ -41,7 +39,6 @@ impl Expander {
     pub fn new() -> Self {
         Expander {
             compiler: Compiler::new(),
-            // TODO: SyntacticContext::for_expander()?
             syntax_ctx: SyntacticContext::default(),
         }
     }
@@ -89,11 +86,8 @@ impl Expander {
                 let denotation = self.denotation_of(operator)?;
                 match denotation {
                     Denotation::Special(special) => match special {
-                        Special::Define => self.expand_define(&datum, &operands),
-                        Special::Lambda => self.expand_lambda(&datum, &operands),
-                        Special::Set => todo!(),
-                        Special::Begin => todo!(),
-                        Special::If => todo!(),
+                        Special::Define => self.expand_define(&datum, &operator, &operands),
+                        Special::Lambda => self.expand_lambda(&datum, &operator, &operands),
                         Special::DefineSyntax => todo!(),
                         Special::LetSyntax => todo!(),
                         Special::LetrecSyntax => todo!(),
@@ -105,14 +99,10 @@ impl Expander {
                         Special::UnquoteSplicing => {
                             Error::bug("Unexpected unquote-splicing in macro-expansion")
                         }
+                        _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                     },
                     Denotation::Macro(transformer) => self.expand_macro(&datum, &transformer),
-                    Denotation::Id(_) => {
-                        self.expand_apply(operator, operands, datum.source_location().clone())
-                    }
-                    Denotation::Global(_) => {
-                        self.expand_apply(operator, operands, datum.source_location().clone())
-                    }
+                    _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                 }
             }
             Some([operator, operands @ ..]) => {
@@ -249,7 +239,7 @@ impl Expander {
     }
 
     fn expand_all(&mut self, all: &[Datum]) -> Result<Vec<Datum>> {
-        all.iter().map(|d| self.expand(d)).collect()
+        all.iter().map(|d| self.expand_macros(d)).collect()
     }
 
     fn expand_apply(
@@ -265,7 +255,12 @@ impl Expander {
     }
 
     // expand a lambda expression
-    fn expand_lambda(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
+    fn expand_lambda(
+        &mut self,
+        datum: &Datum,
+        _operator: &Datum,
+        operands: &[Datum],
+    ) -> Result<Datum> {
         match operands {
             [formals, body @ ..] => match expression::lambda::parse_formals(&formals) {
                 Ok(parsed_formals) => {
@@ -292,13 +287,16 @@ impl Expander {
         }
     }
 
-    fn extend_expansion_env(sym: Symbol, denotation: Denotation) {}
-
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         todo!()
     }
 
-    fn expand_define(&mut self, datum: &Datum, operands: &[Datum]) -> Result<Datum> {
+    fn expand_define(
+        &mut self,
+        datum: &Datum,
+        operator: &Datum,
+        operands: &[Datum],
+    ) -> Result<Datum> {
         match operands {
             //(define (...) <body>)
             [definition, exprs @ ..] if definition.sexp().is_proper_list() => {
@@ -308,9 +306,8 @@ impl Expander {
                         let lambda =
                             self.build_lambda(def_formals, exprs, datum.source_location().clone());
 
-                        Ok(self.build_define(
-                            identifier.clone(),
-                            lambda,
+                        Ok(Datum::new(
+                            Sexp::List(vec![operator.clone(), identifier.clone(), lambda]),
                             datum.source_location().clone(),
                         ))
                     }
@@ -323,22 +320,14 @@ impl Expander {
                 }
             }
             //(define <id> <expr>)
-            [identifier, expr] => Ok(self.build_define(
-                identifier.clone(),
-                expr.clone(),
+            [identifier, expr] => Ok(Datum::new(
+                Sexp::List(vec![operator.clone(), identifier.clone(), expr.clone()]),
                 datum.source_location().clone(),
             )),
             _ => {
                 Error::expansion_error("Expected definition or procedure definition", datum.clone())
             }
         }
-    }
-
-    fn build_define(&self, id: Datum, expr: Datum, loc: SourceLocation) -> Datum {
-        Datum::new(
-            Sexp::list(vec![Datum::new(Sexp::symbol("define"), loc.clone()), id, expr].into_iter()),
-            loc,
-        )
     }
 
     fn build_lambda(&self, def_formals: &[Datum], body: &[Datum], loc: SourceLocation) -> Datum {

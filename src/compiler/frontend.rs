@@ -23,7 +23,11 @@ pub fn read_all<T: Source>(source: &mut T) -> std::result::Result<Vec<Datum>, re
 pub fn parse<T: Source>(source: &mut T) -> std::result::Result<Ast, parser::Error> {
     let mut ctx = ParserContext::default();
     let sexps = read(source)?;
-    parser::parse(sexps, &mut ctx)
+    let parsed = parser::parse(sexps, &mut ctx)?;
+
+    Ok(Ast {
+        expressions: vec![parsed],
+    })
 }
 
 pub fn parse_all<T: Source>(source: &mut T) -> std::result::Result<Ast, parser::Error> {
