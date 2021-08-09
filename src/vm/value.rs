@@ -1,5 +1,3 @@
-#[cfg(test)]
-pub mod arbitrary;
 pub mod closure;
 pub mod equality;
 pub mod error;
@@ -19,6 +17,8 @@ use std::rc::Rc;
 use thiserror::Error;
 
 use equality::SchemeEqual;
+#[cfg(test)]
+pub mod arbitrary;
 
 #[derive(Error, Debug)]
 pub enum Error {

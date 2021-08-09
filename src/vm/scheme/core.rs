@@ -1,6 +1,7 @@
 pub mod numbers;
 pub mod syntax;
 use super::ffi::*;
+use crate::vm::value::list;
 use crate::vm::value::procedure::foreign;
 use crate::vm::value::Value;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
@@ -27,6 +28,7 @@ pub fn register(vm: &mut VM) {
 
     register_procedure!(vm, "not", bool_not, Arity::Exactly(1));
     register_procedure!(vm, "inspect", inspect, Arity::Exactly(1));
+    register_procedure!(vm, "list", build_list, Arity::Many);
 
     numbers::register(vm);
 }
@@ -106,4 +108,16 @@ pub fn bool_not(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn inspect(args: Vec<Value>) -> FunctionResult<Value> {
     println!("Debug: {:?}", args.first().unwrap());
     Ok(Value::Unspecified)
+}
+
+pub fn build_list(args: Vec<Value>) -> FunctionResult<Value> {
+    // hand in a context that gives access to the value factory?
+    let ls = if args.is_empty() {
+        Value::ProperList(list::List::Nil)
+    } else {
+        let ls: list::List = args.into();
+        Value::ProperList(ls)
+    };
+
+    Ok(ls)
 }
