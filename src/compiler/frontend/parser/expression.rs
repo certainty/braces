@@ -6,7 +6,6 @@ pub mod define;
 pub mod error;
 pub mod identifier;
 pub mod lambda;
-pub mod letexp;
 pub mod literal;
 pub mod quotation;
 pub mod sequence;
