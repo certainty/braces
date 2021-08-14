@@ -23,9 +23,9 @@ fn test_vm_lexical_scope() {
     let mut result = vm
         .run_string(
             r#"
-      (let ((x 'bar))
-        (let ((x 'foo))
-          x))
+      ((lambda (x)
+        ((lambda (x) x) 'foo)
+      ) 'bar)
     "#,
             "",
         )
@@ -36,10 +36,7 @@ fn test_vm_lexical_scope() {
     result = vm
         .run_string(
             r#"
-      (let ((x 'bar))
-        (let ((x 'foo))
-          x)
-        x)
+      ((lambda (x) ((lambda (x) x) 'foo) x) 'bar)
     "#,
             "",
         )
@@ -72,7 +69,7 @@ fn test_vm_set() {
     );
 
     let result = vm
-        .run_string(r#"(let ((foo #t)) (set! foo 'bar) foo) "#, "")
+        .run_string(r#"((lambda  (foo) (set! foo 'bar) foo) #t)"#, "")
         .unwrap();
     assert_eq!(result, vm.values.symbol("bar"));
 }
@@ -200,7 +197,9 @@ fn test_vm_simple_closures() {
     let result = vm
         .run_string(
             "
-               (define test (let ((x #t) (y 'ignored)) (lambda () (set! x (not x)) x)))
+               (define test
+                 ((lambda (x y) (lambda () (set! x (not x)) x)) #t 'ignored)
+               )
                (define ls (lambda x x))
                (ls (test) (test) (test))
 ",
@@ -220,7 +219,9 @@ fn test_vm_simple_closures() {
     let result = vm
         .run_string(
             "
-               (define test (let ((x #t) (y 'ignored)) (lambda () x)))
+               (define test
+                 ((lambda (x y) (lambda () x)) #t 'ignored)
+               )
                (test)
 ",
             "",
@@ -232,10 +233,9 @@ fn test_vm_simple_closures() {
         .run_string(
             "
                (define test
-                  (let ((x #t))
-                      (let ((proc (lambda () x)))
-                        (set! x #f)
-                        proc)))
+                  ((lambda (x)
+                     ((lambda (proc) (set! x #f) proc)  (lambda () x)))
+                   #t))
                (test)
 ",
             "",
@@ -254,9 +254,9 @@ fn test_vm_complex_closures() {
                (define set-x #t)
                (define get-x #t)
                (define make-closures (lambda (value)
-                 (let ((x value))
+                 ((lambda (x)
                    (set! get-x (lambda () x))
-                   (set! set-x (lambda (new) (set! x new))))))
+                   (set! set-x (lambda (new) (set! x new)))) value)))
 
               (make-closures #t)
               (list (get-x) (set-x 'foo) (get-x))

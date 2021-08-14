@@ -6,7 +6,6 @@ pub mod define;
 pub mod error;
 pub mod identifier;
 pub mod lambda;
-pub mod letexp;
 pub mod literal;
 pub mod quotation;
 pub mod sequence;
@@ -25,7 +24,6 @@ use define::DefinitionExpression;
 use error::Error;
 use identifier::Identifier;
 use lambda::LambdaExpression;
-use letexp::{BindingSpec, LetExpression};
 use literal::LiteralExpression;
 use sequence::BeginExpression;
 
@@ -170,7 +168,6 @@ pub enum Expression {
     Define(DefinitionExpression),
     Lambda(LambdaExpression),
     Assign(SetExpression),
-    Let(LetExpression),
     If(IfExpression),
     Apply(ApplicationExpression),
     Command(Box<Expression>),
@@ -185,7 +182,6 @@ impl HasSourceLocation for Expression {
             Self::Quotation(exp) => exp.source_location(),
             Self::Assign(exp) => exp.source_location(),
             Self::Define(def) => def.source_location(),
-            Self::Let(exp) => exp.source_location(),
             Self::If(expr) => expr.source_location(),
             Self::Lambda(proc) => proc.source_location(),
             Self::Apply(exp) => exp.source_location(),
@@ -262,15 +258,6 @@ impl Expression {
         BodyExpression::from(self)
     }
 
-    /// Create and expression for core-let
-    pub fn let_bind(
-        bindings: Vec<BindingSpec>,
-        body: BodyExpression,
-        loc: SourceLocation,
-    ) -> Expression {
-        Expression::Let(letexp::build_let(bindings, body, loc))
-    }
-
     /// Parse a single datum into an expression
     ///
     ///
@@ -305,9 +292,7 @@ impl Expression {
     }
 
     fn parse_derived(datum: &Datum) -> ParseResult<Expression> {
-        letexp::parse(datum)
-            .or(|| sequence::parse(datum))
-            .or(|| define::parse(datum))
+        sequence::parse(datum).or(|| define::parse(datum))
     }
 
     pub fn parse_apply_special<'a, T, F>(

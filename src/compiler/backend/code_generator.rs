@@ -228,7 +228,6 @@ impl CodeGenerator {
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr, context)?,
-            Expression::Let(let_exp) => self.emit_instructions(&let_exp.to_lambda(), context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(expr) => self.emit_begin(expr, context)?,
@@ -595,8 +594,12 @@ mod tests {
     }
 
     #[test]
-    fn test_compile_tail_call_in_let() {
-        let chunk = compile("(let ((x (foo))) (bar) (baz))");
+    fn test_compile_tail_call_in_lambda() {
+        let chunk = compile(
+            "
+          ((lambda (x) (bar) (baz)) (foo))
+         ",
+        );
 
         assert_matches!(
             &chunk.code[..],
@@ -628,8 +631,11 @@ mod tests {
     fn test_compile_closures() {
         let chunk = compile(
             "
-          (define foo (let ((x #t) (y 'foo))
-            (lambda () x)))
+          (define foo
+             ((lambda (x)
+               (y 'foo)
+               (lambda () x))
+              #t))
 
           (foo)
         ",
@@ -640,10 +646,9 @@ mod tests {
             &chunk.code[..],
             [
                 // create closure
-                Instruction::Closure(_), // define let closure
+                Instruction::Closure(_), // define closure
                 Instruction::True,
-                Instruction::Const(_), // 'foo
-                Instruction::Call(_),  // call let closure
+                Instruction::Call(_), // call closure
                 // define foo
                 Instruction::Define(_),
                 // apply foo
@@ -653,10 +658,13 @@ mod tests {
             ]
         );
 
-        let let_closure = proc_from(&chunk.constants[0]); // the let closure
+        let foo_closure = proc_from(&chunk.constants[0]); // the let closure
         assert_matches!(
-            &let_closure.code().code[..],
+            &foo_closure.code().code[..],
             [
+                Instruction::GetGlobal(_), // get y
+                Instruction::Const(_),     // 'foo
+                Instruction::Call(_),      // apply 'foo to y
                 // setup the up-value for the x constant
                 Instruction::UpValue(0, true), //x #t
                 // build the closure
@@ -666,7 +674,7 @@ mod tests {
             ]
         );
 
-        let inner_closure = proc_from(&let_closure.code().constants[0]);
+        let inner_closure = proc_from(&foo_closure.code().constants[2]);
         assert_matches!(
             &inner_closure.code().code[..],
             [Instruction::GetUpValue(0), Instruction::Return]
