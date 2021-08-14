@@ -44,16 +44,6 @@ impl Expander {
     }
 
     pub fn expand(&mut self, datum: &Datum) -> Result<Datum> {
-        self.phase0(datum).and_then(|d| self.phase1(&d))
-    }
-
-    #[inline]
-    fn phase0(&mut self, datum: &Datum) -> Result<Datum> {
-        self.expand_quotations(&datum)
-    }
-
-    #[inline]
-    fn phase1(&mut self, datum: &Datum) -> Result<Datum> {
         self.expand_macros(&datum)
     }
 

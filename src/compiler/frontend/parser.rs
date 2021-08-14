@@ -75,11 +75,11 @@ impl ParserContext {
         ()
     }
 
-    pub fn denotation_of(&mut self, datum: &Datum) -> Denotation {
+    pub fn denotation_of(&mut self, datum: &Datum) -> Result<Denotation> {
         if let Sexp::Symbol(sym) = datum.sexp() {
-            self.syntax_ctx.usual_env().get(&sym.clone().into())
+            Ok(self.syntax_ctx.usual_env().get(&sym.clone().into()))
         } else {
-            panic!("[BUG] expected symbol")
+            Error::parser_bug("[BUG] expected symbol")
         }
     }
 }
@@ -116,7 +116,7 @@ fn parse_core(datum: Datum, ctx: &mut ParserContext) -> Result<Expression> {
     match datum.sexp() {
         Sexp::List(ls) => match &ls[..] {
             [operator, _operands @ ..] if operator.is_symbol() => {
-                let denotation = ctx.denotation_of(operator);
+                let denotation = ctx.denotation_of(operator)?;
                 match denotation {
                     Denotation::Special(special) => exparse_special(special, &datum, ctx),
                     Denotation::Global(_) => expression::apply::parse(&datum, ctx).res(),

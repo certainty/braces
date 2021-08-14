@@ -68,8 +68,10 @@ pub enum Value {
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
+    ImproperList(list::List, Box<Value>),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
+    Vector(Vec<Value>),
     Unspecified,
 }
 
@@ -79,6 +81,57 @@ impl Value {
             Self::Bool(false) => true,
             _ => false,
         }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match self {
+            Self::ProperList(ls) => ls.is_null(),
+            _ => false,
+        }
+    }
+}
+
+impl SchemeEqual<Vec<Value>> for Vec<Value> {
+    fn is_eqv(&self, other: &Vec<Value>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        for i in 0..self.len() {
+            if !self[0].is_eqv(&other[i]) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn is_equal(&self, other: &Vec<Value>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        for i in 0..self.len() {
+            if !self[0].is_equal(&other[i]) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn is_eq(&self, other: &Vec<Value>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        for i in 0..self.len() {
+            if !self[0].is_eq(&other[i]) {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -92,6 +145,10 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::InternedString(_)) => false,
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
+            (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
+                lhs_head.is_eqv(rhs_head) && lhs_tail.is_eqv(rhs_tail)
+            }
+            (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eqv(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
@@ -107,6 +164,10 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::InternedString(_)) => false,
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
+            (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
+                lhs_head.is_eq(rhs_head) && lhs_tail.is_eq(rhs_tail)
+            }
+            (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eq(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
@@ -125,6 +186,10 @@ impl SchemeEqual<Value> for Value {
             }
             (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
+            (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
+                lhs_head.is_equal(rhs_head) && lhs_tail.is_equal(rhs_tail)
+            }
+            (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_equal(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),
             (Value::Unspecified, Value::Unspecified) => true,
@@ -208,6 +273,15 @@ impl Factory {
         }
     }
 
+    pub fn improper_list(&self, head: Vec<Value>, tail: Value) -> Value {
+        let ls: list::List = head.into();
+        Value::ImproperList(ls, Box::new(tail))
+    }
+
+    pub fn vector(&self, vals: Vec<Value>) -> Value {
+        Value::Vector(vals)
+    }
+
     pub fn foreign_procedure(&mut self, v: procedure::foreign::Procedure) -> Value {
         Value::Procedure(procedure::Procedure::foreign(v))
     }
@@ -227,6 +301,10 @@ impl Factory {
             Sexp::Bool(false) => self.bool_false().clone(),
             Sexp::Symbol(s) => self.symbol(s),
             Sexp::String(s) => self.string(s),
+            Sexp::Vector(v) => {
+                let elements = v.iter().map(|e| self.from_datum(e)).collect();
+                self.vector(elements)
+            }
             Sexp::List(ls) => {
                 let elements = ls.iter().map(|e| self.from_datum(e)).collect();
                 self.proper_list(elements)

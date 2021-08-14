@@ -15,6 +15,9 @@
 // of execution since it allows to easily activate individual procedures without having to do extensive
 // computation of addresses.
 
+use crate::compiler::frontend::parser::expression::quotation::QuasiQuotedElement;
+use crate::compiler::frontend::parser::expression::quotation::QuasiQuotedExpression;
+use crate::compiler::frontend::parser::expression::quotation::QuotationExpression;
 use crate::vm::value::closure::Closure;
 use crate::vm::value::procedure::Arity;
 
@@ -226,7 +229,7 @@ impl CodeGenerator {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
             Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
-            Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
+            Expression::Quotation(quoted) => self.emit_quotation(quoted, context)?,
             Expression::If(if_expr) => self.emit_if(if_expr, context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
@@ -234,6 +237,79 @@ impl CodeGenerator {
             Expression::Command(expr) => self.emit_instructions(expr, context)?,
             Expression::Apply(expr) => self.emit_apply(expr, context)?,
         }
+        Ok(())
+    }
+
+    fn emit_quotation(&mut self, expr: &QuotationExpression, context: &Context) -> Result<()> {
+        match expr {
+            QuotationExpression::Quote(datum) => self.emit_lit(datum),
+            QuotationExpression::QuasiQuote(quasi_quoted) => {
+                self.emit_quasi_quotation(quasi_quoted, context)
+            }
+        }
+    }
+
+    fn emit_quasi_quotation(
+        &mut self,
+        expr: &QuasiQuotedExpression,
+        context: &Context,
+    ) -> Result<()> {
+        match expr {
+            QuasiQuotedExpression::Datum(d) => {
+                self.emit_lit(d)?;
+            }
+            QuasiQuotedExpression::List(elements, _) => {
+                // add empty list
+                // then add instructions to add to that list
+                self.emit_instruction(Instruction::Nil, expr.source_location())?;
+                for elt in elements.iter().rev() {
+                    self.emit_quasi_quoted_element(
+                        elt,
+                        Instruction::Cons,
+                        Instruction::Append,
+                        context,
+                    )?;
+                }
+            }
+            QuasiQuotedExpression::Vector(elements, loc) => {
+                self.emit_instruction(Instruction::NilVec, expr.source_location())?;
+                for elt in elements.iter().rev() {
+                    self.emit_quasi_quoted_element(
+                        elt,
+                        Instruction::VecPush,
+                        Instruction::VecAppend,
+                        context,
+                    )?;
+                }
+            }
+            _ => todo!(),
+        }
+
+        Ok(())
+    }
+
+    fn emit_quasi_quoted_element(
+        &mut self,
+        expr: &QuasiQuotedElement,
+        cons_instr: Instruction,
+        append_instr: Instruction,
+        context: &Context,
+    ) -> Result<()> {
+        match expr {
+            QuasiQuotedElement::Quote(datum) => {
+                self.emit_lit(datum)?;
+                self.emit_instruction(cons_instr, datum.source_location())?;
+            }
+            QuasiQuotedElement::Unquote(expr, loc) => {
+                self.emit_instructions(expr, context)?;
+                self.emit_instruction(append_instr, loc)?;
+            }
+            QuasiQuotedElement::UnquoteSplicing(expr, loc) => {
+                self.emit_instructions(expr, context)?;
+                self.emit_instruction(append_instr, loc)?;
+            }
+        }
+
         Ok(())
     }
 

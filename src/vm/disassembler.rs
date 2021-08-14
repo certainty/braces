@@ -65,6 +65,12 @@ impl<T: Write> Disassembler<T> {
             &Instruction::True => self.disassemble_simple("OP_TRUE", address),
             &Instruction::False => self.disassemble_simple("OP_FALSE", address),
             &Instruction::Nil => self.disassemble_simple("OP_NIL", address),
+            &Instruction::NilVec => self.disassemble_simple("OP_NIL_VEC", address),
+            &Instruction::Cons => self.disassemble_simple("OP_CONS", address),
+            &Instruction::Append => self.disassemble_simple("OP_APPEND", address),
+            &Instruction::VecPush => self.disassemble_simple("OP_VEC_PUSH", address),
+            &Instruction::VecAppend => self.disassemble_simple("OP_VEC_APPEND", address),
+            &Instruction::Reverse => self.disassemble_simple("OP_REVERSE", address),
             &Instruction::JumpIfFalse(addr) => {
                 self.disassemble_jump("OP_JUMP_IF_FALSE", addr, address)
             }

@@ -157,6 +157,7 @@ impl<'a> Instance<'a> {
                 &Instruction::True => self.push(self.values.bool_true())?,
                 &Instruction::False => self.push(self.values.bool_false())?,
                 &Instruction::Nil => self.push(self.values.nil())?,
+                &Instruction::NilVec => self.push(self.values.vector(vec![]))?,
                 &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
 
                 &Instruction::Define(addr) => self.define_value(addr)?,
@@ -182,6 +183,11 @@ impl<'a> Instance<'a> {
                         return Ok(value);
                     }
                 }
+                &Instruction::Cons => self.cons()?,
+                &Instruction::Append => self.list_append()?,
+                &Instruction::VecPush => self.vec_push()?,
+                &Instruction::VecAppend => self.vec_append()?,
+                &Instruction::Reverse => self.list_reverse()?,
                 &Instruction::Nop => (),   // do nothing
                 &Instruction::Break => (), // reserved for future use in a debugger
                 &Instruction::Pop => {
@@ -913,6 +919,80 @@ impl<'a> Instance<'a> {
         self.frame_set_slot(addr, self.peek(0).clone());
         self.push(self.values.unspecified())?;
         Ok(())
+    }
+
+    ///////////////////////////////////////////////////////
+    // Primitive operations
+    ///////////////////////////////////////////////////////
+
+    // cons the two values on top of the stack
+    fn cons(&mut self) -> Result<()> {
+        let val = self.pop();
+        let ls = self.pop();
+
+        match ls {
+            Value::ProperList(ls) => self.push(Value::ProperList(ls.cons(val))),
+            Value::ImproperList(head, tail) => {
+                let new_head = head.cons(val);
+                self.push(Value::ImproperList(new_head, tail))
+            }
+            _ => self.push(self.values.improper_list(vec![val], ls)),
+        }
+    }
+
+    fn list_append(&mut self) -> Result<()> {
+        let rhs = self.pop();
+        let lhs = self.pop();
+
+        match (lhs, rhs) {
+            (Value::ProperList(inner_lhs), Value::ProperList(inner_rhs)) => {
+                self.push(Value::ProperList(inner_lhs.append(inner_rhs)))
+            }
+            (Value::ProperList(inner_lhs), Value::ImproperList(head_rhs, tail_rhs)) => {
+                self.push(Value::ImproperList(inner_lhs.append(head_rhs), tail_rhs))
+            }
+            (other, _) => {
+                self.runtime_error(error::argument_error(other, "Not a proper list"), None)
+            }
+        }
+    }
+
+    fn list_reverse(&mut self) -> Result<()> {
+        let ls = self.pop();
+
+        match ls {
+            Value::ProperList(inner) => self.push(Value::ProperList(inner.reverse())),
+            _ => self.runtime_error(error::argument_error(ls, "Not a list"), None),
+        }
+    }
+
+    fn vec_push(&mut self) -> Result<()> {
+        let rhs = self.pop();
+        let lhs = self.pop();
+
+        match (lhs, rhs) {
+            (Value::Vector(mut inner), other) => {
+                inner.push(other);
+                self.push(Value::Vector(inner))
+            }
+            (other, _) => self.runtime_error(error::argument_error(other, "Not a vector"), None),
+        }
+    }
+
+    fn vec_append(&mut self) -> Result<()> {
+        let rhs = self.pop();
+        let lhs = self.pop();
+
+        match (lhs, rhs) {
+            (Value::Vector(mut inner), Value::ProperList(inner_ls)) => {
+                inner.extend(inner_ls.to_vec());
+                self.push(Value::Vector(inner))
+            }
+            (Value::Vector(_), other) => {
+                self.runtime_error(error::argument_error(other, "Not a list"), None)
+            }
+            (other, _) => self.runtime_error(error::argument_error(other, "Not a vector"), None),
+        }
     }
 
     ///////////////////////////////////////////////////////

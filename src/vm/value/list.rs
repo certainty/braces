@@ -26,6 +26,54 @@ impl List {
         }
     }
 
+    pub fn to_vec(self) -> Vec<Value> {
+        match self {
+            Self::Nil => vec![],
+            Self::Cons(inner) => {
+                let mut result = Vec::with_capacity(inner.len());
+                result.extend(inner.into_iter());
+                result
+            }
+        }
+    }
+
+    pub fn reverse(&self) -> Self {
+        match self {
+            Self::Nil => Self::Nil,
+            Self::Cons(inner) => {
+                let result = inner.iter().cloned().rev().collect();
+                Self::Cons(result)
+            }
+        }
+    }
+
+    pub fn append(&self, other: Self) -> Self {
+        match (self, other) {
+            (_, Self::Nil) => self.clone(),
+            (Self::Nil, other) => other,
+            (Self::Cons(lhs), Self::Cons(rhs)) => {
+                let mut result = lhs.clone();
+                result.append(rhs);
+                Self::Cons(result)
+            }
+        }
+    }
+
+    pub fn cons(&self, value: Value) -> Self {
+        match self {
+            List::Nil => {
+                let mut v = Vector::new();
+                v.push_back(value);
+                Self::Cons(v)
+            }
+            List::Cons(inner) => {
+                let mut cloned = inner.clone();
+                cloned.push_front(value);
+                Self::Cons(cloned)
+            }
+        }
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         match self {

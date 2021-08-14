@@ -52,6 +52,33 @@ impl Writer {
 
                 format!("'({})", body.join(" "))
             }
+
+            Value::ImproperList(head, tail) => {
+                let head_elts: Vec<String> = head
+                    .iter()
+                    .map(|e| self.write_impl(&e, values, false))
+                    .collect();
+
+                if tail.is_null() {
+                    format!("'({})", head_elts.join(" "))
+                } else {
+                    format!(
+                        "'({} . {})",
+                        head_elts.join(" "),
+                        self.write_impl(tail, values, false)
+                    )
+                }
+            }
+
+            Value::Vector(elts) => {
+                let body: Vec<String> = elts
+                    .iter()
+                    .map(|e| self.write_impl(&e, values, false))
+                    .collect();
+
+                format!("'#({})", body.join(" "))
+            }
+
             Value::Unspecified => "#<unspecified>".to_string(),
         }
     }

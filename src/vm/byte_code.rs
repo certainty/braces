@@ -19,11 +19,17 @@ pub enum Instruction {
     Jump(AddressType),
     Call(usize),     // number of arguments
     TailCall(usize), // number of arguments
-    Break,           // Reserved for future use
+    Reverse,         // reverse a list
+    Cons,            // cons one element to value
+    Append,
+    VecPush, // push an element to a vector
+    VecAppend,
+    Break, // Reserved for future use
     Return,
     Nop, // do nothing
     Pop,
     Nil,
+    NilVec,
     True,
     False,
 }
