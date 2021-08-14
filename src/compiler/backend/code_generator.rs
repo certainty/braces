@@ -594,8 +594,12 @@ mod tests {
     }
 
     #[test]
-    fn test_compile_tail_call_in_let() {
-        let chunk = compile("(let ((x (foo))) (bar) (baz))");
+    fn test_compile_tail_call_in_lambda() {
+        let chunk = compile(
+            "
+          ((lambda (x) (bar) (baz)) (foo))
+         ",
+        );
 
         assert_matches!(
             &chunk.code[..],
