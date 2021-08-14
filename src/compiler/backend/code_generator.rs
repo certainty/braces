@@ -261,7 +261,6 @@ impl CodeGenerator {
             QuasiQuotedExpression::List(elements, _) => {
                 // add empty list
                 // then add instructions to add to that list
-                self.emit_instruction(Instruction::Nil, expr.source_location())?;
                 for elt in elements.iter().rev() {
                     self.emit_quasi_quoted_element(
                         elt,
@@ -270,6 +269,7 @@ impl CodeGenerator {
                         context,
                     )?;
                 }
+                self.emit_instruction(Instruction::Nil, expr.source_location())?;
             }
             QuasiQuotedExpression::Vector(elements, loc) => {
                 self.emit_instruction(Instruction::NilVec, expr.source_location())?;
@@ -302,7 +302,7 @@ impl CodeGenerator {
             }
             QuasiQuotedElement::Unquote(expr, loc) => {
                 self.emit_instructions(expr, context)?;
-                self.emit_instruction(append_instr, loc)?;
+                self.emit_instruction(cons_instr, loc)?;
             }
             QuasiQuotedElement::UnquoteSplicing(expr, loc) => {
                 self.emit_instructions(expr, context)?;

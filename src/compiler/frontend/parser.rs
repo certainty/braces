@@ -112,7 +112,7 @@ pub fn parse(datum: Datum, ctx: &mut ParserContext) -> Result<Expression> {
     parse_core(expanded, ctx)
 }
 
-fn parse_core(datum: Datum, ctx: &mut ParserContext) -> Result<Expression> {
+pub fn parse_core(datum: Datum, ctx: &mut ParserContext) -> Result<Expression> {
     match datum.sexp() {
         Sexp::List(ls) => match &ls[..] {
             [operator, _operands @ ..] if operator.is_symbol() => {
@@ -147,11 +147,12 @@ fn exparse_special(
     match special_form {
         Special::Define => expression::define::parse(&datum, ctx).res(),
         Special::Quote => expression::quotation::parse(&datum, ctx).res(),
+        Special::QuasiQuote => expression::quotation::parse(&datum, ctx).res(),
         Special::Lambda => expression::lambda::parse(&datum, ctx).res(),
         Special::Set => expression::assignment::parse(&datum, ctx).res(),
         Special::Begin => expression::sequence::parse(&datum, ctx).res(),
         Special::If => expression::conditional::parse(&datum, ctx).res(),
-        _ => return Error::parser_bug("Unexpected special form"),
+        _ => return Error::parser_bug(&format!("Unexpected special form: {:?}", special_form)),
     }
 }
 

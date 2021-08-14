@@ -2,6 +2,7 @@ use super::Error;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
+use crate::compiler::frontend;
 use crate::compiler::frontend::parser::syntax::environment::{
     Denotation, Special, SyntacticContext,
 };
@@ -88,11 +89,14 @@ pub fn parse(datum: &Datum, ctx: &mut ParserContext) -> ParseResult<Expression> 
                         datum.source_location().clone(),
                     )
                     .into(),
-                    _ => Error::parse_error(
-                        "Expected (quote <datum>) or (quasi-quote <datum>)",
-                        datum.source_location().clone(),
-                    )
-                    .into(),
+                    other => {
+                        println!("OTHER: {:?}", other);
+                        Error::parse_error(
+                            "Expected (quote <datum>) or (quasi-quote <datum>)",
+                            datum.source_location().clone(),
+                        )
+                        .into()
+                    }
                 },
                 Err(_) => Error::parse_error(
                     "Expected quoted expression",
@@ -166,6 +170,8 @@ fn parse_quasi_quoted_element(
     element: &Datum,
     ctx: &mut ParserContext,
 ) -> Result<QuasiQuotedElement> {
+    println!("Parsing quasi-quoted element: {:?}", element.sexp());
+
     match element.list_slice() {
         Some([operator, operand]) if operator.is_symbol() => match ctx.denotation_of(operator)? {
             Denotation::Special(Special::QuasiQuote) => Error::parse_error(
@@ -177,8 +183,12 @@ fn parse_quasi_quoted_element(
                 element.source_location().clone(),
             )),
             Denotation::Special(Special::UnquoteSplicing) => {
+                println!("Found unquote splicing");
+                println!("Parsing operand: {:?}", operand.sexp());
+                let parsed_operand = frontend::parser::parse_core(operand.clone(), ctx)?;
+                println!("Parsing of operand successful");
                 Ok(QuasiQuotedElement::UnquoteSplicing(
-                    Box::new(Expression::parse(&operand, ctx)?),
+                    Box::new(parsed_operand),
                     element.source_location().clone(),
                 ))
             }

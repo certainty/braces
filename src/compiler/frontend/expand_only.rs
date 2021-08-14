@@ -82,13 +82,6 @@ impl Expander {
                         Special::LetSyntax => todo!(),
                         Special::LetrecSyntax => todo!(),
                         Special::Quote => Ok(datum.clone()), // already expanded in phase 0
-                        Special::QuasiQuote => {
-                            Error::bug("Unexpected quasi-quote in macro-expansion")
-                        }
-                        Special::Unquote => Error::bug("Unexpected unquote in macro-expansion"),
-                        Special::UnquoteSplicing => {
-                            Error::bug("Unexpected unquote-splicing in macro-expansion")
-                        }
                         _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                     },
                     Denotation::Macro(transformer) => self.expand_macro(&datum, &transformer),
