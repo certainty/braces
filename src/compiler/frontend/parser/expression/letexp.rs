@@ -70,7 +70,7 @@ pub fn build_let(
 
 #[inline]
 pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_let(datum).map(Expression::Let)
+    todo!()
 }
 
 pub fn parse_let(datum: &Datum) -> ParseResult<LetExpression> {
@@ -127,6 +127,7 @@ fn parse_binding_spec(datum: &Datum) -> Result<BindingSpec> {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,3 +149,4 @@ mod tests {
         )
     }
 }
+*/

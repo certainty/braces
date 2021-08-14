@@ -25,7 +25,6 @@ use define::DefinitionExpression;
 use error::Error;
 use identifier::Identifier;
 use lambda::LambdaExpression;
-use letexp::{BindingSpec, LetExpression};
 use literal::LiteralExpression;
 use sequence::BeginExpression;
 
@@ -260,15 +259,6 @@ impl Expression {
         BodyExpression::from(self)
     }
 
-    /// Create and expression for core-let
-    pub fn let_bind(
-        bindings: Vec<BindingSpec>,
-        body: BodyExpression,
-        loc: SourceLocation,
-    ) -> Expression {
-        Expression::Let(letexp::build_let(bindings, body, loc))
-    }
-
     /// Parse a single datum into an expression
     ///
     ///
@@ -303,9 +293,7 @@ impl Expression {
     }
 
     fn parse_derived(datum: &Datum) -> ParseResult<Expression> {
-        letexp::parse(datum)
-            .or(|| sequence::parse(datum))
-            .or(|| define::parse(datum))
+        sequence::parse(datum).or(|| define::parse(datum))
     }
 
     pub fn parse_apply_special<'a, T, F>(
