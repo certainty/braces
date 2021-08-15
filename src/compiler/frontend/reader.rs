@@ -1,14 +1,14 @@
 pub mod sexp;
 pub mod error;
+use crate::compiler::frontend;
+
 use nom::branch::alt;
 use nom::combinator::value;
-use nom::error::{context, VerboseError};
+use nom::error::{context, Error};
 use nom::IResult;
 use nom::multi::many1;
 use nom::sequence::preceded;
 use nom_locate::{LocatedSpan, position};
-
-use error::ReadError;
 use sexp::{
     abbreviation,
     boolean,
@@ -25,7 +25,6 @@ use sexp::{
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
 
-
 // See https://matklad.github.io/2018/06/06/modern-parser-generator.html for error recovery strategies
 
 // TODO: Better error reporting strategy
@@ -35,31 +34,19 @@ use crate::compiler::source_location::SourceLocation;
 // type and not `VerboseError`
 
 /// Parser definition
-pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
+pub type Result<T> = std::result::Result<T, error::Error>;
 
-type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
-
-pub type Result<T> = std::result::Result<T, ReadError>;
-
-pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Datum> {
-    let source_type = source.source_type();
-    let mut source_str = String::new();
-    source.read_to_string(&mut source_str)?;
-    let input = Input::new_extra(&source_str, source_type);
-    let (_, datum) = parse_datum(input)?;
-
-    Ok(datum)
-}
-
-pub fn parse_sequence<'a, T: Source>(source: &'a mut T) -> Result<Vec<Datum>> {
+pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Vec<Datum>> {
     let source_type = source.source_type();
     let mut source_str = String::new();
     source.read_to_string(&mut source_str)?;
     let input = Input::new_extra(&source_str, source_type);
     let (_rest, datum) = context("program", many1(parse_datum))(input)?;
-
     Ok(datum)
 }
+
+pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
+type ParseResult<'a, T> = IResult<Input<'a>, T, Error<Input<'a>>>;
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let datum = context("datum", alt((parse_simple_datum, parse_compound_datum)));
@@ -109,11 +96,10 @@ where
         Ok((s, datum))
     }
 }
-
 fn location<'a>(input: Input<'a>) -> SourceLocation {
     input
         .extra
-        .location(input.location_line() as usize, input.get_column())
+        .location(input.location_offset()..input.fragment().len())
 }
 
 #[inline]
@@ -150,11 +136,11 @@ mod tests {
         assert!(parsed.is_err(), "expected  parse error")
     }
 
-    pub fn location(line: usize, col: usize) -> SourceLocation {
-        SourceType::Buffer("datum-parser-test".to_string()).location(line, col)
+    pub fn location(span: std::ops::Range<usize>) -> SourceLocation {
+        SourceType::Buffer("datum-parser-test".to_string()).location(span)
     }
 
-    pub fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
-        Datum::new(sexp, location(line, col))
+    pub fn make_datum(sexp: Sexp, span: std::ops::Range<uszie>) -> Datum {
+        Datum::new(sexp, location(span))
     }
 }

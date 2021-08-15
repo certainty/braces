@@ -1,18 +1,17 @@
 use super::source::SourceType;
+use std::ops::Range;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct SourceLocation {
-    pub line: usize,
-    pub column: usize,
     pub source_type: SourceType,
+    pub span: Range<usize>,
 }
 
 impl SourceLocation {
-    pub fn new(source_type: SourceType, line: usize, column: usize) -> Self {
+    pub fn new(source_type: SourceType, span: Range<usize>) -> Self {
         SourceLocation {
-            line,
-            column,
             source_type,
+            span
         }
     }
 }

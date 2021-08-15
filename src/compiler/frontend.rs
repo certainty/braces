@@ -1,3 +1,4 @@
 pub mod parser;
-pub mod expression;
-pub mod reader;
+pub(crate) mod expression;
+pub(crate) mod reader;
+mod error;

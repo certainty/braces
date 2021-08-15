@@ -1,60 +1,39 @@
 use nom::Err;
-use nom::error::{VerboseError, VerboseErrorKind};
+use nom::error::{Error, ErrorKind};
 use thiserror::Error;
-
+use crate::compiler::frontend::error;
 use crate::compiler::frontend::reader::Input;
 use crate::compiler::source_location::SourceLocation;
 
-type NomError<'a> = VerboseError<Input<'a>>;
+type NomError<'a> = Error<Input<'a>>;
 
-#[derive(Debug, Clone)]
-pub struct ParserErrorDetail {
-    pub context: String,
-    pub span: String,
-    pub location: SourceLocation,
-}
-
-impl<'a> From<&(Input<'a>, VerboseErrorKind)> for ParserErrorDetail {
-    fn from(e: &(Input<'a>, VerboseErrorKind)) -> ParserErrorDetail {
+impl<'a> From<&(Input<'a>, ErrorKind)> for error::Detail {
+    fn from(e: &(Input<'a>, ErrorKind)) -> error::Detail {
         let (input, kind) = e;
-        let context = match kind {
-            VerboseErrorKind::Context(ctx) => ctx.to_string(),
-            VerboseErrorKind::Char(c) => format!("expected {}", c),
-            VerboseErrorKind::Nom(k) => format!("while parsing {:?}", k),
+        let _context = match kind {
+            ErrorKind::Context(ctx) => ctx.to_string(),
+            ErrorKind::Nom(k) => format!("while parsing {:?}", k),
         };
-        let span = input.fragment().to_string();
+        let content = input.fragment().len();
+        let span = input.location_offset() .. input.fragment().to_string().len();
         let location = SourceLocation::new(
             input.extra.clone(),
-            input.location_line() as usize,
-            input.get_column() as usize,
-        );
-
-        ParserErrorDetail {
-            context,
             span,
-            location,
-        }
+        );
+        error::Detail::new(content,  location)
     }
 }
 
-#[derive(Error, Debug)]
-pub enum ReadError {
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-    #[error("ReadError: {}", 0)]
-    ReadError(Vec<ParserErrorDetail>),
-    #[error("Incomplete Input")]
-    IncompleteInput,
-}
-
-impl<'a> From<Err<NomError<'a>>> for ReadError {
-    fn from(e: Err<NomError<'a>>) -> ReadError {
+impl<'a> From<Err<NomError<'a>>> for error::Error {
+    fn from(e: Err<NomError<'a>>) -> error::Error {
         match e {
-            Err::Incomplete(_) => ReadError::IncompleteInput,
+            Err::Incomplete(_) => error::Error::incomplete_input("incomplete input while reading source file", None),
             Err::Failure(e) => {
-                ReadError::ReadError(e.errors.iter().map(|elt| elt.into()).collect())
+                error::Error::read_error("Fatal error while reading input", e.code.into())
             }
-            Err::Error(e) => ReadError::ReadError(e.errors.iter().map(|elt| elt.into()).collect()),
+            Err::Error(e) => {
+                error::Error::read_error("Error while reading input", e.code.into())
+            },
         }
     }
 }

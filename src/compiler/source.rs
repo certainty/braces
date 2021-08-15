@@ -12,8 +12,8 @@ pub enum SourceType {
 }
 
 impl SourceType {
-    pub fn location(&self, line: usize, col: usize) -> SourceLocation {
-        SourceLocation::new(self.clone(), line, col)
+    pub fn location(&self, span: std::ops::Range<usize>) -> SourceLocation {
+        SourceLocation::new(self.clone(), span)
     }
 }
 
@@ -21,8 +21,8 @@ pub trait Source {
     fn source_type(&self) -> SourceType;
     fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<()>;
 
-    fn location(&self, line: usize, col: usize) -> SourceLocation {
-        SourceLocation::new(self.source_type(), line, col)
+    fn location(&self, span: std::ops::Range<usize>) -> SourceLocation {
+        SourceLocation::new(self.source_type(), span)
     }
 }
 
