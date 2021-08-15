@@ -1,8 +1,9 @@
-use super::Input;
-use crate::compiler::source_location::SourceLocation;
-use nom::error::{VerboseError, VerboseErrorKind};
 use nom::Err;
+use nom::error::{VerboseError, VerboseErrorKind};
 use thiserror::Error;
+
+use crate::compiler::frontend::reader::Input;
+use crate::compiler::source_location::SourceLocation;
 
 type NomError<'a> = VerboseError<Input<'a>>;
 

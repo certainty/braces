@@ -1,26 +1,30 @@
-mod abbreviation;
-mod boolean;
-mod character;
-pub mod datum;
+pub mod sexp;
 pub mod error;
-mod list;
-mod number;
-mod string;
-pub mod symbol;
-mod whitespace;
-
-use crate::compiler::source::{Source, SourceType};
-use crate::compiler::source_location::SourceLocation;
-use datum::Datum;
-use datum::Sexp;
-use error::ReadError;
 use nom::branch::alt;
 use nom::combinator::value;
 use nom::error::{context, VerboseError};
+use nom::IResult;
 use nom::multi::many1;
 use nom::sequence::preceded;
-use nom::IResult;
-use nom_locate::{position, LocatedSpan};
+use nom_locate::{LocatedSpan, position};
+
+use error::ReadError;
+use sexp::{
+    abbreviation,
+    boolean,
+    character,
+    datum::Datum,
+    datum::Sexp,
+    list,
+    number,
+    string,
+    symbol,
+    whitespace
+};
+
+use crate::compiler::source::{Source, SourceType};
+use crate::compiler::source_location::SourceLocation;
+
 
 // See https://matklad.github.io/2018/06/06/modern-parser-generator.html for error recovery strategies
 
@@ -32,6 +36,7 @@ use nom_locate::{position, LocatedSpan};
 
 /// Parser definition
 pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
+
 type ParseResult<'a, T> = IResult<Input<'a>, T, VerboseError<Input<'a>>>;
 
 pub type Result<T> = std::result::Result<T, ReadError>;
@@ -121,8 +126,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::source::StringSource;
+
+    use super::*;
 
     pub fn assert_parse_as(inp: &str, expected: Sexp) {
         let datum = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();

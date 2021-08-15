@@ -1,4 +1,4 @@
-use crate::compiler::frontend::parser::sexp;
+use crate::compiler::frontend::reader;
 use crate::vm::value::number::fixnum::Fixnum;
 use crate::vm::value::number::flonum::Flonum;
 use crate::vm::value::number::{real::RealNumber, Number, SchemeNumber};
@@ -19,7 +19,7 @@ pub struct Writer {
 
 impl Writer {
     pub fn new() -> Self {
-        let special_initial: HashSet<char> = String::from(sexp::symbol::SYMBOL_SPECIAL_INITIAL)
+        let special_initial: HashSet<char> = String::from(reader::sexp::symbol::SYMBOL_SPECIAL_INITIAL)
             .chars()
             .collect();
         Writer {
@@ -207,7 +207,7 @@ impl Writer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp;
+    use crate::compiler::frontend::reader;
     use crate::compiler::source::StringSource;
     use crate::vm::value::arbitrary::SymbolString;
     use crate::vm::value::Value;
@@ -315,11 +315,11 @@ mod tests {
         read_my_write(&sym, &mut values).is_ok()
     }
 
-    fn read_my_write(val: &Value, values: &mut Factory) -> sexp::Result<Value> {
+    fn read_my_write(val: &Value, values: &mut Factory) -> reader::Result<Value> {
         let writer = Writer::new();
         let external = writer.write(&val, &values);
         let mut source = StringSource::new(&external, "");
 
-        sexp::parse(&mut source).map(|e| values.from_datum(&e))
+        reader::parse(&mut source).map(|e| values.from_datum(&e))
     }
 }

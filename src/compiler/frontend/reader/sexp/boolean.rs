@@ -1,12 +1,13 @@
-use super::datum::Datum;
-use super::datum::Sexp;
-use super::map_datum;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::value;
 
-use super::Input;
-use super::ParseResult;
+use super::datum::{Sexp, Datum};
+use crate::compiler::frontend::reader::{
+    Input,
+    ParseResult,
+    map_datum,
+};
 
 /// Boolean parser
 ///

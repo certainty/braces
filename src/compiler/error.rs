@@ -1,5 +1,5 @@
-use super::frontend::parser::expression;
-use super::frontend::parser::sexp::error::ReadError;
+use crate::compiler::frontend::expression;
+use crate::compiler::frontend::reader::error::ReadError;
 use super::source::SourceType;
 use super::source_location::SourceLocation;
 

@@ -1,7 +1,3 @@
-use super::datum::Datum;
-use super::datum::Sexp;
-use super::whitespace::{consume_line_ending, parse_intra_line_ws};
-use super::{character::parse_inline_hex_escape, character::parse_mnemonic_escape, map_datum};
 use nom::branch::alt;
 use nom::bytes::complete::is_not;
 use nom::character::complete::char;
@@ -10,8 +6,15 @@ use nom::error::{context, ErrorKind, ParseError, VerboseError};
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{delimited, preceded, terminated};
 
-use super::Input;
-use super::ParseResult;
+use crate::compiler::frontend::reader::{
+    character::{parse_inline_hex_escape, parse_mnemonic_escape},
+    Input,
+    map_datum,
+    ParseResult,
+    whitespace::{consume_line_ending, parse_intra_line_ws}
+};
+
+use super::datum::{Datum, Sexp};
 
 //////////////////////////////
 // String parser
@@ -90,8 +93,9 @@ fn parse_string_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::sexp::tests::*;
+
+    use super::*;
 
     #[test]
     fn test_read_string() {

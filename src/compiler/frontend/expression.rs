@@ -1,3 +1,21 @@
+use std::iter::FromIterator;
+
+use apply::ApplicationExpression;
+use body::BodyExpression;
+use define::DefinitionExpression;
+use error::Error;
+use identifier::Identifier;
+use lambda::LambdaExpression;
+use literal::LiteralExpression;
+use sequence::BeginExpression;
+
+use crate::compiler::frontend::parser::Parser;
+use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::source::Source;
+use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+
+use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
+
 pub mod apply;
 pub mod assignment;
 pub mod body;
@@ -9,23 +27,6 @@ pub mod lambda;
 pub mod literal;
 pub mod quotation;
 pub mod sequence;
-use std::iter::FromIterator;
-
-use self::{assignment::SetExpression, conditional::IfExpression, quotation::QuotationExpression};
-use crate::compiler::frontend::parser::{
-    sexp::datum::{Datum, Sexp},
-    Parser,
-};
-use crate::compiler::source::Source;
-use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
-use apply::ApplicationExpression;
-use body::BodyExpression;
-use define::DefinitionExpression;
-use error::Error;
-use identifier::Identifier;
-use lambda::LambdaExpression;
-use literal::LiteralExpression;
-use sequence::BeginExpression;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -328,8 +329,9 @@ impl Expression {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::source::{SourceType, StringSource};
+
+    use super::*;
 
     #[test]
     fn test_parse_result_collect_err() {

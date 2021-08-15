@@ -1,14 +1,15 @@
-use super::datum::Datum;
-use super::datum::Sexp;
-use super::{map_datum, parse_datum};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
 use nom::combinator::value;
 use nom::sequence::pair;
-
-use super::Input;
-use super::ParseResult;
+use super::datum::{Sexp, Datum};
+use crate::compiler::frontend::reader::{
+    Input,
+    ParseResult,
+    map_datum,
+    parse_datum
+};
 
 ////////////////////////////
 // abbreviation

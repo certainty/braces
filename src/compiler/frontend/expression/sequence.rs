@@ -3,7 +3,7 @@ use super::error::Error;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
-use crate::compiler::frontend::parser::sexp::datum::Datum;
+use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -60,7 +60,7 @@ pub fn parse_command_or_definition(datum: &Datum) -> ParseResult<Expression> {
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::expression::tests::*;
-    use crate::compiler::frontend::parser::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::datum::Sexp;
 
     #[test]
     fn test_parse_begin() {

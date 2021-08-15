@@ -17,3 +17,5 @@ history.txt
 r7rs.pdf
 .DS_*
 .#*
+.idea
+*.iml

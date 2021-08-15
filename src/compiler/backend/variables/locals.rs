@@ -1,5 +1,5 @@
 use crate::compiler::backend::code_generator::{Error, Result};
-use crate::compiler::frontend::parser::expression::identifier::Identifier;
+use crate::compiler::frontend::expression::identifier::Identifier;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Local {

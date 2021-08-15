@@ -5,7 +5,7 @@ use super::Expression;
 use super::ParseResult;
 use super::Result;
 use super::{body, lambda};
-use crate::compiler::frontend::parser::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -107,7 +107,7 @@ fn parse_procedure_definition(definition: &Datum, body: &[Datum]) -> Result<Defi
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::expression::tests::*;
-    use crate::compiler::frontend::parser::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::datum::Sexp;
 
     #[test]
     fn test_parse_define() {

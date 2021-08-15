@@ -4,7 +4,7 @@ use super::identifier::Identifier;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
-use crate::compiler::frontend::parser::sexp::datum::Datum;
+use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -58,7 +58,7 @@ pub fn do_parse_set(_op: &str, operands: &[Datum], loc: &SourceLocation) -> Resu
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::expression::tests::*;
-    use crate::compiler::frontend::parser::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::datum::Sexp;
 
     #[test]
     fn test_parse_assignment() {

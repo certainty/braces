@@ -1,8 +1,3 @@
-use super::datum::Datum;
-use super::datum::Sexp;
-use super::map_datum;
-use crate::vm::value::number::rational::Rational;
-use crate::vm::value::number::{flonum::Flonum, real::RealNumber, Exactness, SchemeNumber, Sign};
 use az::CheckedAs;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -12,9 +7,17 @@ use nom::combinator::{map, opt, value};
 use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
+use crate::compiler::frontend::reader::{
+    Input,
+    map_datum,
+    ParseResult,
+};
 
-use super::Input;
-use super::ParseResult;
+use super::datum::{Datum, Sexp};
+
+use crate::vm::value::number::{Exactness, flonum::Flonum, real::RealNumber, SchemeNumber, Sign};
+use crate::vm::value::number::rational::Rational;
+
 
 // Parse numbers
 // R7RS 7.1.2
@@ -284,9 +287,10 @@ pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Sign> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::sexp::tests::*;
     use crate::vm::value::number::Number;
+
+    use super::*;
 
     #[test]
     fn parse_integer_10() {

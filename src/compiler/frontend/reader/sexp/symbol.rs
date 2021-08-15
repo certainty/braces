@@ -1,14 +1,18 @@
-use super::datum::Datum;
-use super::datum::Sexp;
-use super::Input;
-use super::ParseResult;
-use super::{character::parse_inline_hex_escape, character::parse_mnemonic_escape, map_datum};
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag};
 use nom::character::complete::{anychar, char, one_of};
 use nom::combinator::{map, value, verify};
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{delimited, pair, tuple};
+
+use crate::compiler::frontend::reader::{
+    character::{parse_inline_hex_escape, parse_mnemonic_escape},
+    Input,
+    map_datum,
+    ParseResult,
+};
+
+use super::datum::{Datum, Sexp};
 
 //////////////////////////////////////////
 // Identifier / Symbol
@@ -162,8 +166,9 @@ fn parse_explicit_sign<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::sexp::tests::*;
+
+    use super::*;
 
     #[test]
     fn test_read_symbol() {

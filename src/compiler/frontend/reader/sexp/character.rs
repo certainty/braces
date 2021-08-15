@@ -1,6 +1,3 @@
-use super::datum::Datum;
-use super::datum::Sexp;
-use super::map_datum;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::bytes::complete::take_while_m_n;
@@ -9,8 +6,13 @@ use nom::combinator::{map_opt, map_res, value};
 use nom::error::context;
 use nom::sequence::{delimited, preceded};
 
-use super::Input;
-use super::ParseResult;
+use super::datum::{Sexp, Datum};
+use crate::compiler::frontend::reader::{
+    Input,
+    ParseResult,
+    map_datum,
+};
+
 
 /// Character parser
 pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {

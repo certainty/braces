@@ -15,35 +15,36 @@
 // of execution since it allows to easily activate individual procedures without having to do extensive
 // computation of addresses.
 
-use crate::vm::value::closure::Closure;
-use crate::vm::value::procedure::Arity;
+use thiserror::Error;
 
-use super::variables::{Variables, VariablesRef};
-use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
-use crate::compiler::frontend::parser::expression::Expression;
-use crate::compiler::frontend::parser::expression::{
+use crate::{
+    vm::byte_code::chunk::AddressType,
+};
+use crate::compiler::CompilationUnit;
+use crate::compiler::frontend::expression::{
     apply::ApplicationExpression, assignment::SetExpression,
 };
-use crate::compiler::frontend::parser::expression::{
+use crate::compiler::frontend::expression::{
     body::BodyExpression, sequence::BeginExpression,
 };
-use crate::compiler::frontend::parser::expression::{
+use crate::compiler::frontend::expression::{
     conditional::IfExpression, define::DefinitionExpression,
 };
-use crate::compiler::frontend::parser::sexp::datum;
+use crate::compiler::frontend::expression::Expression;
+use crate::compiler::frontend::expression::identifier::Identifier;
+use crate::compiler::frontend::expression::lambda::{Formals, LambdaExpression};
+use crate::compiler::frontend::reader::sexp::datum;
 use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
-use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
 use crate::vm::disassembler::Disassembler;
 use crate::vm::value;
+use crate::vm::value::closure::Closure;
+use crate::vm::value::procedure::Arity;
 use crate::vm::value::Value;
-use crate::{
-    compiler::frontend::parser::expression::identifier::Identifier,
-    vm::byte_code::chunk::AddressType,
-};
-use thiserror::Error;
+
+use super::variables::{Variables, VariablesRef};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -516,11 +517,13 @@ impl CodeGenerator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::compiler::source::StringSource;
-    use crate::compiler::Compiler;
-    use crate::vm::value::procedure::native;
     use std::rc::Rc;
+
+    use crate::compiler::Compiler;
+    use crate::compiler::source::StringSource;
+    use crate::vm::value::procedure::native;
+
+    use super::*;
 
     // Test tail context and tail calls
     // R7RS Section 3.5

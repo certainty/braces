@@ -1,11 +1,11 @@
-use crate::compiler::frontend::parser::sexp;
+use crate::compiler::frontend::reader;
 use crate::compiler::source_location::SourceLocation;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    ReadError(#[from] sexp::error::ReadError),
+    ReadError(#[from] reader::error::ReadError),
     #[error("ParseError")]
     ParseError(String, SourceLocation),
     #[error("DomainError")]

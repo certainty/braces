@@ -1,9 +1,8 @@
-pub mod expression;
-pub mod sexp;
+use crate::compiler::frontend::{expression, reader};
+use crate::compiler::frontend::expression::error::Error;
+use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::reader::error::ReadError;
 use crate::compiler::source::Source;
-use expression::error::Error;
-use sexp::datum::Datum;
-use sexp::error::ReadError;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -11,14 +10,14 @@ pub struct Parser;
 
 impl Parser {
     pub fn parse_datum<T: Source>(&self, source: &mut T) -> std::result::Result<Datum, ReadError> {
-        sexp::parse(source)
+        reader::parse(source)
     }
 
     pub fn parse_datum_sequence<T: Source>(
         &self,
         source: &mut T,
     ) -> std::result::Result<Vec<Datum>, ReadError> {
-        sexp::parse_sequence(source)
+        reader::parse_sequence(source)
     }
 
     pub fn parse_program<T: Source>(&self, source: &mut T) -> Result<Vec<expression::Expression>> {
