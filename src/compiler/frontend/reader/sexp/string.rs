@@ -8,10 +8,9 @@ use nom::sequence::{delimited, preceded, terminated};
 
 use crate::compiler::frontend::reader::{
     character::{parse_inline_hex_escape, parse_mnemonic_escape},
-    Input,
     map_datum,
-    ParseResult,
-    whitespace::{consume_line_ending, parse_intra_line_ws}
+    whitespace::{consume_line_ending, parse_intra_line_ws},
+    Input, ParseResult,
 };
 
 use super::datum::{Datum, Sexp};
@@ -82,7 +81,7 @@ fn parse_string_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
     let (s, v) = is_not("\\\"")(input)?;
 
     if v.fragment().is_empty() {
-        Err(nom::Err::Error(VerboseError::from_error_kind(
+        Err(nom::Err::Error(nom::error::Error::from_error_kind(
             s,
             ErrorKind::Verify,
         )))
@@ -93,7 +92,7 @@ fn parse_string_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::tests::*;
 
     use super::*;
 

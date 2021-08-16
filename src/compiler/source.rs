@@ -1,17 +1,31 @@
 use super::source_location::SourceLocation;
+use codespan_reporting::files;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
 use std::path;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum SourceType {
     Synthetic,
     Buffer(String),
-    File(path::PathBuf),
+    File(std::path::PathBuf),
 }
 
-impl SourceType {
+impl std::fmt::Display for SourceType {
+    fn fmt(
+        &self,
+        formatter: &mut std::fmt::Formatter<'_>,
+    ) -> std::result::Result<(), std::fmt::Error> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[repr(transparent)]
+pub struct SourceId(u64);
+
+impl SourceId {
     pub fn location(&self, span: std::ops::Range<usize>) -> SourceLocation {
         SourceLocation::new(self.clone(), span)
     }
@@ -20,9 +34,28 @@ impl SourceType {
 pub trait Source {
     fn source_type(&self) -> SourceType;
     fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<()>;
+}
 
-    fn location(&self, span: std::ops::Range<usize>) -> SourceLocation {
-        SourceLocation::new(self.source_type(), span)
+pub struct Registry {
+    sources: files::SimpleFiles<SourceType, String>,
+}
+
+impl Registry {
+    pub fn new() -> Self {
+        Self {
+            sources: files::SimpleFiles::new(),
+        }
+    }
+
+    pub fn add(&mut self, s: impl Source) -> std::io::Result<SourceId> {
+        let mut out = String::new();
+        s.read_to_string(&mut out)?;
+        let handle = self.sources.add(s.source_type(), out);
+        Ok(SourceId(handle))
+    }
+
+    pub fn sources(&self) -> &files::SimpleFiles<SourceType, String> {
+        &self.sources
     }
 }
 

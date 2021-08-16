@@ -24,7 +24,7 @@ impl Identifier {
         }
     }
     pub fn synthetic(s: &str) -> Identifier {
-        Self::new(s, SourceType::Synthetic.location(0, 0))
+        Self::new(s, SourceType::Synthetic.location(0..0))
     }
 
     pub fn string(&self) -> &String {
@@ -58,7 +58,7 @@ pub fn parse_identifier(datum: &Datum) -> ParseResult<Identifier> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::expression::tests::*;
+    use crate::compiler::frontend::expression::tests::*;
 
     #[test]
     fn test_identifier_equals() {

@@ -1,18 +1,15 @@
-use super::source::SourceType;
+use super::source::SourceId;
 use std::ops::Range;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct SourceLocation {
-    pub source_type: SourceType,
+    pub id: SourceId,
     pub span: Range<usize>,
 }
 
 impl SourceLocation {
-    pub fn new(source_type: SourceType, span: Range<usize>) -> Self {
-        SourceLocation {
-            source_type,
-            span
-        }
+    pub fn new(id: SourceId, span: Range<usize>) -> Self {
+        SourceLocation { id, span }
     }
 }
 

@@ -1,45 +1,33 @@
-pub mod sexp;
 pub mod error;
+pub mod sexp;
 use crate::compiler::frontend;
 
 use nom::branch::alt;
 use nom::combinator::value;
 use nom::error::{context, Error};
-use nom::IResult;
 use nom::multi::many1;
 use nom::sequence::preceded;
-use nom_locate::{LocatedSpan, position};
+use nom::IResult;
+use nom_locate::{position, LocatedSpan};
 use sexp::{
-    abbreviation,
-    boolean,
-    character,
-    datum::Datum,
-    datum::Sexp,
-    list,
-    number,
-    string,
-    symbol,
-    whitespace
+    abbreviation, boolean, character, datum::Datum, datum::Sexp, list, number, string, symbol,
+    whitespace,
 };
 
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
 
-// See https://matklad.github.io/2018/06/06/modern-parser-generator.html for error recovery strategies
-
-// TODO: Better error reporting strategy
-// Every parser that returns a datum is a good candidate to be on a boundary
-// for better errors. We should create a meaningful error if these parser fail
-// and give enough context to be useful for the user. This requires a custom error
-// type and not `VerboseError`
-
-/// Parser definition
-pub type Result<T> = std::result::Result<T, error::Error>;
-
-pub fn parse<'a, T: Source>(source: &'a mut T) -> Result<Vec<Datum>> {
+pub fn parse<'a, T: Source>(
+    source: &'a mut T,
+) -> std::result::Result<Vec<Datum>, frontend::error::Error> {
     let source_type = source.source_type();
     let mut source_str = String::new();
-    source.read_to_string(&mut source_str)?;
+    if let Err(ioError) = source.read_to_string(&mut source_str) {
+        return Err(frontend::error::Error::io_error(
+            "Couldn't read source",
+            ioError,
+        ));
+    }
     let input = Input::new_extra(&source_str, source_type);
     let (_rest, datum) = context("program", many1(parse_datum))(input)?;
     Ok(datum)

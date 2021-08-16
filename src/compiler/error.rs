@@ -1,69 +1,74 @@
-use crate::compiler::frontend::expression;
-use crate::compiler::frontend::reader::error::ReadError;
-use super::source::SourceType;
-use super::source_location::SourceLocation;
+use super::source::{Registry, SourceId, SourceType};
+use crate::compiler::frontend;
+use crate::compiler::frontend::error::Detail;
+use codespan_reporting::diagnostic::{Diagnostic, Label};
+use codespan_reporting::term;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
-pub trait UserMessage {
-    fn print_user_friendly_message(&self);
+#[derive(Debug)]
+pub enum Error {
+    FrontendError(frontend::error::Error),
 }
 
-impl UserMessage for ReadError {
-    fn print_user_friendly_message(&self) {
-        match self {
-            ReadError::IncompleteInput => eprintln!("ReadError: unexpected end of input"),
-            ReadError::IoError(e) => eprintln!("ReadError: error during read caused by: {}", e),
-            ReadError::ReadError(details) => {
-                eprintln!("ReadError: error while parsing the next datum");
-                if let Some(detail) = details.first() {
-                    eprintln!(
-                        "--> {} in context: {}",
-                        source_location_string(&detail.location),
-                        detail.context
-                    );
-                    eprintln!("   |");
-                    eprintln!("   |");
-                    eprintln!("{}  |         {}", detail.location.line, detail.span);
-                    eprintln!("   |\n");
-                }
-            }
+impl Error {
+    pub fn print(registry: &Registry, e: Error) {
+        let writer = StandardStream::stderr(ColorChoice::Always);
+        let config = codespan_reporting::term::Config::default();
+
+        term::emit(
+            &mut writer.lock(),
+            &config,
+            &registry.sources(),
+            &Self::diagnostic(e),
+        )
+        .unwrap();
+    }
+
+    pub fn diagnostic(e: Error) -> Diagnostic<SourceId> {
+        match e {
+            Error::FrontendError(fe) => Self::frontend_diagnostic(fe),
         }
     }
-}
 
-impl UserMessage for expression::error::Error {
-    fn print_user_friendly_message(&self) {
-        match self {
-            expression::error::Error::ReadError(e) => e.print_user_friendly_message(),
-            expression::error::Error::ParseError(message, location) => {
-                eprintln!("ParseError: {}", message);
-                eprintln!("--> {} ", source_location_string(location))
+    fn frontend_diagnostic(e: frontend::error::Error) -> Diagnostic<SourceId> {
+        use frontend::error::Error::*;
+
+        match e {
+            IoError(message, source_id, underlying) => Diagnostic::error()
+                .with_code("E001")
+                .with_message("failure while reading input")
+                .with_notes(vec![message]),
+            IncompleteInput(message, source) => Diagnostic::error()
+                .with_code("E010")
+                .with_message("unexpected end of input")
+                .with_notes(vec![message]),
+            ReadError(message, detail, more_details) => {
+                let mut labels =
+                    vec![Label::primary(detail.location.id, detail.location.span)
+                        .with_message(message)];
+                labels.extend(more_details.iter().map(Self::to_label));
+
+                Diagnostic::error()
+                    .with_code("E011")
+                    .with_message("failed to read input")
+                    .with_labels(labels)
             }
-            expression::error::Error::DomainError(message, location) => {
-                eprintln!("DomainError: {}", message);
-                eprintln!("--> {} ", source_location_string(location))
+            ParseError(message, detail, more_details) => {
+                let mut labels =
+                    vec![Label::primary(detail.location.id, detail.location.span)
+                        .with_message(message)];
+                labels.extend(more_details.iter().map(Self::to_label));
+
+                Diagnostic::error()
+                    .with_code("E012")
+                    .with_message("failed to parse input")
+                    .with_labels(labels)
             }
+            Bug(message) => todo!(),
         }
     }
-}
 
-impl UserMessage for super::Error {
-    fn print_user_friendly_message(&self) {
-        match self {
-            super::Error::ParseError(e) => e.print_user_friendly_message(),
-            super::Error::GenerationError(e) => eprintln!("Failed to generate code: {:?}", e),
-        }
-    }
-}
-
-fn source_location_string(loc: &SourceLocation) -> String {
-    match &loc.source_type {
-        SourceType::Synthetic => format!("{}:{}", loc.line, loc.column),
-        SourceType::Buffer(name) => format!("[buffer] {}:{}:{}", name, loc.line, loc.column),
-        SourceType::File(path) => format!(
-            "[file] {}:{}:{}",
-            path.as_path().display(),
-            loc.line,
-            loc.column
-        ),
+    fn to_label(detail: &Detail) -> Label<SourceId> {
+        Label::secondary(detail.location.id, detail.location.span).with_message(detail.content)
     }
 }
