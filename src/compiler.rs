@@ -11,7 +11,7 @@ use frontend::parser::Parser;
 use source::Source;
 use thiserror::Error;
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, error::Error>;
 
 #[derive(Error, Debug)]
 pub enum Error {

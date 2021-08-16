@@ -172,7 +172,7 @@ impl Repl {
         match self.vm.run_string(source, "repl") {
             Ok(Value::Unspecified) => (),
             Ok(v) => println!("{}", self.vm.write(&v)),
-            Err(vm::Error::CompilerError(e)) => e.print_user_friendly_message(),
+            Err(vm::Error::CompilerError(e)) => todo!(),
             Err(vm::Error::RuntimeError(msg, line, stack_trace, Some(ctx))) => {
                 eprintln!(
                     "{} in line {} [in {}]\n{}",

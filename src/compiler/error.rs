@@ -64,7 +64,7 @@ impl Error {
                     .with_message("failed to parse input")
                     .with_labels(labels)
             }
-            Bug(message) => todo!(),
+            Bug(message) => Diagnostic::bug().with_message(message),
         }
     }
 

@@ -25,10 +25,13 @@ impl<'a> From<Err<NomError<'a>>> for error::Error {
             Err::Failure(e) => error::Error::read_error(
                 "Fatal error while reading input",
                 (e.input, e.code).into(),
+                vec![],
             ),
-            Err::Error(e) => {
-                error::Error::read_error("Error while reading input", (e.input, e.code).into())
-            }
+            Err::Error(e) => error::Error::read_error(
+                "Error while reading input",
+                (e.input, e.code).into(),
+                vec![],
+            ),
         }
     }
 }

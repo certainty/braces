@@ -23,11 +23,17 @@ impl std::fmt::Display for SourceType {
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(transparent)]
-pub struct SourceId(u64);
+pub struct SourceId(usize);
 
 impl SourceId {
     pub fn location(&self, span: std::ops::Range<usize>) -> SourceLocation {
         SourceLocation::new(self.clone(), span)
+    }
+}
+
+impl From<usize> for SourceId {
+    fn from(n: usize) -> SourceId {
+        SourceId(n)
     }
 }
 

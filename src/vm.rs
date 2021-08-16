@@ -1,6 +1,7 @@
 pub mod byte_code;
 pub mod debug;
 pub mod disassembler;
+pub mod error;
 pub mod global;
 pub mod instance;
 pub mod scheme;
@@ -15,6 +16,8 @@ use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use crate::vm::disassembler::Disassembler;
+use codespan_reporting::diagnostic::{Diagnostic, Label};
+use error::Error;
 use global::TopLevel;
 use instance::Instance;
 use rustc_hash::FxHashMap;
@@ -24,21 +27,6 @@ use std::io::stdout;
 use std::path::PathBuf;
 use thiserror::Error;
 use value::Value;
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error(transparent)]
-    CompilerError(#[from] compiler::Error),
-    #[error("RuntimeError at {1}: {0}")]
-    RuntimeError(
-        error::RuntimeError,
-        usize,
-        stack_trace::StackTrace,
-        Option<String>,
-    ),
-    #[error("CompilerBug: {}", 0)]
-    CompilerBug(String),
-}
 
 type Result<T> = std::result::Result<T, Error>;
 

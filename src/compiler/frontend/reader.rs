@@ -1,6 +1,7 @@
 pub mod error;
 pub mod sexp;
 use crate::compiler::frontend;
+use crate::compiler::source::SourceId;
 
 use nom::branch::alt;
 use nom::combinator::value;
@@ -19,21 +20,23 @@ use crate::compiler::source_location::SourceLocation;
 
 pub fn parse<'a, T: Source>(
     source: &'a mut T,
+    source_id: SourceId,
 ) -> std::result::Result<Vec<Datum>, frontend::error::Error> {
     let source_type = source.source_type();
     let mut source_str = String::new();
     if let Err(ioError) = source.read_to_string(&mut source_str) {
         return Err(frontend::error::Error::io_error(
             "Couldn't read source",
+            source_id,
             ioError,
         ));
     }
-    let input = Input::new_extra(&source_str, source_type);
+    let input = Input::new_extra(&source_str, source_id);
     let (_rest, datum) = context("program", many1(parse_datum))(input)?;
     Ok(datum)
 }
 
-pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceType>;
+pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceId>;
 type ParseResult<'a, T> = IResult<Input<'a>, T, Error<Input<'a>>>;
 
 fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
@@ -105,30 +108,38 @@ mod tests {
     use super::*;
 
     pub fn assert_parse_as(inp: &str, expected: Sexp) {
-        let datum = parse(&mut StringSource::new(inp, "datum-parser-test")).unwrap();
+        let datum = parse(
+            &mut StringSource::new(inp, "datum-parser-test"),
+            source_id(),
+        )
+        .unwrap();
 
-        assert_eq!(datum.sexp, expected)
+        assert_eq!(datum[0].sexp, expected)
     }
 
     pub fn assert_parse_ok(inp: &str) {
         let mut source = StringSource::new(inp, "datum-parser-test");
-        let parsed = parse(&mut source);
+        let parsed = parse(&mut source, source_id());
 
         assert!(parsed.is_ok(), "expected to parse successfully")
     }
 
     pub fn assert_parse_error(inp: &str) {
         let mut source = StringSource::new(inp, "datum-parser-test");
-        let parsed = parse(&mut source);
+        let parsed = parse(&mut source, source_id());
 
         assert!(parsed.is_err(), "expected  parse error")
     }
 
     pub fn location(span: std::ops::Range<usize>) -> SourceLocation {
-        SourceType::Buffer("datum-parser-test".to_string()).location(span)
+        SourceLocation::new(source_id(), span)
     }
 
-    pub fn make_datum(sexp: Sexp, span: std::ops::Range<uszie>) -> Datum {
+    pub fn make_datum(sexp: Sexp, span: std::ops::Range<usize>) -> Datum {
         Datum::new(sexp, location(span))
+    }
+
+    pub fn source_id() -> SourceId {
+        SourceId::from(0)
     }
 }
