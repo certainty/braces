@@ -329,7 +329,9 @@ impl Expression {
 
 #[cfg(test)]
 mod tests {
+    use crate::compiler::source::SourceId;
     use crate::compiler::source::{SourceType, StringSource};
+    use std::ops::Range;
 
     use super::*;
 
@@ -425,12 +427,8 @@ mod tests {
         assert!(result.is_err(), message)
     }
 
-    pub fn location(line: usize, col: usize) -> SourceLocation {
-        SourceLocation::new(
-            SourceType::Buffer("datum-parser-test".to_string()),
-            line,
-            col,
-        )
+    pub fn location(span: Range<usize>) -> SourceLocation {
+        SourceLocation::new(SourceId::from(0), span)
     }
 
     pub fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
