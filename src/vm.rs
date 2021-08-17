@@ -8,15 +8,12 @@ pub mod scheme;
 pub mod stack;
 pub mod stack_trace;
 pub mod value;
-use self::value::error;
 use self::value::procedure::foreign;
 use self::value::procedure::native;
-use crate::compiler;
 use crate::compiler::source::*;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use crate::vm::disassembler::Disassembler;
-use codespan_reporting::diagnostic::{Diagnostic, Label};
 use error::Error;
 use global::TopLevel;
 use instance::Instance;
@@ -118,6 +115,7 @@ impl VM {
         self.writer.write(value, &self.values).to_string()
     }
 
+    // convenience function to compile and run a single file (which might refer to other files)
     pub fn run_file(&mut self, path: PathBuf) -> Result<Value> {
         let mut source = FileSource::new(path);
         let mut compiler = Compiler::new();

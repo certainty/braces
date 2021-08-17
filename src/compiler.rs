@@ -23,6 +23,7 @@ pub enum Error {
 }
 
 pub struct Compiler {
+    sources: source::Registry,
     parser: Parser,
 }
 
@@ -40,10 +41,14 @@ impl CompilationUnit {
 
 impl Compiler {
     pub fn new() -> Self {
-        Compiler { parser: Parser }
+        Compiler {
+            parser: Parser,
+            sources: source::Registry::new(),
+        }
     }
 
     pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
+        let (source_id, source_code) = self.sources.add(source)?;
         let ast = self.parser.parse_program(source)?;
         let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
         Ok(code_gen.generate(ast)?)

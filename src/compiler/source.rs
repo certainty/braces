@@ -95,11 +95,11 @@ impl Registry {
         }
     }
 
-    pub fn add(&mut self, s: impl Source) -> std::io::Result<SourceId> {
+    pub fn add(&mut self, s: impl Source) -> std::io::Result<SourceId, &'a str> {
         let mut out = String::new();
         s.read_to_string(&mut out)?;
         let handle = self.sources.add(s.source_type(), out);
-        Ok(SourceId(handle))
+        Ok(SourceId(handle), self.sources.source(handle)?)
     }
 
     pub fn source_opt<'a>(&'a self, s: &SourceId) -> Option<&'a str> {
