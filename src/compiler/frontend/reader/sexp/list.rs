@@ -2,15 +2,9 @@ use nom::character::complete::char;
 use nom::multi::{many0, many1};
 use nom::sequence::{delimited, tuple};
 
-use crate::compiler::frontend::reader::{
-    Input,
-    map_datum,
-    parse_datum,
-    ParseResult,
-    whitespace::{ parse_inter_token_space}
-};
-
 use super::datum::{Datum, Sexp};
+use super::whitespace::parse_inter_token_space;
+use super::{map_datum, parse_datum, Input, ParseResult};
 
 /// Parse proper list
 /// Ref: r7rs 7.1.2
@@ -60,7 +54,7 @@ pub fn parse_improper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::tests::*;
 
     use super::*;
 

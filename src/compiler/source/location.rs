@@ -8,9 +8,9 @@ pub struct Location {
 }
 
 impl Location {
-    pub fn new<S: Into<Span>>(id: SourceId, span: S) -> Self {
+    pub fn new<S: Into<Span>, Id: Into<SourceId>>(id: Id, span: S) -> Self {
         Self {
-            id,
+            id: id.into(),
             span: span.into(),
         }
     }

@@ -1,15 +1,10 @@
+use super::datum::{Datum, Sexp};
+use super::{map_datum, parse_datum, Input, ParseResult};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
 use nom::combinator::value;
 use nom::sequence::pair;
-use super::datum::{Sexp, Datum};
-use crate::compiler::frontend::reader::{
-    Input,
-    ParseResult,
-    map_datum,
-    parse_datum
-};
 
 ////////////////////////////
 // abbreviation
@@ -37,7 +32,7 @@ fn parse_abbrev_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::tests::*;
 
     #[test]
     fn test_read_abbrev() {

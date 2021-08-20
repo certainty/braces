@@ -42,8 +42,8 @@ impl From<Range<usize>> for Span {
 
 #[derive(Debug, Clone)]
 pub struct Source<'a> {
-    id: SourceId,
-    code: &'a str,
+    pub id: SourceId,
+    pub code: &'a str,
 }
 
 impl<'a> Source<'a> {

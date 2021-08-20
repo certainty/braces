@@ -1,9 +1,7 @@
 use super::error::Error;
-use super::Expression;
-use super::ParseResult;
-use super::Result;
+use super::{Expression, ParseResult, Parser, Result};
 use crate::compiler::frontend::reader::sexp::datum::Datum;
-use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::source::{HasSourceLocation, Location};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum QuotationExpression {
@@ -11,6 +9,10 @@ pub enum QuotationExpression {
 }
 
 impl QuotationExpression {
+    pub fn new(datum: Datum) -> Self {
+        QuotationExpression::Quote(datum)
+    }
+
     pub fn datum<'a>(&'a self) -> &'a Datum {
         match self {
             Self::Quote(d) => d,
@@ -19,15 +21,17 @@ impl QuotationExpression {
 }
 
 impl HasSourceLocation for QuotationExpression {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+    fn source_location<'a>(&'a self) -> &'a Location {
         match self {
             Self::Quote(d) => d.source_location(),
         }
     }
 }
 
-pub fn build_quote(datum: Datum) -> QuotationExpression {
-    QuotationExpression::Quote(datum)
+impl Expression {
+    pub fn quoted_value(datum: Datum) -> Expression {
+        Expression::Quotation(QuotationExpression::new(datum))
+    }
 }
 
 /// Create a quotation expression
@@ -35,34 +39,28 @@ pub fn build_quote(datum: Datum) -> QuotationExpression {
 /// Quoted values are special in the sense that they maintain a reference
 /// to the quote `Datum`. They're treated as unevaluated expressions.
 
-#[inline]
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_quote(datum).map(Expression::Quotation)
-}
+impl Parser {
+    #[inline]
+    pub fn parse(&mut self, datum: &Datum) -> ParseResult<Expression> {
+        self.do_parse_quote(datum).map(Expression::Quotation).into()
+    }
 
-pub fn parse_quote(datum: &Datum) -> ParseResult<QuotationExpression> {
-    Expression::parse_apply_special(datum, "quote", do_parse_quote)
-}
-
-pub fn do_parse_quote(
-    _op: &str,
-    operands: &[Datum],
-    loc: &SourceLocation,
-) -> Result<QuotationExpression> {
-    match operands {
-        [value] => Ok(build_quote(value.clone())),
-        _ => Error::parse_error(
-            "Expected (quote <datum>) or (quasiquite <datum>)",
-            loc.clone(),
-        ),
+    pub fn do_parse_quote(&mut self, datum: &Datum, loc: &Location) -> Result<QuotationExpression> {
+        match self.parse_list(datum)? {
+            [_, value] => Ok(QuotationExpression::new(value.clone())),
+            _ => Error::parse_error(
+                "Expected (quote <datum>) or (quasiquite <datum>)",
+                loc.clone(),
+            ),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::expression::tests::*;
-    use crate::compiler::frontend::reader::datum::Sexp;
+    use crate::compiler::frontend::parser::tests::*;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
 
     #[test]
     fn test_parse_quote() {

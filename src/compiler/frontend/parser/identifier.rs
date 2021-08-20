@@ -1,13 +1,12 @@
 use super::Expression;
-use super::ParseResult;
+use super::{ParseResult, Parser};
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
-use crate::compiler::source::SourceType;
-use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::source::{HasSourceLocation, Location, SourceId};
 
 #[derive(Clone, Debug)]
 pub struct Identifier {
     name: String,
-    location: SourceLocation,
+    location: Location,
 }
 
 impl PartialEq for Identifier {
@@ -17,14 +16,14 @@ impl PartialEq for Identifier {
 }
 
 impl Identifier {
-    pub fn new<T: Into<String>>(s: T, location: SourceLocation) -> Self {
+    pub fn new<T: Into<String>>(s: T, location: Location) -> Self {
         Self {
             name: s.into(),
             location,
         }
     }
     pub fn synthetic(s: &str) -> Identifier {
-        Self::new(s, SourceType::Synthetic.location(0..0))
+        Self::new(s, Location::new(SourceId::from(0), 0..0))
     }
 
     pub fn string(&self) -> &String {
@@ -39,26 +38,36 @@ impl From<Identifier> for String {
 }
 
 impl HasSourceLocation for Identifier {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+    fn source_location<'a>(&'a self) -> &'a Location {
         &self.location
     }
 }
 
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_identifier(datum).map(Expression::Identifier)
+impl Expression {
+    pub fn identifier(str: String, loc: Location) -> Expression {
+        Expression::Identifier(Identifier::new(str, loc))
+    }
 }
 
-pub fn parse_identifier(datum: &Datum) -> ParseResult<Identifier> {
-    match datum.sexp() {
-        Sexp::Symbol(s) => ParseResult::accept(Identifier::new(s, datum.source_location().clone())),
-        _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),
+impl Parser {
+    pub fn parse(&mut self, datum: &Datum) -> ParseResult<Expression> {
+        self.parse_identifier(datum).map(Expression::Identifier)
+    }
+
+    pub fn do_parse_identifier(&mut self, datum: &Datum) -> ParseResult<Identifier> {
+        match datum.sexp() {
+            Sexp::Symbol(s) => {
+                ParseResult::accept(Identifier::new(s, datum.source_location().clone()))
+            }
+            _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::expression::tests::*;
+    use crate::compiler::frontend::parser::tests::*;
 
     #[test]
     fn test_identifier_equals() {

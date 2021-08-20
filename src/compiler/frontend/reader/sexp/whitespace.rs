@@ -1,18 +1,13 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{anychar, line_ending};
 use nom::character::complete::char;
+use nom::character::complete::{anychar, line_ending};
 use nom::error::context;
 use nom::multi::many0;
 use nom::multi::many_till;
 use nom::sequence::{delimited, preceded};
 
-use crate::compiler::frontend::reader::{
-    Input,
-    parse_datum,
-    unit,
-    ParseResult
-};
+use super::{parse_datum, unit, Input, ParseResult};
 
 #[inline]
 pub fn consume_line_ending<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
@@ -74,10 +69,8 @@ pub fn parse_directive<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::sexp::datum::Sexp;
-    use crate::compiler::frontend::parser::sexp::tests::*;
-
-    use super::*;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::tests::*;
 
     #[test]
     fn test_read_comments() {

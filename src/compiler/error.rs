@@ -1,9 +1,13 @@
 pub mod reporting;
 use crate::compiler::backend;
 use crate::compiler::frontend;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    FrontendError(frontend::error::Error),
-    BackendError(backend::error::Error),
+    #[error(transparent)]
+    FrontendError(#[from] frontend::error::Error),
+
+    #[error(transparent)]
+    BackendError(#[from] backend::error::Error),
 }

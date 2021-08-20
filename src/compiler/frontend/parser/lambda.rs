@@ -1,13 +1,9 @@
-use super::body;
 use super::body::BodyExpression;
 use super::error::Error;
-use super::identifier;
 use super::identifier::Identifier;
-use super::Expression;
-use super::ParseResult;
-use super::Result;
+use super::{Expression, ParseResult, Parser, Result};
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
-use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::value::procedure::Arity;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -15,11 +11,27 @@ pub struct LambdaExpression {
     pub formals: Formals,
     pub body: BodyExpression,
     pub label: Option<String>, // in case of form rewrites to lambda we track where this lambda was generated from
-    location: SourceLocation,
+    location: Location,
+}
+
+impl LambdaExpression {
+    pub fn new(
+        formals: Formals,
+        body: BodyExpression,
+        label: Option<String>,
+        location: Location,
+    ) -> Self {
+        Self {
+            formals,
+            body,
+            location,
+            label,
+        }
+    }
 }
 
 impl HasSourceLocation for LambdaExpression {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+    fn source_location<'a>(&'a self) -> &'a Location {
         &self.location
     }
 }
@@ -57,72 +69,63 @@ impl Formals {
     }
 }
 
-pub fn build(
-    formals: Formals,
-    body: BodyExpression,
-    label: Option<String>,
-    location: SourceLocation,
-) -> LambdaExpression {
-    LambdaExpression {
-        formals,
-        body,
-        location,
-        label,
+impl Expression {
+    pub fn lambda(
+        formals: Formals,
+        body: BodyExpression,
+        label: Option<String>,
+        loc: Location,
+    ) -> Expression {
+        Expression::Lambda(LambdaExpression::new(formals, body, label, loc))
     }
 }
 
-#[inline]
-pub fn parse(datum: &Datum) -> ParseResult<Expression> {
-    parse_lambda(datum).map(Expression::Lambda)
-}
-
-pub fn parse_lambda(datum: &Datum) -> ParseResult<LambdaExpression> {
-    Expression::parse_apply_special(datum, "lambda", do_parse_lambda)
-}
-
-pub fn do_parse_lambda(
-    _op: &str,
-    operands: &[Datum],
-    loc: &SourceLocation,
-) -> Result<LambdaExpression> {
-    match &operands {
-        [formals, body @ ..] => {
-            let formals = parse_formals(formals)?;
-            let body = body::parse(body, loc)?;
-            Ok(LambdaExpression {
-                formals,
-                body,
-                label: Some(String::from("lambda")),
-                location: loc.clone(),
-            })
-        }
-        _ => Error::parse_error("Expected (lambda <formals> <body>)", loc.clone()),
+impl Parser {
+    #[inline]
+    pub fn parse_lambda(&mut self, datum: &Datum) -> ParseResult<Expression> {
+        self.do_parse_lambda(datum).map(Expression::Lambda).into()
     }
-}
 
-pub fn parse_formals(datum: &Datum) -> Result<Formals> {
-    match datum.sexp() {
-        Sexp::List(ls) => {
-            let identifiers: Result<Vec<Identifier>> =
-                ls.iter().map(identifier::parse_identifier).collect();
-            Ok(Formals::ArgList(identifiers?))
+    pub fn do_parse_lambda(&mut self, datum: &Datum, loc: &Location) -> Result<LambdaExpression> {
+        match self.parse_list(datum)? {
+            [formals, body @ ..] => {
+                let formals = self.parse_formals(formals)?;
+                let body = self.parse_body(body, loc)?;
+                Ok(LambdaExpression::new(
+                    formals,
+                    body,
+                    Some(String::from("lambda")),
+                    loc.clone(),
+                ))
+            }
+            _ => Error::parse_error("Expected (lambda <formals> <body>)", loc.clone()),
         }
-        Sexp::ImproperList(head, tail) => {
-            let identifiers: Result<Vec<Identifier>> =
-                head.iter().map(identifier::parse_identifier).collect();
-            let rest = identifier::parse_identifier(tail).res();
+    }
 
-            Ok(Formals::VarArg(identifiers?, rest?))
+    pub fn parse_formals(&mut self, datum: &Datum) -> Result<Formals> {
+        match datum.sexp() {
+            Sexp::List(ls) => {
+                let identifiers: Result<Vec<Identifier>> =
+                    ls.iter().map(|e| self.parse_identifier(d)).collect();
+                Ok(Formals::ArgList(identifiers?))
+            }
+            Sexp::ImproperList(head, tail) => {
+                let identifiers: Result<Vec<Identifier>> =
+                    head.iter().map(|e| self.parse_identifier(d)).collect();
+                let rest = self.parse_identifier(tail).res();
+
+                Ok(Formals::VarArg(identifiers?, rest?))
+            }
+            _ => Ok(Formals::RestArg(self.parse_identifier(datum).res()?)),
         }
-        _ => Ok(Formals::RestArg(identifier::parse_identifier(datum).res()?)),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::expression::tests::*;
-    use crate::compiler::frontend::reader::datum::Sexp;
+    use crate::compiler::frontend::parser::tests::*;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
 
     #[test]
     fn test_parse_lambda() {

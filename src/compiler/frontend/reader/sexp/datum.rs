@@ -1,4 +1,4 @@
-use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::value::number;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -74,12 +74,12 @@ impl Sexp {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Datum {
-    pub location: SourceLocation,
+    pub location: Location,
     pub sexp: Sexp,
 }
 
 impl Datum {
-    pub fn new(sexp: Sexp, location: SourceLocation) -> Self {
+    pub fn new(sexp: Sexp, location: Location) -> Self {
         Self { sexp, location }
     }
 
@@ -87,13 +87,13 @@ impl Datum {
         &self.sexp
     }
 
-    pub fn location(&self) -> &SourceLocation {
+    pub fn location(&self) -> &Location {
         &self.location
     }
 }
 
 impl HasSourceLocation for Datum {
-    fn source_location<'a>(&'a self) -> &'a SourceLocation {
+    fn source_location<'a>(&'a self) -> &'a Location {
         &self.location
     }
 }

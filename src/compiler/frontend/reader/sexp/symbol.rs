@@ -5,11 +5,9 @@ use nom::combinator::{map, value, verify};
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{delimited, pair, tuple};
 
-use crate::compiler::frontend::reader::{
+use super::{
     character::{parse_inline_hex_escape, parse_mnemonic_escape},
-    Input,
-    map_datum,
-    ParseResult,
+    map_datum, Input, ParseResult,
 };
 
 use super::datum::{Datum, Sexp};
@@ -166,7 +164,7 @@ fn parse_explicit_sign<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::tests::*;
 
     use super::*;
 

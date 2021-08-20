@@ -1,6 +1,6 @@
 use crate::compiler::frontend::error;
 use crate::compiler::frontend::reader::Input;
-use crate::compiler::source_location::SourceLocation;
+use crate::compiler::source::Location;
 use nom::error::{Error, ErrorKind};
 use nom::Err;
 
@@ -11,7 +11,7 @@ impl<'a> From<(Input<'a>, ErrorKind)> for error::Detail {
         let (input, kind) = e;
         let content = input.fragment();
         let span = input.location_offset()..input.fragment().len();
-        let location = SourceLocation::new(input.extra.clone(), span);
+        let location = Location::new(input.extra.clone(), span);
         error::Detail::new(content.to_string(), location)
     }
 }

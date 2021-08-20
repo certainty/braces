@@ -6,13 +6,8 @@ use nom::combinator::{map_opt, map_res, value};
 use nom::error::context;
 use nom::sequence::{delimited, preceded};
 
-use super::datum::{Sexp, Datum};
-use crate::compiler::frontend::reader::{
-    Input,
-    ParseResult,
-    map_datum,
-};
-
+use super::datum::{Datum, Sexp};
+use super::{map_datum, Input, ParseResult};
 
 /// Character parser
 pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
@@ -82,7 +77,7 @@ pub fn parse_mnemonic_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp::tests::*;
+    use crate::compiler::frontend::reader::tests::*;
 
     #[test]
     fn test_read_char_hex_literal() {

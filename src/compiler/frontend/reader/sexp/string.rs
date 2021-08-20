@@ -2,18 +2,17 @@ use nom::branch::alt;
 use nom::bytes::complete::is_not;
 use nom::character::complete::char;
 use nom::combinator::{map, value};
-use nom::error::{context, ErrorKind, ParseError, VerboseError};
+use nom::error::{context, ErrorKind, ParseError};
 use nom::multi::{fold_many0, many0};
 use nom::sequence::{delimited, preceded, terminated};
 
-use crate::compiler::frontend::reader::{
+use super::{
     character::{parse_inline_hex_escape, parse_mnemonic_escape},
-    map_datum,
     whitespace::{consume_line_ending, parse_intra_line_ws},
-    Input, ParseResult,
 };
 
 use super::datum::{Datum, Sexp};
+use super::{map_datum, Input, ParseResult};
 
 //////////////////////////////
 // String parser
