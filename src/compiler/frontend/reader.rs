@@ -18,6 +18,14 @@ use sexp::{
 use crate::compiler::source::{Source, SourceType};
 use crate::compiler::source_location::SourceLocation;
 
+pub struct Reader {}
+
+impl Reader {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 pub fn parse<'a, T: Source>(
     source: &'a mut T,
     source_id: SourceId,

@@ -1,63 +1,39 @@
 pub mod backend;
+pub mod compilation_unit;
 pub mod error;
 pub mod frontend;
+pub mod representation;
 pub mod source;
-pub mod source_location;
 pub mod utils;
-use crate::vm::value;
-use backend::code_generator;
-use backend::code_generator::{CodeGenerator, Target};
-use frontend::parser::Parser;
-use source::Source;
-use thiserror::Error;
+use source::{HasOrigin, Source};
+use std::io::Read;
 
-type Result<T> = std::result::Result<T, error::Error>;
+pub type Result<T> = std::result::Result<T, error::Error>;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error(transparent)]
-    ParseError(#[from] frontend::expression::error::Error),
+pub use compilation_unit::CompilationUnit;
 
-    #[error(transparent)]
-    GenerationError(#[from] code_generator::Error),
+pub struct Compiler<'a> {
+    sources: source::Registry<'a>,
+    frontend: frontend::Frontend,
+    backend: backend::Backend,
 }
 
-pub struct Compiler {
-    sources: source::Registry,
-    parser: Parser,
-}
-
-#[derive(Clone, Debug)]
-pub struct CompilationUnit {
-    pub values: value::Factory,
-    pub closure: value::closure::Closure,
-}
-
-impl CompilationUnit {
-    pub fn new(values: value::Factory, closure: value::closure::Closure) -> Self {
-        CompilationUnit { values, closure }
-    }
-}
-
-impl Compiler {
-    pub fn new() -> Self {
+impl<'a> Compiler<'a> {
+    pub fn new() -> Self<'a> {
         Compiler {
-            parser: Parser,
             sources: source::Registry::new(),
+            frontend: frontend::Frontend::new(),
+            backend: backend::Backend::new(),
         }
     }
 
-    pub fn compile_program<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
-        let (source_id, source_code) = self.sources.add(source)?;
-        let ast = self.parser.parse_program(source)?;
-        let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
-        Ok(code_gen.generate(ast)?)
+    pub fn compile<T: HasOrigin + Read>(&mut self, input: T) -> Result<CompilationUnit> {
+        let source = self.sources.add(input)?;
+        self.compile_source(source)
     }
 
-    pub fn compile_expression<T: Source>(&mut self, source: &mut T) -> Result<CompilationUnit> {
-        let ast = self.parser.parse_expression(source)?;
-        let mut code_gen = CodeGenerator::new(Target::TopLevel, None);
-
-        Ok(code_gen.generate(vec![ast])?)
+    fn compile_source(&mut self, source: &Source<'a>) -> Result<CompilationUnit> {
+        let ast = self.frontend.pass(&source)?;
+        self.backend.pass(&ast)
     }
 }
