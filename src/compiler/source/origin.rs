@@ -10,7 +10,7 @@ impl std::fmt::Display for Origin {
 #[derive(Debug, Clone)]
 pub enum Origin {
     Synthetic,
-    Buffer(String),
+    Buffer(std::string::String),
     File(std::path::PathBuf),
 }
 

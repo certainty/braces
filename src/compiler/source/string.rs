@@ -1,4 +1,5 @@
 use super::{HasOrigin, Origin};
+use std::io::Write;
 
 #[repr(transparent)]
 #[derive(Debug, Clone)]
@@ -12,12 +13,12 @@ impl StringSource {
 
 impl HasOrigin for StringSource {
     fn origin(&self) -> Origin {
-        Origin::String
+        Origin::Synthetic
     }
 }
 
 impl std::io::Read for StringSource {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.content.write(&mut buf)
+        buf.write(self.0.as_bytes())
     }
 }

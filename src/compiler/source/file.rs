@@ -11,13 +11,13 @@ impl FileSource {
 
 impl HasOrigin for FileSource {
     fn origin(&self) -> Origin {
-        Origin::File(self.path.clone())
+        Origin::File(self.0.clone())
     }
 }
 
 impl std::io::Read for FileSource {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let mut file = std::fs::File::Open(self.0)?;
+        let mut file = std::fs::File::open(self.0)?;
         file.read(&mut buf)
     }
 }

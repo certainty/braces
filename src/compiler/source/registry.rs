@@ -3,28 +3,23 @@ use codespan_reporting::files;
 use std::io::Read;
 
 pub struct Registry<'a> {
-    sources: &'a files::SimpleFiles<Origin, String>,
+    inner: &'a files::SimpleFiles<Origin, String>,
 }
 
 impl<'a> Registry<'a> {
     pub fn new() -> Self {
         Self {
-            sources: &files::SimpleFiles::new(),
+            inner: &files::SimpleFiles::new(),
         }
     }
 
     pub fn add<T: HasOrigin + Read>(&mut self, s: T) -> std::io::Result<Source<'a>> {
         let mut out = String::new();
         s.read_to_string(&mut out)?;
-        let handle = self.sources.add(s.source_type(), out);
-        Source::new(SourceId(handle), self.sources.source(handle)?)
-    }
+        let handle = self.inner.add(s.origin(), out);
+        let code = self.inner.source(handle)?;
 
-    pub fn source_opt(&'a self, s: &SourceId) -> Option<Source<'a>> {
-        match self.sources.get(s) {
-            Ok(f) => Some(Source::new(s.clone(), self.sources.source(s)?)),
-            _ => None,
-        }
+        Ok(Source::new(SourceId(handle), code))
     }
 }
 
@@ -34,11 +29,11 @@ impl<'a> files::Files<'a> for Registry<'a> {
     type Source = &'a str;
 
     fn name(&'a self, id: Self::FileId) -> Result<Self::Name, files::Error> {
-        self.sources.name(id)
+        self.inner.name(id.0)
     }
 
     fn source(&'a self, id: Self::FileId) -> Result<Self::Source, files::Error> {
-        self.sources.source(id)
+        self.inner.source(id.0)
     }
 
     fn line_index(
@@ -46,6 +41,14 @@ impl<'a> files::Files<'a> for Registry<'a> {
         id: Self::FileId,
         byte_index: usize,
     ) -> Result<usize, codespan_reporting::files::Error> {
-        self.sources.line_index(id, byte_index)
+        self.inner.line_index(id.0, byte_index)
+    }
+
+    fn line_range(
+        &'a self,
+        id: Self::FileId,
+        line_index: usize,
+    ) -> Result<std::ops::Range<usize>, files::Error> {
+        self.inner.line_range(id.0, line_index)
     }
 }

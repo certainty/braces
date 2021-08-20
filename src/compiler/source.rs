@@ -14,7 +14,7 @@ pub use origin::{HasOrigin, Origin};
 pub use registry::Registry;
 pub use string::StringSource;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 #[repr(transparent)]
 pub struct SourceId(usize);
 

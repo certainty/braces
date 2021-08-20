@@ -1,6 +1,7 @@
 use super::{HasOrigin, Origin};
+use std::io::Write;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct BufferSource {
     content: String,
     name: String,
@@ -23,6 +24,6 @@ impl HasOrigin for BufferSource {
 
 impl std::io::Read for BufferSource {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.content.write(&mut buf)
+        buf.write(self.content.as_bytes())
     }
 }

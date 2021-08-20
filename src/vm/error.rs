@@ -15,6 +15,8 @@ pub enum Error {
         stack_trace::StackTrace,
         Option<String>,
     ),
+    #[error("CompilerBug: {0}")]
+    CompilerBug(String),
 }
 
 impl From<compiler::error::Error> for Error {

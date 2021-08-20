@@ -14,11 +14,13 @@ impl Reader {
     }
 
     pub fn parse<'a>(
+        &self,
         source: &'a Source<'a>,
     ) -> std::result::Result<SexpAST, frontend::error::Error> {
         let input = sexp::Input::new_extra(&source.code, source.id.clone());
         let (_rest, datum) = context("program", many1(sexp::parse_datum))(input)?;
-        Ok(datum)
+
+        Ok(SexpAST::new(datum))
     }
 }
 
@@ -31,15 +33,13 @@ mod tests {
     use crate::compiler::source::{BufferSource, Location, Registry, SourceId, Span};
 
     // test helpers to use in the sexp parser
-    pub fn assert_parse_as(inp: &str, expected: Sexp) -> Result<()> {
+    pub fn assert_parse_as(inp: &str, expected: Sexp) {
         let mut registry = Registry::new();
         let source = registry.add(BufferSource::new(inp, "datum-parser-test"));
         let reader = Reader::new();
-        let datum = reader.parse(source)?;
+        let datum = reader.parse(source).unwrap();
 
         assert_eq!(datum[0].sexp, expected);
-
-        Ok(())
     }
 
     pub fn assert_parse_ok(inp: &str) {
