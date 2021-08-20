@@ -17,24 +17,21 @@
 
 use thiserror::Error;
 
-use crate::{
-    vm::byte_code::chunk::AddressType,
+use crate::compiler::frontend::parser::{
+    apply::ApplicationExpression,
+    assignment::SetExpression,
+    body::BodyExpression,
+    conditional::IfExpression,
+    define::DefinitionExpression,
+    identifier::Identifier,
+    lambda::{Formals, LambdaExpression},
+    sequence::BeginExpression,
+    Expression,
 };
-use crate::compiler::CompilationUnit;
-use crate::compiler::frontend::expression::{
-    apply::ApplicationExpression, assignment::SetExpression,
-};
-use crate::compiler::frontend::expression::{
-    body::BodyExpression, sequence::BeginExpression,
-};
-use crate::compiler::frontend::expression::{
-    conditional::IfExpression, define::DefinitionExpression,
-};
-use crate::compiler::frontend::expression::Expression;
-use crate::compiler::frontend::expression::identifier::Identifier;
-use crate::compiler::frontend::expression::lambda::{Formals, LambdaExpression};
 use crate::compiler::frontend::reader::sexp::datum;
-use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::source::{HasSourceLocation, Location};
+use crate::compiler::CompilationUnit;
+use crate::vm::byte_code::chunk::AddressType;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
@@ -270,7 +267,7 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_jump(&mut self, instr: Instruction, loc: &SourceLocation) -> Result<AddressType> {
+    fn emit_jump(&mut self, instr: Instruction, loc: &Location) -> Result<AddressType> {
         self.emit_instruction(instr, loc)?;
         Ok(self.current_chunk().size() - 1)
     }
@@ -439,7 +436,7 @@ impl CodeGenerator {
         }
     }
 
-    fn emit_constant(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
+    fn emit_constant(&mut self, value: Value, loc: &Location) -> Result<()> {
         let const_addr = self.current_chunk().add_constant(value);
         let inst_addr = self
             .current_chunk()
@@ -451,7 +448,7 @@ impl CodeGenerator {
     }
 
     // a closure is compiled to a sequence of up-value markers followed by the closure
-    fn emit_closure(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
+    fn emit_closure(&mut self, value: Value, loc: &Location) -> Result<()> {
         // add up-values
         let up_values = self.variables.up_values_vec();
         for up_value in up_values {
@@ -497,11 +494,7 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_instruction(
-        &mut self,
-        instr: Instruction,
-        source_location: &SourceLocation,
-    ) -> Result<()> {
+    fn emit_instruction(&mut self, instr: Instruction, source_location: &Location) -> Result<()> {
         let addr = self.current_chunk().write_instruction(instr);
 
         self.current_chunk()
@@ -519,8 +512,8 @@ impl CodeGenerator {
 mod tests {
     use std::rc::Rc;
 
-    use crate::compiler::Compiler;
     use crate::compiler::source::StringSource;
+    use crate::compiler::Compiler;
     use crate::vm::value::procedure::native;
 
     use super::*;

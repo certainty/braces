@@ -1,4 +1,3 @@
-use crate::compiler::error::UserMessage;
 use crate::vm;
 use crate::vm::VM;
 use clap::Clap;

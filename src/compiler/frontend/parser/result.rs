@@ -1,4 +1,5 @@
 use super::error::Error;
+use super::Result;
 use crate::compiler::source::Location;
 use std::iter::FromIterator;
 

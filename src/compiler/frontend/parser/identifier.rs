@@ -50,7 +50,7 @@ impl Expression {
 }
 
 impl Parser {
-    pub fn parse(&mut self, datum: &Datum) -> ParseResult<Expression> {
+    pub fn parse_identifier(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.parse_identifier(datum).map(Expression::Identifier)
     }
 

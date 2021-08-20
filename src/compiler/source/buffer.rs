@@ -22,7 +22,7 @@ impl HasOrigin for BufferSource {
 }
 
 impl std::io::Read for BufferSource {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.content.write(&mut buf)
     }
 }

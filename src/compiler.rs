@@ -19,7 +19,7 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new() -> Self<'a> {
+    pub fn new() -> Self {
         Compiler {
             sources: source::Registry::new(),
             frontend: frontend::Frontend::new(),

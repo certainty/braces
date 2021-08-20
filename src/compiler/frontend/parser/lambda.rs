@@ -106,12 +106,12 @@ impl Parser {
         match datum.sexp() {
             Sexp::List(ls) => {
                 let identifiers: Result<Vec<Identifier>> =
-                    ls.iter().map(|e| self.parse_identifier(d)).collect();
+                    ls.iter().map(|e| self.parse_identifier(e)).collect();
                 Ok(Formals::ArgList(identifiers?))
             }
             Sexp::ImproperList(head, tail) => {
                 let identifiers: Result<Vec<Identifier>> =
-                    head.iter().map(|e| self.parse_identifier(d)).collect();
+                    head.iter().map(|e| self.parse_identifier(e)).collect();
                 let rest = self.parse_identifier(tail).res();
 
                 Ok(Formals::VarArg(identifiers?, rest?))

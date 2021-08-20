@@ -3,24 +3,24 @@ use codespan_reporting::files;
 use std::io::Read;
 
 pub struct Registry<'a> {
-    sources: files::SimpleFiles<Origin, String>,
+    sources: &'a files::SimpleFiles<Origin, String>,
 }
 
 impl<'a> Registry<'a> {
     pub fn new() -> Self {
         Self {
-            sources: files::SimpleFiles::new(),
+            sources: &files::SimpleFiles::new(),
         }
     }
 
-    pub fn add<T: HasOrigin + Read>(&mut self, s: T) -> std::io::Result<Source> {
+    pub fn add<T: HasOrigin + Read>(&mut self, s: T) -> std::io::Result<Source<'a>> {
         let mut out = String::new();
         s.read_to_string(&mut out)?;
         let handle = self.sources.add(s.source_type(), out);
         Source::new(SourceId(handle), self.sources.source(handle)?)
     }
 
-    pub fn source_opt<'a>(&'a self, s: &SourceId) -> Option<Source> {
+    pub fn source_opt(&'a self, s: &SourceId) -> Option<Source<'a>> {
         match self.sources.get(s) {
             Ok(f) => Some(Source::new(s.clone(), self.sources.source(s)?)),
             _ => None,

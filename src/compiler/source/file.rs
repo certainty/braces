@@ -16,7 +16,7 @@ impl HasOrigin for FileSource {
 }
 
 impl std::io::Read for FileSource {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut file = std::fs::File::Open(self.0)?;
         file.read(&mut buf)
     }

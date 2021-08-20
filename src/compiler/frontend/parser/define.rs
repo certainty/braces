@@ -97,7 +97,7 @@ impl Parser {
 
                 Ok(DefinitionExpression::DefineProcedure(
                     name,
-                    lamba::LambdaExpression::new(formals, body, Some(label), definition.source_location().clone()),
+                    lambda::LambdaExpression::new(formals, body, Some(label), definition.source_location().clone()),
                     definition.source_location().clone()
                 ))
             },

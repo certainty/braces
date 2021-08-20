@@ -17,7 +17,7 @@ impl HasOrigin for StringSource {
 }
 
 impl std::io::Read for StringSource {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.content.write(&mut buf)
     }
 }

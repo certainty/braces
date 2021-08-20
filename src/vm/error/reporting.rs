@@ -6,7 +6,7 @@ use crate::vm::value::error::RuntimeError;
 
 pub struct ErrorReporter<'a> {
     source_registry: Registry<'a>,
-    compiler_reporter: CompilerErrorReporter,
+    compiler_reporter: CompilerErrorReporter<'a>,
 }
 
 impl<'a> ErrorReporter<'a> {

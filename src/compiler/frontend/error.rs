@@ -1,26 +1,9 @@
-use crate::compiler::frontend::reader;
-use crate::compiler::source::{SourceId, SourceType};
-use crate::compiler::source_location::SourceLocation;
-
-#[derive(Debug, Clone)]
-pub struct Detail {
-    pub content: String,
-    pub location: SourceLocation,
-}
-
-impl Detail {
-    pub fn new<Content: Into<String>, Loc: Into<SourceLocation>>(m: Content, loc: Loc) -> Self {
-        Self {
-            content: m.into(),
-            location: loc.into(),
-        }
-    }
-}
+use crate::compiler::source::{Location, Origin, SourceId};
 
 #[derive(Debug)]
 pub enum Error {
     IoError(String, SourceId, std::io::Error),
-    IncompleteInput(String, Option<SourceType>),
+    IncompleteInput(String, Option<Origin>),
     Bug(String),
     ReadError(String, Detail, Vec<Detail>),
     ParseError(String, Detail, Vec<Detail>),
@@ -30,7 +13,7 @@ impl Error {
     pub fn detail<M: Into<String>, C: Into<String>>(
         m: M,
         content: C,
-        loc: SourceLocation,
+        loc: Location,
     ) -> (String, Detail) {
         (m.into(), Detail::new(content, loc))
     }
@@ -38,7 +21,7 @@ impl Error {
         Error::IoError(message.into(), source_id, e)
     }
 
-    pub fn incomplete_input<M: Into<String>>(message: M, source: Option<SourceType>) -> Self {
+    pub fn incomplete_input<M: Into<String>>(message: M, source: Option<Origin>) -> Self {
         Error::IncompleteInput(message.into(), source)
     }
 
@@ -60,5 +43,20 @@ impl Error {
 
     pub fn bug<M: Into<String>>(message: M) -> Self {
         Error::Bug(message.into())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Detail {
+    pub content: String,
+    pub location: Location,
+}
+
+impl Detail {
+    pub fn new<Content: Into<String>, Loc: Into<Location>>(m: Content, loc: Loc) -> Self {
+        Self {
+            content: m.into(),
+            location: loc.into(),
+        }
     }
 }

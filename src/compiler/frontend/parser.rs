@@ -4,7 +4,6 @@ pub mod body;
 pub mod conditional;
 pub mod define;
 pub mod error;
-pub mod expression;
 pub mod identifier;
 pub mod lambda;
 pub mod literal;
@@ -57,7 +56,7 @@ pub struct Parser {}
 
 impl Parser {
     pub fn parse(&mut self, ast: &SexpAST) -> std::result::Result<CoreAST, FrontendError> {
-        ast.iter().map(|d| self.parse(d)).collect()
+        ast.iter().map(|d| self.do_parse(d)).collect()
     }
 
     /// Parse a single datum into an expression
@@ -78,7 +77,7 @@ impl Parser {
     ///   <includer>           |
     /// ```
 
-    fn parse(&mut self, datum: &Datum) -> Result<Expression> {
+    fn do_parse(&mut self, datum: &Datum) -> Result<Expression> {
         self.parse_identifier(datum)
             .or(|| self.parse_literal(datum))
             .or(|| self.parse_lambda(datum))

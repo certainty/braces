@@ -1,4 +1,4 @@
-use super::frontend::expression::Expression;
+use super::frontend::parser::Expression;
 use super::frontend::reader::sexp::datum::Datum;
 
 pub struct CoreAST {

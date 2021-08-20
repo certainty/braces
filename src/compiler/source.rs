@@ -47,7 +47,7 @@ pub struct Source<'a> {
 }
 
 impl<'a> Source<'a> {
-    pub fn new(id: SourceId, code: &'a str) -> Self<'a> {
+    pub fn new(id: SourceId, code: &'a str) -> Self {
         Self { id, code }
     }
 }

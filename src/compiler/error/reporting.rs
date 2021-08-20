@@ -18,7 +18,7 @@ impl<'a> ErrorReporter<'a> {
 }
 
 impl<'a> ErrorReporter<'a> {
-    pub fn report_error<'a>(&self, e: &Error) {
+    pub fn report_error(&self, e: &Error) {
         let writer = StandardStream::stderr(ColorChoice::Always);
         let config = codespan_reporting::term::Config::default();
 

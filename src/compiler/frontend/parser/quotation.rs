@@ -41,7 +41,7 @@ impl Expression {
 
 impl Parser {
     #[inline]
-    pub fn parse(&mut self, datum: &Datum) -> ParseResult<Expression> {
+    pub fn parse_quote(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_quote(datum).map(Expression::Quotation).into()
     }
 
