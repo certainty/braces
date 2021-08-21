@@ -39,23 +39,23 @@ mod tests {
         assert_parse_as(
             "'foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("quote"), 1..1),
-                make_datum(Sexp::symbol("foo"), 1..2),
+                make_datum(Sexp::symbol("quote"), 0..0),
+                make_datum(Sexp::symbol("foo"), 1..1),
             ]),
         );
         assert_parse_as(
             ",foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("unquote"), 1..1),
-                make_datum(Sexp::symbol("foo"), 1..2),
+                make_datum(Sexp::symbol("unquote"), 0..0),
+                make_datum(Sexp::symbol("foo"), 1..1),
             ]),
         );
 
         assert_parse_as(
             "`foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("quasi-quote"), 1..1),
-                make_datum(Sexp::symbol("foo"), 1..2),
+                make_datum(Sexp::symbol("quasi-quote"), 0..0),
+                make_datum(Sexp::symbol("foo"), 1..1),
             ]),
         );
 

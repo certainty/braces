@@ -70,16 +70,19 @@ where
 {
     move |input: Input<'a>| {
         let (s, p) = position(input)?;
-        let (s, v) = first(s)?;
+        let (s2, v) = first(s)?;
+        let (s3, p2) = position(s2)?;
         let value = second(v);
-        let datum = Datum::new(value, location(p));
-        Ok((s, datum))
+        let datum = Datum::new(value, location(p2));
+        Ok((s3, datum))
     }
 }
 
-fn location<'a>(input: Input<'a>) -> Location {
+fn location(input: Input) -> Location {
     let start = input.location_offset();
     let end = start + input.fragment().len();
+    input.fragment()
+    println!("FRAGMENT: {}", input.fragment());
     input.extra.location(start..end)
 }
 
