@@ -78,9 +78,9 @@ where
 }
 
 fn location<'a>(input: Input<'a>) -> Location {
-    input
-        .extra
-        .location(input.location_offset()..input.fragment().len())
+    let start = input.location_offset();
+    let end = start + input.fragment().len();
+    input.extra.location(start..end)
 }
 
 #[inline]

@@ -30,6 +30,8 @@ impl Registry {
         s.read_to_string(&mut out)?;
         let handle = SourceId::from(self.files.add(s.origin(), out));
         let code = self.files.source(handle.0)?;
+
+        log::trace!("source registered: {:?} {:?}", s.origin(), handle);
         Ok(Source::new(handle, code))
     }
 }

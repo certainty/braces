@@ -28,6 +28,7 @@ impl Compiler {
     }
 
     pub fn compile<T: HasOrigin + Read>(&mut self, input: &mut T) -> Result<CompilationUnit> {
+        log::trace!("compiling source {:?}", input.origin());
         let source = self.sources.add(input)?;
         self.compile_source(&source)
     }
@@ -38,7 +39,9 @@ impl Compiler {
 
     fn compile_source(&mut self, source: &Source) -> Result<CompilationUnit> {
         let ast = self.frontend.pass(&source)?;
+        log::trace!("frontend pass done: {:#?}", ast);
         let unit = self.backend.pass(&ast, &self.sources)?;
+        log::trace!("backend pass done: {:#?}", unit);
         Ok(unit)
     }
 }

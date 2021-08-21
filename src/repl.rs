@@ -170,8 +170,10 @@ impl Repl {
     }
 
     fn eval(&mut self, input: &String) -> anyhow::Result<()> {
+        println!("Evaluating source");
         let mut source = BufferSource::new(input.clone(), "repl");
         let mut compiler = Compiler::new();
+        println!("Compiler is built");
 
         match compiler.compile(&mut source) {
             Ok(unit) => match self.vm.interpret(unit) {
