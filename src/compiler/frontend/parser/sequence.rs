@@ -35,17 +35,16 @@ impl Expression {
 
 impl Parser {
     pub fn parse_begin(&mut self, datum: &Datum) -> ParseResult<Expression> {
+        log::trace!("parsing begin: {:?} ", datum);
         self.do_parse_begin(datum).map(Expression::Begin).into()
     }
 
     fn do_parse_begin(&mut self, datum: &Datum) -> Result<BeginExpression> {
         match self.parse_list(datum)? {
             [_, first, rest @ ..] => {
-                let parsed_first = self.parse_command_or_definition(first).res();
-                let parsed_exprs: Result<Vec<Expression>> = rest
-                    .iter()
-                    .map(|d| self.parse_command_or_definition(d))
-                    .collect();
+                let parsed_first = self.do_parse(first);
+                let parsed_exprs: Result<Vec<Expression>> =
+                    rest.iter().map(|d| self.do_parse(d)).collect();
 
                 Ok(BeginExpression::new(
                     parsed_first?,
@@ -60,11 +59,6 @@ impl Parser {
             )),
         }
     }
-
-    fn parse_command_or_definition(&mut self, datum: &Datum) -> ParseResult<Expression> {
-        self.parse_definition(datum)
-            .or(|| self.do_parse(datum).into())
-    }
 }
 
 #[cfg(test)]
@@ -78,9 +72,9 @@ mod tests {
         assert_parse_as(
             "(begin #t)",
             Expression::begin(
-                Expression::constant(make_datum(Sexp::Bool(true), 1, 8)),
+                Expression::constant(make_datum(Sexp::Bool(true), 7, 9)),
                 vec![],
-                location(1..1),
+                location(0..10),
             ),
         )
     }

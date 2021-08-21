@@ -23,7 +23,7 @@ impl Expression {
 }
 
 impl HasSourceLocation for LiteralExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         self.0.source_location()
     }
 }
@@ -60,17 +60,17 @@ mod tests {
     fn test_parse_literal_constant() {
         assert_parse_as(
             "#t",
-            Expression::constant(make_datum(Sexp::Bool(true), 1, 1)),
+            Expression::constant(make_datum(Sexp::Bool(true), 0, 2)),
         );
 
         assert_parse_as(
             "\"foo\"",
-            Expression::constant(make_datum(Sexp::string("foo"), 1, 1)),
+            Expression::constant(make_datum(Sexp::string("foo"), 0, 5)),
         );
 
         assert_parse_as(
             "123",
-            Expression::constant(make_datum(Sexp::number(Number::fixnum(123)), 1, 1)),
+            Expression::constant(make_datum(Sexp::number(Number::fixnum(123)), 0, 3)),
         );
     }
 }

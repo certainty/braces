@@ -87,9 +87,9 @@ mod tests {
         assert_parse_as(
             "(foo #t)",
             Expression::apply(
-                Expression::identifier("foo".to_string(), location(1..0)),
-                vec![Expression::constant(make_datum(Sexp::Bool(true), 5, 0))],
-                location(0..0),
+                Expression::identifier("foo".to_string(), location(1..4)),
+                vec![Expression::constant(make_datum(Sexp::Bool(true), 5, 7))],
+                location(0..8),
             ),
         )
     }

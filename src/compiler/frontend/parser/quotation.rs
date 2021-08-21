@@ -68,7 +68,7 @@ mod tests {
     fn test_parse_quote() {
         assert_parse_as(
             "(quote #t)",
-            Expression::quoted_value(make_datum(Sexp::Bool(true), 1, 8)),
+            Expression::quoted_value(make_datum(Sexp::Bool(true), 7, 9)),
         )
     }
 
@@ -76,19 +76,17 @@ mod tests {
     fn test_parse_literal_quoted_datum() {
         assert_parse_as(
             "'#t",
-            Expression::quoted_value(make_datum(Sexp::Bool(true), 1, 2)),
+            Expression::quoted_value(make_datum(Sexp::Bool(true), 1, 3)),
         );
 
         assert_parse_as(
             "'#\\a",
-            Expression::quoted_value(make_datum(Sexp::character('a'), 1, 2)),
+            Expression::quoted_value(make_datum(Sexp::character('a'), 1, 4)),
         );
 
         assert_parse_as(
             "'foo",
-            Expression::quoted_value(make_datum(Sexp::symbol("foo"), 1, 2)),
+            Expression::quoted_value(make_datum(Sexp::symbol("foo"), 1, 4)),
         );
-
-        assert_parse_error("'");
     }
 }

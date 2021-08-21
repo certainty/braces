@@ -14,7 +14,7 @@ pub mod string;
 pub mod symbol;
 pub mod whitespace;
 
-use crate::compiler::source::{Location, SourceId};
+use crate::compiler::source::SourceId;
 use datum::{Datum, Sexp};
 use nom::branch::alt;
 use nom::combinator::value;
@@ -50,7 +50,7 @@ fn parse_simple_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 #[inline]
 fn parse_compound_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     context(
-        "compund datum",
+        "compound datum",
         alt((
             context("improper list", list::parse_improper_list),
             context("list", list::parse_proper_list),
@@ -73,17 +73,12 @@ where
         let (s2, v) = first(s)?;
         let (s3, p2) = position(s2)?;
         let value = second(v);
-        let datum = Datum::new(value, location(p2));
+        let loc = input
+            .extra
+            .location(p.location_offset()..p2.location_offset());
+        let datum = Datum::new(value, loc);
         Ok((s3, datum))
     }
-}
-
-fn location(input: Input) -> Location {
-    let start = input.location_offset();
-    let end = start + input.fragment().len();
-    input.fragment()
-    println!("FRAGMENT: {}", input.fragment());
-    input.extra.location(start..end)
 }
 
 #[inline]

@@ -107,6 +107,7 @@ impl Parser {
                         }
                     }
                 }
+                [_operator, _operands @ ..] => self.parse_apply(&datum).res(),
                 _ => Err(Error::parse_error(
                     "Unexpected unquoted list",
                     Detail::new("found unquoted list", datum.source_location().clone()),
@@ -145,6 +146,7 @@ impl Parser {
     }
 
     pub fn parse_list<'a>(&mut self, datum: &'a Datum) -> Result<&'a [Datum]> {
+        log::trace!("trying to parse list: {:?}", datum);
         match datum.sexp() {
             Sexp::List(ls) => Ok(&ls[..]),
             _ => Err(Error::parse_error(

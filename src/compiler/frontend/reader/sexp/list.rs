@@ -59,12 +59,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_span_is_correct() {
+        assert_parse_as(
+            "(#t    #f)",
+            Sexp::list(vec![
+                make_datum(Sexp::boolean(true), 1..3),
+                make_datum(Sexp::boolean(false), 7..9),
+            ]),
+        );
+    }
+
+    #[test]
     fn test_read_proper_list() {
         assert_parse_as(
             "(#t    #f)",
             Sexp::list(vec![
-                make_datum(Sexp::boolean(true), 1..1),
-                make_datum(Sexp::boolean(false), 7..7),
+                make_datum(Sexp::boolean(true), 1..3),
+                make_datum(Sexp::boolean(false), 7..9),
             ]),
         );
         let v: Vec<Datum> = vec![];
@@ -75,10 +86,10 @@ mod tests {
             "((foo #t))",
             Sexp::list(vec![make_datum(
                 Sexp::list(vec![
-                    make_datum(Sexp::symbol("foo"), 2..2),
-                    make_datum(Sexp::boolean(true), 6..6),
+                    make_datum(Sexp::symbol("foo"), 2..5),
+                    make_datum(Sexp::boolean(true), 6..8),
                 ]),
-                1..1,
+                1..9,
             )]),
         );
     }
@@ -88,8 +99,8 @@ mod tests {
         assert_parse_as(
             "(#t  .  #f)",
             Sexp::improper_list(
-                vec![make_datum(Sexp::boolean(true), 1..1)],
-                make_datum(Sexp::boolean(false), 8..8),
+                vec![make_datum(Sexp::boolean(true), 1..3)],
+                make_datum(Sexp::boolean(false), 8..10),
             ),
         );
 
@@ -97,11 +108,11 @@ mod tests {
             "(#t #f #t .  #f)",
             Sexp::improper_list(
                 vec![
-                    make_datum(Sexp::boolean(true), 1..2),
-                    make_datum(Sexp::boolean(false), 1..5),
-                    make_datum(Sexp::boolean(true), 1..8),
+                    make_datum(Sexp::boolean(true), 1..3),
+                    make_datum(Sexp::boolean(false), 4..6),
+                    make_datum(Sexp::boolean(true), 7..9),
                 ],
-                make_datum(Sexp::boolean(false), 1..14),
+                make_datum(Sexp::boolean(false), 13..15),
             ),
         );
     }

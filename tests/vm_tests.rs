@@ -22,7 +22,7 @@ fn assert_result_eq(vm: &mut VM, code: &str, expected: Value) {
 fn test_vm_literal() {
     let mut vm = VM::default();
 
-    assert_result_eq(&mut vm, "t", Value::Bool(true));
+    assert_result_eq(&mut vm, "#t", Value::Bool(true));
     assert_result_eq(&mut vm, "#t", Value::Bool(true));
     assert_result_eq(&mut vm, "#false", Value::Bool(false));
     assert_result_eq(&mut vm, "'#false", Value::Bool(false));
@@ -171,7 +171,7 @@ fn test_vm_lambda_formals() {
 fn test_vm_conditional() {
     let mut vm = VM::default();
 
-    assert_result_eq(&mut vm, "(if #f #t #f)", Value::Bool(true));
+    assert_result_eq(&mut vm, "(if #f #t #f)", Value::Bool(false));
 
     assert_result_eq(&mut vm, "(if #t #t #f)", Value::Bool(true));
 

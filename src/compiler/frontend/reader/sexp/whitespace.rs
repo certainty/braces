@@ -78,8 +78,8 @@ mod tests {
         assert_parse_as(
             "(#t \n #; foo\n #f)",
             Sexp::list(vec![
-                make_datum(Sexp::boolean(true), 1..1),
-                make_datum(Sexp::boolean(false), 14..14),
+                make_datum(Sexp::boolean(true), 1..3),
+                make_datum(Sexp::boolean(false), 14..16),
             ]),
         );
 

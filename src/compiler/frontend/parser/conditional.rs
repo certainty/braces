@@ -29,8 +29,19 @@ impl IfExpression {
 }
 
 impl HasSourceLocation for IfExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         &self.location
+    }
+}
+
+impl Expression {
+    fn conditional(
+        test: Expression,
+        consequent: Expression,
+        alternate: Option<Expression>,
+        loc: Location,
+    ) -> Expression {
+        Expression::If(IfExpression::new(test, consequent, alternate, loc.clone()))
     }
 }
 
@@ -65,7 +76,7 @@ impl Parser {
                     datum.source_location().clone(),
                 ))
             }
-            [test, consequent] => {
+            [_if, test, consequent] => {
                 let test_expr = self.do_parse(&test)?;
                 let consequent_expr = self.do_parse(&consequent)?;
 
@@ -82,5 +93,38 @@ impl Parser {
                 vec![],
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compiler::frontend::parser::tests::*;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
+
+    #[test]
+    fn one_armed_if() {
+        assert_parse_as(
+            "(if #t #f)",
+            Expression::conditional(
+                Expression::constant(make_datum(Sexp::Bool(true), 4, 6)),
+                Expression::constant(make_datum(Sexp::Bool(false), 7, 9)),
+                None,
+                location(0..10),
+            ),
+        )
+    }
+
+    #[test]
+    fn two_armed_if() {
+        assert_parse_as(
+            "(if #t #f #\\a)",
+            Expression::conditional(
+                Expression::constant(make_datum(Sexp::Bool(true), 4, 6)),
+                Expression::constant(make_datum(Sexp::Bool(false), 7, 9)),
+                Some(Expression::constant(make_datum(Sexp::Char('a'), 10, 13))),
+                location(0..14),
+            ),
+        )
     }
 }

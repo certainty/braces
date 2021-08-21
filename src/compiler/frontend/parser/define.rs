@@ -101,7 +101,7 @@ impl Parser {
                         definition.source_location().clone()
                     ))
                 },
-                _ => Err(Error::parse_error("Invalid precedure definition. Expected (define (<IDENTIFIER> <def formals>) <body>)", Detail::new("", definition.source_location().clone()), vec![]))
+                _ => Err(Error::parse_error("Invalid procedure definition. Expected (define (<IDENTIFIER> <def formals>) <body>)", Detail::new("", definition.source_location().clone()), vec![]))
             },
             _ => Err(Error::parse_error(
                 "Invalid procedure definition. Expected (define (<IDENTIFIER> <def formals>) <body>)",
@@ -124,8 +124,8 @@ mod tests {
             "(define x #t)",
             Expression::define(
                 Identifier::synthetic("x"),
-                Expression::constant(make_datum(Sexp::Bool(true), 1, 11)),
-                location(1..1),
+                Expression::constant(make_datum(Sexp::Bool(true), 10, 12)),
+                location(0..13),
             ),
         )
     }

@@ -77,8 +77,8 @@ mod tests {
             "(set! foo #t)",
             Expression::assign(
                 identifier::Identifier::synthetic("foo"),
-                Expression::constant(make_datum(Sexp::Bool(true), 1, 11)),
-                location(1..1),
+                Expression::constant(make_datum(Sexp::Bool(true), 10, 12)),
+                location(0..13),
             ),
         );
 
