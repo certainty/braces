@@ -7,6 +7,7 @@ use super::CompilationUnit;
 use crate::compiler::source::Registry;
 use code_generator::{CodeGenerator, Target};
 
+#[derive(Debug)]
 pub struct Backend {}
 
 impl Backend {

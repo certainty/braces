@@ -14,6 +14,7 @@ pub enum Error {
     IoError(#[from] std::io::Error),
 }
 
+#[derive(Debug)]
 pub struct Registry {
     files: files::SimpleFiles<Origin, String>,
 }

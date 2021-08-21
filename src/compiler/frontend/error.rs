@@ -1,4 +1,5 @@
-use crate::compiler::source::{Location, Origin, SourceId};
+use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::source::{HasSourceLocation, Location, Origin, SourceId};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -15,6 +16,8 @@ pub enum Error {
     ReadError(String, Detail, Vec<Detail>),
     #[error("ReadError")]
     ParseError(String, Detail, Vec<Detail>),
+    #[error("Expansion Error")]
+    ExpansionError(String, Detail, Vec<Detail>),
 }
 
 impl Error {
@@ -25,12 +28,21 @@ impl Error {
     ) -> (String, Detail) {
         (m.into(), Detail::new(content, loc))
     }
+
     pub fn io_error<M: Into<String>>(message: M, source_id: SourceId, e: std::io::Error) -> Self {
         Error::SourceError(message.into(), source_id, e)
     }
 
     pub fn incomplete_input<M: Into<String>>(message: M, source: Option<Origin>) -> Self {
         Error::IncompleteInput(message.into(), source)
+    }
+
+    pub fn expansion_error<M: Into<String>>(m: M, d: &Datum) -> Self {
+        Error::ExpansionError(
+            m.into(),
+            Detail::new("failed to expand form", d.source_location().clone()),
+            vec![],
+        )
     }
 
     pub fn parse_error<M: Into<String>, More: Into<Vec<Detail>>>(

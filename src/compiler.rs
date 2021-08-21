@@ -12,9 +12,10 @@ pub type Result<T> = std::result::Result<T, error::Error>;
 
 pub use compilation_unit::CompilationUnit;
 
+#[derive(Debug)]
 pub struct Compiler {
     sources: source::Registry,
-    frontend: frontend::Frontend,
+    frontend: Box<frontend::Frontend>,
     backend: backend::Backend,
 }
 
@@ -22,7 +23,7 @@ impl Compiler {
     pub fn new() -> Self {
         Compiler {
             sources: source::Registry::new(),
-            frontend: frontend::Frontend::new(),
+            frontend: Box::new(frontend::Frontend::new()),
             backend: backend::Backend::new(),
         }
     }

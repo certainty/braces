@@ -1,4 +1,3 @@
-use crate::vm::value::procedure;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
@@ -16,13 +15,13 @@ pub enum Tag {
 }
 
 #[derive(Debug, Clone)]
-pub struct Identifier {
+pub struct Symbol {
     tag: Tag,
     value: String,
 }
 
-impl PartialEq for Identifier {
-    fn eq(&self, other: &Identifier) -> bool {
+impl PartialEq for Symbol {
+    fn eq(&self, other: &Symbol) -> bool {
         match (&self.tag, &other.tag) {
             (Tag::Unforgeable, Tag::Unforgeable) => self.value == other.value,
             (Tag::Unforgeable, _) => false,
@@ -34,9 +33,9 @@ impl PartialEq for Identifier {
         }
     }
 }
-impl Eq for Identifier {}
+impl Eq for Symbol {}
 
-impl Hash for Identifier {
+impl Hash for Symbol {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.tag {
             Tag::Unforgeable => {
@@ -53,7 +52,7 @@ impl Hash for Identifier {
     }
 }
 
-impl Identifier {
+impl Symbol {
     pub fn as_str(&self) -> &str {
         self.string().as_str()
     }
@@ -92,27 +91,22 @@ impl Identifier {
     }
 }
 
-impl From<Identifier> for String {
-    fn from(s: Identifier) -> String {
+impl From<Symbol> for String {
+    fn from(s: Symbol) -> String {
         s.string().clone()
     }
 }
 
-impl From<&Identifier> for String {
-    fn from(s: &Identifier) -> String {
+impl From<&Symbol> for String {
+    fn from(s: &Symbol) -> String {
         s.string().clone()
     }
 }
 
-impl From<String> for Identifier {
-    fn from(s: String) -> Identifier {
-        Identifier::forged(s)
+impl From<String> for Symbol {
+    fn from(s: String) -> Symbol {
+        Symbol::forged(s)
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum Transformer {
-    ExplicitRenaming(procedure::Procedure),
 }
 
 #[derive(Error, Debug, Clone)]

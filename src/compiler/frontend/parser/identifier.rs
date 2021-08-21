@@ -1,11 +1,12 @@
 use super::Expression;
 use super::{ParseResult, Parser};
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location, SourceId};
 
 #[derive(Clone, Debug)]
 pub struct Identifier {
-    name: String,
+    name: Symbol,
     location: Location,
 }
 
@@ -16,24 +17,29 @@ impl PartialEq for Identifier {
 }
 
 impl Identifier {
-    pub fn new<T: Into<String>>(s: T, location: Location) -> Self {
+    pub fn new<T: Into<Symbol>>(s: T, location: Location) -> Self {
         Self {
             name: s.into(),
             location,
         }
     }
+
+    pub fn symbol(&self) -> &Symbol {
+        &self.name
+    }
+
     pub fn synthetic(s: &str) -> Identifier {
-        Self::new(s, Location::new(SourceId::from(0), 0..0))
+        Self::new(Symbol::forged(s), Location::new(SourceId::from(0), 0..0))
     }
 
     pub fn string(&self) -> &String {
-        &self.name
+        &self.name.string()
     }
 }
 
 impl From<Identifier> for String {
     fn from(id: Identifier) -> String {
-        id.name
+        id.name.string().clone()
     }
 }
 
@@ -57,7 +63,7 @@ impl Parser {
     pub fn do_parse_identifier(&mut self, datum: &Datum) -> ParseResult<Identifier> {
         match datum.sexp() {
             Sexp::Symbol(s) => {
-                ParseResult::accept(Identifier::new(s, datum.source_location().clone()))
+                ParseResult::accept(Identifier::new(s.clone(), datum.source_location().clone()))
             }
             _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),
         }

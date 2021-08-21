@@ -22,12 +22,23 @@ impl Reader {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::{
         sexp::datum::{Datum, Sexp},
         Reader,
     };
     use crate::compiler::source::{BufferSource, Location, Registry, SourceId, Span};
+
+    pub fn parse_datum(inp: &str) -> Datum {
+        let mut registry = Registry::new();
+        let source = registry
+            .add(&mut BufferSource::new(inp, "datum-parser-test"))
+            .unwrap();
+        let reader = Reader::new();
+        let datum = reader.parse(&source).unwrap();
+
+        datum.to_vec()[0].clone()
+    }
 
     // test helpers to use in the sexp parser
     pub fn assert_parse_as(inp: &str, expected: Sexp) {

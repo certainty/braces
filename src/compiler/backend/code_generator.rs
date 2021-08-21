@@ -410,6 +410,7 @@ impl<'a> CodeGenerator<'a> {
 
     fn emit_definition(&mut self, definition: &DefinitionExpression) -> Result<()> {
         match definition {
+            /*
             DefinitionExpression::DefineProcedure(id, lambda_expr, _loc) => {
                 // name of procedure is part is the label of the lambda expression
                 self.emit_lambda(lambda_expr)?;
@@ -425,7 +426,7 @@ impl<'a> CodeGenerator<'a> {
                     // internal define sets a local variable instead
                     todo!()
                 }
-            }
+            }*/
             DefinitionExpression::DefineSimple(id, expr, _loc) => {
                 self.emit_instructions(expr, &Context::NonTail)?;
                 let id_sym = self.sym(&id.string());
@@ -441,7 +442,6 @@ impl<'a> CodeGenerator<'a> {
                     todo!()
                 }
             }
-            DefinitionExpression::Begin(_inner, _loc) => todo!(),
         }
     }
 

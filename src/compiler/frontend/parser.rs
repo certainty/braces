@@ -18,6 +18,11 @@ use crate::compiler::frontend;
 use crate::compiler::representation::{CoreAST, SexpAST};
 use crate::compiler::source::{HasSourceLocation, Location};
 
+use crate::compiler::frontend::error::Detail;
+use crate::compiler::frontend::expander::Expander;
+use crate::compiler::frontend::syntax::environment::Special;
+pub use result::ParseResult;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(identifier::Identifier),
@@ -49,18 +54,16 @@ impl HasSourceLocation for Expression {
     }
 }
 
-use crate::compiler::frontend::error::Detail;
-use crate::compiler::frontend::syntax::environment::Special;
-pub use result::ParseResult;
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Parser {
+    expander: Expander,
     environment: syntax::environment::SyntaxEnvironment,
 }
 
 impl Parser {
     pub fn new() -> Self {
         Self {
+            expander: Expander::new(),
             environment: syntax::environment::SyntaxEnvironment::basic(),
         }
     }
@@ -91,6 +94,7 @@ impl Parser {
     /// ```
 
     fn do_parse(&mut self, datum: &Datum) -> Result<Expression> {
+        //let datum = self.expander.expand(datum)?;
         match datum.sexp() {
             Sexp::List(ls) => match &ls[..] {
                 [operator, _operands @ ..] if operator.is_symbol() => {

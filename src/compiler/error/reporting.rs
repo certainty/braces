@@ -91,6 +91,19 @@ impl<'a> ErrorReporter<'a> {
                     .with_message("failed to parse input")
                     .with_labels(labels)
             }
+            ExpansionError(message, detail, more_details) => {
+                let mut labels =
+                    vec![
+                        Label::primary(detail.location.id, detail.location.span.clone())
+                            .with_message(message),
+                    ];
+                labels.extend(more_details.iter().map(Self::to_label));
+
+                Diagnostic::error()
+                    .with_code("E013")
+                    .with_message("failed to expand input")
+                    .with_labels(labels)
+            }
             Bug(message) => Diagnostic::bug().with_message(message),
         }
     }

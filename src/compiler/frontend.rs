@@ -1,4 +1,5 @@
 pub mod error;
+mod expander;
 pub mod parser;
 pub mod reader;
 pub mod syntax;
@@ -8,7 +9,7 @@ use super::source::Source;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Frontend {
     reader: reader::Reader,
     parser: parser::Parser,
