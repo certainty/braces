@@ -38,7 +38,7 @@ impl From<Identifier> for String {
 }
 
 impl HasSourceLocation for Identifier {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         &self.location
     }
 }
@@ -51,7 +51,7 @@ impl Expression {
 
 impl Parser {
     pub fn parse_identifier(&mut self, datum: &Datum) -> ParseResult<Expression> {
-        self.parse_identifier(datum).map(Expression::Identifier)
+        self.do_parse_identifier(datum).map(Expression::Identifier)
     }
 
     pub fn do_parse_identifier(&mut self, datum: &Datum) -> ParseResult<Identifier> {
@@ -71,8 +71,8 @@ mod tests {
 
     #[test]
     fn test_identifier_equals() {
-        let x = Identifier::new(String::from("foo"), location(0, 1));
-        let y = Identifier::new(String::from("foo"), location(10, 1));
+        let x = Identifier::new(String::from("foo"), location(0..1));
+        let y = Identifier::new(String::from("foo"), location(10..1));
 
         assert_eq!(x, y)
     }
@@ -81,7 +81,7 @@ mod tests {
     fn test_parse_identifier() {
         assert_parse_as(
             "foo",
-            Expression::identifier("foo".to_string(), location(0, 0)),
+            Expression::identifier("foo".to_string(), location(0..0)),
         )
     }
 }

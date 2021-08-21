@@ -19,9 +19,10 @@ pub struct Writer {
 
 impl Writer {
     pub fn new() -> Self {
-        let special_initial: HashSet<char> = String::from(reader::sexp::symbol::SYMBOL_SPECIAL_INITIAL)
-            .chars()
-            .collect();
+        let special_initial: HashSet<char> =
+            String::from(reader::sexp::symbol::SYMBOL_SPECIAL_INITIAL)
+                .chars()
+                .collect();
         Writer {
             symbol_special_initial: special_initial,
         }
@@ -207,8 +208,9 @@ impl Writer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::frontend;
     use crate::compiler::frontend::reader;
-    use crate::compiler::source::StringSource;
+    use crate::compiler::source::{Registry, StringSource};
     use crate::vm::value::arbitrary::SymbolString;
     use crate::vm::value::Value;
     use quickcheck;
@@ -315,11 +317,13 @@ mod tests {
         read_my_write(&sym, &mut values).is_ok()
     }
 
-    fn read_my_write(val: &Value, values: &mut Factory) -> reader::Result<Value> {
+    fn read_my_write(val: &Value, values: &mut Factory) -> frontend::Result<Value> {
         let writer = Writer::new();
         let external = writer.write(&val, &values);
-        let mut source = StringSource::new(&external, "");
-
-        reader::parse(&mut source).map(|e| values.from_datum(&e))
+        let mut registry = Registry::new();
+        let source = registry.add(&mut StringSource::new(&external)).unwrap();
+        let reader = reader::Reader::new();
+        let ast = reader.parse(&source)?;
+        Ok(values.from_datum(ast.first()))
     }
 }

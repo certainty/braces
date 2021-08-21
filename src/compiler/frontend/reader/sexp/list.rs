@@ -63,8 +63,8 @@ mod tests {
         assert_parse_as(
             "(#t    #f)",
             Sexp::list(vec![
-                make_datum(Sexp::boolean(true), 1, 2),
-                make_datum(Sexp::boolean(false), 1, 8),
+                make_datum(Sexp::boolean(true), 1..2),
+                make_datum(Sexp::boolean(false), 1..8),
             ]),
         );
 
@@ -76,11 +76,10 @@ mod tests {
             "((foo #t))",
             Sexp::list(vec![make_datum(
                 Sexp::list(vec![
-                    make_datum(Sexp::symbol("foo"), 1, 3),
-                    make_datum(Sexp::boolean(true), 1, 7),
+                    make_datum(Sexp::symbol("foo"), 1..3),
+                    make_datum(Sexp::boolean(true), 1..7),
                 ]),
-                1,
-                2,
+                1..2,
             )]),
         );
     }
@@ -90,8 +89,8 @@ mod tests {
         assert_parse_as(
             "(#t  .  #f)",
             Sexp::improper_list(
-                vec![make_datum(Sexp::boolean(true), 1, 2)],
-                make_datum(Sexp::boolean(false), 1, 9),
+                vec![make_datum(Sexp::boolean(true), 1..2)],
+                make_datum(Sexp::boolean(false), 1..9),
             ),
         );
 
@@ -99,11 +98,11 @@ mod tests {
             "(#t #f #t .  #f)",
             Sexp::improper_list(
                 vec![
-                    make_datum(Sexp::boolean(true), 1, 2),
-                    make_datum(Sexp::boolean(false), 1, 5),
-                    make_datum(Sexp::boolean(true), 1, 8),
+                    make_datum(Sexp::boolean(true), 1..2),
+                    make_datum(Sexp::boolean(false), 1..5),
+                    make_datum(Sexp::boolean(true), 1..8),
                 ],
-                make_datum(Sexp::boolean(false), 1, 14),
+                make_datum(Sexp::boolean(false), 1..14),
             ),
         );
     }

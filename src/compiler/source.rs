@@ -34,6 +34,24 @@ impl From<usize> for SourceId {
 #[repr(transparent)]
 pub struct Span(Range<usize>);
 
+impl From<Span> for Range<usize> {
+    fn from(s: Span) -> Range<usize> {
+        s.0.clone()
+    }
+}
+
+impl Span {
+    #[inline]
+    pub fn start(&self) -> usize {
+        self.0.start
+    }
+
+    #[inline]
+    pub fn end(&self) -> usize {
+        self.0.end
+    }
+}
+
 impl From<Range<usize>> for Span {
     fn from(n: Range<usize>) -> Self {
         Span(n)
@@ -41,13 +59,16 @@ impl From<Range<usize>> for Span {
 }
 
 #[derive(Debug, Clone)]
-pub struct Source<'a> {
+pub struct Source {
     pub id: SourceId,
-    pub code: &'a str,
+    pub code: String,
 }
 
-impl<'a> Source<'a> {
-    pub fn new(id: SourceId, code: &'a str) -> Self {
-        Self { id, code }
+impl Source {
+    pub fn new<S: Into<String>>(id: SourceId, code: S) -> Self {
+        Self {
+            id,
+            code: code.into(),
+        }
     }
 }

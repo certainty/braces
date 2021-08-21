@@ -24,6 +24,6 @@ impl HasOrigin for BufferSource {
 
 impl std::io::Read for BufferSource {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        buf.write(self.content.as_bytes())
+        self.content.as_bytes().to_vec().write(buf)
     }
 }

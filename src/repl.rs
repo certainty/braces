@@ -1,10 +1,11 @@
 pub mod command;
 pub mod string_completer;
 use crate::braces_config_directory;
+use crate::compiler::source::BufferSource;
+use crate::compiler::Compiler;
 use crate::repl::command::CommandCompleter;
 use crate::repl::command::Commands;
 use crate::repl::string_completer::StringCompleter;
-use crate::vm;
 use crate::vm::value::Value;
 use crate::vm::VM;
 use crate::BRACES_VERSION;
@@ -168,27 +169,19 @@ impl Repl {
         Ok(())
     }
 
-    fn eval(&mut self, source: &String) -> anyhow::Result<()> {
-        match self.vm.run_string(source, "repl") {
-            Ok(Value::Unspecified) => (),
-            Ok(v) => println!("{}", self.vm.write(&v)),
-            Err(vm::Error::CompilerError(e)) => todo!(),
-            Err(vm::Error::RuntimeError(msg, line, stack_trace, Some(ctx))) => {
-                eprintln!(
-                    "{} in line {} [in {}]\n{}",
-                    msg,
-                    line,
-                    ctx,
-                    stack_trace.as_string()
-                )
-            }
+    fn eval(&mut self, input: &String) -> anyhow::Result<()> {
+        let mut source = BufferSource::new(input.clone(), "repl");
+        let mut compiler = Compiler::new();
 
-            Err(vm::Error::RuntimeError(msg, line, stack_trace, _)) => {
-                eprintln!("{} in line {}\n{}", msg, line, stack_trace.as_string())
-            }
-
-            Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
+        match compiler.compile(&mut source) {
+            Ok(unit) => match self.vm.interpret(unit) {
+                Ok(Value::Unspecified) => (),
+                Ok(v) => println!("{}", self.vm.write(&v)),
+                Err(e) => self.vm.print_error(&e, &compiler),
+            },
+            Err(e) => compiler.print_error(&e),
         }
+
         Ok(())
     }
 

@@ -25,7 +25,7 @@ use nom_locate::{position, LocatedSpan};
 
 pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceId>;
 
-type ParseResult<'a, T> = IResult<Input<'a>, T, Error<Input<'a>>>;
+pub type ParseResult<'a, T> = IResult<Input<'a>, T, Error<Input<'a>>>;
 
 // Parse a single datum from input
 pub fn parse_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {

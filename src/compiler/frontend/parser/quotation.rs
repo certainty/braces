@@ -1,5 +1,6 @@
-use super::error::Error;
+use super::frontend::error::Error;
 use super::{Expression, ParseResult, Parser, Result};
+use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
@@ -13,7 +14,7 @@ impl QuotationExpression {
         QuotationExpression::Quote(datum)
     }
 
-    pub fn datum<'a>(&'a self) -> &'a Datum {
+    pub fn datum(&self) -> &Datum {
         match self {
             Self::Quote(d) => d,
         }
@@ -21,7 +22,7 @@ impl QuotationExpression {
 }
 
 impl HasSourceLocation for QuotationExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         match self {
             Self::Quote(d) => d.source_location(),
         }
@@ -45,13 +46,14 @@ impl Parser {
         self.do_parse_quote(datum).map(Expression::Quotation).into()
     }
 
-    pub fn do_parse_quote(&mut self, datum: &Datum, loc: &Location) -> Result<QuotationExpression> {
+    pub fn do_parse_quote(&mut self, datum: &Datum) -> Result<QuotationExpression> {
         match self.parse_list(datum)? {
             [_, value] => Ok(QuotationExpression::new(value.clone())),
-            _ => Error::parse_error(
-                "Expected (quote <datum>) or (quasiquite <datum>)",
-                loc.clone(),
-            ),
+            _ => Err(Error::parse_error(
+                "Expected (quote <datum>) or (quasi-quote <datum>)",
+                Detail::new("", datum.source_location().clone()),
+                vec![],
+            )),
         }
     }
 }

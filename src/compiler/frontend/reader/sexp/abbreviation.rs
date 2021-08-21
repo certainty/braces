@@ -11,14 +11,14 @@ use nom::sequence::pair;
 ////////////////////////////
 
 #[inline]
-pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse(input: Input) -> ParseResult<Datum> {
     let abbrev = pair(parse_abbrev_prefix, parse_datum);
 
     map_datum(abbrev, |(abbr, datum)| Sexp::list(vec![abbr, datum]))(input)
 }
 
 #[inline]
-fn parse_abbrev_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+fn parse_abbrev_prefix(input: Input) -> ParseResult<Datum> {
     let abbrev = alt((
         value(Sexp::symbol("quote"), char('\'')),
         value(Sexp::symbol("quasi-quote"), char('`')),
@@ -39,31 +39,31 @@ mod tests {
         assert_parse_as(
             "'foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("quote"), 1, 1),
-                make_datum(Sexp::symbol("foo"), 1, 2),
+                make_datum(Sexp::symbol("quote"), 1..1),
+                make_datum(Sexp::symbol("foo"), 1..2),
             ]),
         );
         assert_parse_as(
             ",foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("unquote"), 1, 1),
-                make_datum(Sexp::symbol("foo"), 1, 2),
+                make_datum(Sexp::symbol("unquote"), 1..1),
+                make_datum(Sexp::symbol("foo"), 1..2),
             ]),
         );
 
         assert_parse_as(
             "`foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("quasi-quote"), 1, 1),
-                make_datum(Sexp::symbol("foo"), 1, 2),
+                make_datum(Sexp::symbol("quasi-quote"), 1..1),
+                make_datum(Sexp::symbol("foo"), 1..2),
             ]),
         );
 
         assert_parse_as(
             ",@foo",
             Sexp::list(vec![
-                make_datum(Sexp::symbol("unquote-splicing"), 1, 1),
-                make_datum(Sexp::symbol("foo"), 1, 3),
+                make_datum(Sexp::symbol("unquote-splicing"), 1..1),
+                make_datum(Sexp::symbol("foo"), 1..3),
             ]),
         );
     }

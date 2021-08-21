@@ -1,5 +1,6 @@
-use super::error::Error;
+use super::frontend::error::Error;
 use super::{Expression, ParseResult, Parser, Result};
+use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
@@ -21,7 +22,7 @@ impl BeginExpression {
 }
 
 impl HasSourceLocation for BeginExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         &self.location
     }
 }
@@ -37,7 +38,7 @@ impl Parser {
         self.do_parse_begin(datum).map(Expression::Begin).into()
     }
 
-    fn do_parse_begin(&mut self, datum: &Datum, loc: &Location) -> Result<BeginExpression> {
+    fn do_parse_begin(&mut self, datum: &Datum) -> Result<BeginExpression> {
         match self.parse_list(datum)? {
             [_, first, rest @ ..] => {
                 let parsed_first = self.parse_command_or_definition(first).res();
@@ -49,15 +50,20 @@ impl Parser {
                 Ok(BeginExpression::new(
                     parsed_first?,
                     parsed_exprs?,
-                    loc.clone(),
+                    datum.source_location().clone(),
                 ))
             }
-            _ => Error::parse_error("Expected (define <command-or-definition+>)", loc.clone()),
+            _ => Err(Error::parse_error(
+                "Expected (define <command-or-definition+>)",
+                Detail::new("", datum.source_location().clone()),
+                vec![],
+            )),
         }
     }
 
     fn parse_command_or_definition(&mut self, datum: &Datum) -> ParseResult<Expression> {
-        self.parse_define(datum).or(|| self.parse(datum))
+        self.parse_definition(datum)
+            .or(|| self.do_parse(datum).into())
     }
 }
 
@@ -74,7 +80,7 @@ mod tests {
             Expression::begin(
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 8)),
                 vec![],
-                location(1, 1),
+                location(1..1),
             ),
         )
     }

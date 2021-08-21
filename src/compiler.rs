@@ -12,13 +12,13 @@ pub type Result<T> = std::result::Result<T, error::Error>;
 
 pub use compilation_unit::CompilationUnit;
 
-pub struct Compiler<'a> {
-    sources: source::Registry<'a>,
+pub struct Compiler {
+    sources: source::Registry,
     frontend: frontend::Frontend,
     backend: backend::Backend,
 }
 
-impl<'a> Compiler<'a> {
+impl Compiler {
     pub fn new() -> Self {
         Compiler {
             sources: source::Registry::new(),
@@ -27,13 +27,18 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile<T: HasOrigin + Read>(&mut self, input: T) -> Result<CompilationUnit> {
+    pub fn compile<T: HasOrigin + Read>(&mut self, input: &mut T) -> Result<CompilationUnit> {
         let source = self.sources.add(input)?;
-        self.compile_source(source)
+        self.compile_source(&source)
     }
 
-    fn compile_source(&mut self, source: &Source<'a>) -> Result<CompilationUnit> {
+    pub fn print_error(&self, _e: &error::Error) {
+        todo!()
+    }
+
+    fn compile_source(&mut self, source: &Source) -> Result<CompilationUnit> {
         let ast = self.frontend.pass(&source)?;
-        self.backend.pass(&ast)
+        let unit = self.backend.pass(&ast, &self.sources)?;
+        Ok(unit)
     }
 }

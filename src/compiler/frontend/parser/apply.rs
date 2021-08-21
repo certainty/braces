@@ -1,7 +1,8 @@
-use super::error::Error;
+use super::frontend::error::Error;
 use super::Expression;
 use super::Result;
 use super::{ParseResult, Parser};
+use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::{HasSourceLocation, Location};
 
@@ -28,7 +29,7 @@ impl ApplicationExpression {
 }
 
 impl HasSourceLocation for ApplicationExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         &self.location
     }
 }
@@ -40,7 +41,7 @@ impl Expression {
 }
 
 impl Parser {
-    fn parse_apply(&mut self, datum: &Datum) -> ParseResult<Expression> {
+    pub fn parse_apply(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_apply(datum).map(Expression::Apply).into()
     }
 
@@ -48,9 +49,9 @@ impl Parser {
         match datum.sexp() {
             Sexp::List(ls) => {
                 if let [operator, operands @ ..] = &ls[..] {
-                    let operator_expr = Expression::parse(&operator)?;
+                    let operator_expr = self.do_parse(&operator)?;
                     let operands_expr: Result<Vec<Expression>> =
-                        operands.iter().map(Expression::parse).collect();
+                        operands.iter().map(|e| self.do_parse(e)).collect();
 
                     Ok(ApplicationExpression::new(
                         operator_expr,
@@ -58,17 +59,19 @@ impl Parser {
                         datum.source_location().clone(),
                     ))
                 } else {
-                    Error::parse_error(
+                    Err(Error::parse_error(
                         "expected (<operator> <operand>*)",
-                        datum.source_location().clone(),
-                    )
+                        Detail::new("", datum.source_location().clone()),
+                        vec![],
+                    ))
                 }
             }
 
-            _ => Error::parse_error(
+            _ => Err(Error::parse_error(
                 "expected (<operator> <operand>*)",
-                datum.source_location().clone(),
-            ),
+                Detail::new("", datum.source_location().clone()),
+                vec![],
+            )),
         }
     }
 }
@@ -84,9 +87,9 @@ mod tests {
         assert_parse_as(
             "(foo #t)",
             Expression::apply(
-                Expression::identifier("foo".to_string(), location(1, 2)),
+                Expression::identifier("foo".to_string(), location(1..2)),
                 vec![Expression::constant(make_datum(Sexp::Bool(true), 1, 6))],
-                location(1, 1),
+                location(1..1),
             ),
         )
     }

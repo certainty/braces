@@ -1,11 +1,19 @@
 use crate::compiler::source::{Location, Origin, SourceId};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    IoError(String, SourceId, std::io::Error),
+    #[error("IOError")]
+    IoError(#[from] std::io::Error),
+    #[error("SourceError")]
+    SourceError(String, SourceId, std::io::Error),
+    #[error("Incomplete Input")]
     IncompleteInput(String, Option<Origin>),
+    #[error("Bug")]
     Bug(String),
+    #[error("ReadError")]
     ReadError(String, Detail, Vec<Detail>),
+    #[error("ReadError")]
     ParseError(String, Detail, Vec<Detail>),
 }
 
@@ -18,7 +26,7 @@ impl Error {
         (m.into(), Detail::new(content, loc))
     }
     pub fn io_error<M: Into<String>>(message: M, source_id: SourceId, e: std::io::Error) -> Self {
-        Error::IoError(message.into(), source_id, e)
+        Error::SourceError(message.into(), source_id, e)
     }
 
     pub fn incomplete_input<M: Into<String>>(message: M, source: Option<Origin>) -> Self {

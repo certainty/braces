@@ -1,5 +1,7 @@
 use super::SourceId;
 use super::Span;
+use crate::compiler::source::Registry;
+use codespan_reporting::files::Files;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Location {
@@ -14,8 +16,14 @@ impl Location {
             span: span.into(),
         }
     }
+
+    pub fn line(&self, registry: &Registry) -> Option<usize> {
+        registry
+            .line_number(self.id.clone(), self.span.start())
+            .ok()
+    }
 }
 
 pub trait HasSourceLocation {
-    fn source_location<'a>(&'a self) -> &'a Location;
+    fn source_location(&self) -> &Location;
 }

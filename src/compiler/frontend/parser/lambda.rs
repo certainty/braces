@@ -1,7 +1,8 @@
 use super::body::BodyExpression;
-use super::error::Error;
+use super::frontend::error::Error;
 use super::identifier::Identifier;
 use super::{Expression, ParseResult, Parser, Result};
+use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::value::procedure::Arity;
@@ -31,7 +32,7 @@ impl LambdaExpression {
 }
 
 impl HasSourceLocation for LambdaExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         &self.location
     }
 }
@@ -86,19 +87,23 @@ impl Parser {
         self.do_parse_lambda(datum).map(Expression::Lambda).into()
     }
 
-    pub fn do_parse_lambda(&mut self, datum: &Datum, loc: &Location) -> Result<LambdaExpression> {
+    pub fn do_parse_lambda(&mut self, datum: &Datum) -> Result<LambdaExpression> {
         match self.parse_list(datum)? {
-            [formals, body @ ..] => {
+            [_, formals, body @ ..] => {
                 let formals = self.parse_formals(formals)?;
-                let body = self.parse_body(body, loc)?;
+                let body = self.parse_body(body, &datum.source_location().clone())?;
                 Ok(LambdaExpression::new(
                     formals,
                     body,
                     Some(String::from("lambda")),
-                    loc.clone(),
+                    datum.source_location().clone(),
                 ))
             }
-            _ => Error::parse_error("Expected (lambda <formals> <body>)", loc.clone()),
+            _ => Err(Error::parse_error(
+                "Expected (lambda <formals> <body>)",
+                Detail::new("", datum.source_location().clone()),
+                vec![],
+            )),
         }
     }
 
@@ -106,17 +111,19 @@ impl Parser {
         match datum.sexp() {
             Sexp::List(ls) => {
                 let identifiers: Result<Vec<Identifier>> =
-                    ls.iter().map(|e| self.parse_identifier(e)).collect();
+                    ls.iter().map(|e| self.do_parse_identifier(e)).collect();
                 Ok(Formals::ArgList(identifiers?))
             }
             Sexp::ImproperList(head, tail) => {
-                let identifiers: Result<Vec<Identifier>> =
-                    head.iter().map(|e| self.parse_identifier(e)).collect();
-                let rest = self.parse_identifier(tail).res();
+                let identifiers: Result<Vec<Identifier>> = head
+                    .iter()
+                    .map(|e| self.do_parse_identifier(e).res())
+                    .collect();
+                let rest = self.do_parse_identifier(tail).res();
 
                 Ok(Formals::VarArg(identifiers?, rest?))
             }
-            _ => Ok(Formals::RestArg(self.parse_identifier(datum).res()?)),
+            _ => Ok(Formals::RestArg(self.do_parse_identifier(datum).res()?)),
         }
     }
 }
@@ -135,7 +142,7 @@ mod tests {
                 Formals::RestArg(Identifier::synthetic("all")),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 13)).to_body_expression(),
                 Some(String::from("lambda")),
-                location(1, 1),
+                location(1..1),
             ),
         );
 
@@ -145,7 +152,7 @@ mod tests {
                 Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 15)).to_body_expression(),
                 Some(String::from("lambda")),
-                location(1, 1),
+                location(1..1),
             ),
         );
 
@@ -155,7 +162,7 @@ mod tests {
                 Formals::ArgList(vec![]),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 12)).to_body_expression(),
                 Some(String::from("lambda")),
-                location(1, 1),
+                location(1..1),
             ),
         );
 
@@ -168,7 +175,7 @@ mod tests {
                 ),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 19)).to_body_expression(),
                 Some(String::from("lambda")),
-                location(1, 1),
+                location(1..1),
             ),
         );
 

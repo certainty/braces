@@ -1,7 +1,7 @@
 impl std::fmt::Display for Origin {
     fn fmt(
         &self,
-        formatter: &mut std::fmt::Formatter<'_>,
+        _formatter: &mut std::fmt::Formatter<'_>,
     ) -> std::result::Result<(), std::fmt::Error> {
         todo!()
     }

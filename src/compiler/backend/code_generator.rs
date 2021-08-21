@@ -29,7 +29,8 @@ use crate::compiler::frontend::parser::{
     Expression,
 };
 use crate::compiler::frontend::reader::sexp::datum;
-use crate::compiler::source::{HasSourceLocation, Location};
+use crate::compiler::representation::CoreAST;
+use crate::compiler::source::{HasSourceLocation, Location, Registry};
 use crate::compiler::CompilationUnit;
 use crate::vm::byte_code::chunk::AddressType;
 use crate::vm::byte_code::chunk::Chunk;
@@ -61,7 +62,8 @@ pub enum Target {
     Procedure(Option<String>),
 }
 
-pub struct CodeGenerator {
+pub struct CodeGenerator<'a> {
+    source_registry: &'a Registry,
     variables: VariablesRef,
     values: value::Factory,
     target: Target,
@@ -83,11 +85,16 @@ impl Context {
     }
 }
 
-impl CodeGenerator {
-    pub fn new(target: Target, parent_variables: Option<VariablesRef>) -> Self {
+impl<'a> CodeGenerator<'a> {
+    pub fn new(
+        target: Target,
+        parent_variables: Option<VariablesRef>,
+        source_registry: &'a Registry,
+    ) -> Self {
         let variables = Variables::child(parent_variables);
 
-        CodeGenerator {
+        Self {
+            source_registry,
             variables,
             target,
             values: value::Factory::default(),
@@ -95,11 +102,12 @@ impl CodeGenerator {
         }
     }
 
-    pub fn generate(&mut self, ast: Vec<Expression>) -> Result<CompilationUnit> {
+    pub fn generate(&mut self, ast: &CoreAST) -> Result<CompilationUnit> {
         let proc = Self::generate_procedure(
+            self.source_registry,
             None,
             Target::TopLevel,
-            &Expression::body(ast),
+            &Expression::body(ast.expressions.clone()),
             &Formals::empty(),
         )?;
 
@@ -110,12 +118,13 @@ impl CodeGenerator {
     }
 
     pub fn generate_procedure(
+        registry: &Registry,
         parent_variables: Option<VariablesRef>,
         target: Target,
         ast: &BodyExpression,
         formals: &Formals,
     ) -> Result<value::procedure::native::Procedure> {
-        let mut generator = CodeGenerator::new(target.clone(), parent_variables);
+        let mut generator = CodeGenerator::new(target.clone(), parent_variables, registry);
 
         generator.begin_scope();
         for argument in formals.identifiers() {
@@ -169,10 +178,9 @@ impl CodeGenerator {
         if processed_variables.len() > 0 {
             for (addr, was_captured) in processed_variables {
                 if was_captured {
-                    self.current_chunk()
-                        .write_instruction(Instruction::CloseUpValue(addr));
+                    self.emit_instruction_without_location(Instruction::CloseUpValue(addr));
                 } else if pop_locals {
-                    self.current_chunk().write_instruction(Instruction::Pop);
+                    self.emit_instruction_without_location(Instruction::Pop);
                 }
             }
         }
@@ -340,6 +348,7 @@ impl CodeGenerator {
 
     fn emit_lambda(&mut self, expr: &LambdaExpression) -> Result<()> {
         let lambda = Self::generate_procedure(
+            &self.source_registry,
             Some(self.variables.clone()),
             Target::Procedure(expr.label.clone()),
             &expr.body,
@@ -395,7 +404,7 @@ impl CodeGenerator {
     }
 
     fn emit_return(&mut self) -> Result<()> {
-        self.current_chunk().write_instruction(Instruction::Return);
+        self.emit_instruction_without_location(Instruction::Return);
         Ok(())
     }
 
@@ -437,13 +446,8 @@ impl CodeGenerator {
     }
 
     fn emit_constant(&mut self, value: Value, loc: &Location) -> Result<()> {
-        let const_addr = self.current_chunk().add_constant(value);
-        let inst_addr = self
-            .current_chunk()
-            .write_instruction(Instruction::Const(const_addr));
-
-        self.current_chunk()
-            .write_line(inst_addr, inst_addr, loc.line);
+        let const_address = self.current_chunk().add_constant(value);
+        self.emit_instruction(Instruction::Const(const_address), &loc)?;
         Ok(())
     }
 
@@ -452,18 +456,15 @@ impl CodeGenerator {
         // add up-values
         let up_values = self.variables.up_values_vec();
         for up_value in up_values {
-            self.current_chunk()
-                .write_instruction(Instruction::UpValue(up_value.address, up_value.is_local));
+            self.emit_instruction_without_location(Instruction::UpValue(
+                up_value.address,
+                up_value.is_local,
+            ));
         }
 
         // now add the closure
-        let const_addr = self.current_chunk().add_constant(value);
-        let inst_addr = self
-            .current_chunk()
-            .write_instruction(Instruction::Closure(const_addr));
-        self.current_chunk()
-            .write_line(inst_addr, inst_addr, loc.line);
-
+        let const_address = self.current_chunk().add_constant(value);
+        self.emit_instruction(Instruction::Closure(const_address), &loc)?;
         Ok(())
     }
 
@@ -490,16 +491,27 @@ impl CodeGenerator {
     }
 
     fn emit_pop(&mut self) -> Result<()> {
-        self.current_chunk().write_instruction(Instruction::Pop);
+        self.emit_instruction_without_location(Instruction::Pop);
         Ok(())
     }
 
     fn emit_instruction(&mut self, instr: Instruction, source_location: &Location) -> Result<()> {
-        let addr = self.current_chunk().write_instruction(instr);
-
-        self.current_chunk()
-            .write_line(addr, addr, source_location.line);
+        let address = self.emit_instruction_without_location(instr);
+        self.write_line(address, address, &source_location);
         Ok(())
+    }
+
+    #[inline]
+    fn emit_instruction_without_location(&mut self, instr: Instruction) -> AddressType {
+        self.current_chunk().write_instruction(instr)
+    }
+
+    #[inline]
+    fn write_line(&mut self, from: AddressType, to: AddressType, loc: &Location) {
+        match loc.line(&self.source_registry) {
+            Some(line) => self.current_chunk().write_line(from, to, line),
+            _ => (),
+        }
     }
 
     #[inline]
@@ -679,8 +691,8 @@ mod tests {
 
     fn compile(input: &str) -> Chunk {
         let mut compiler = Compiler::new();
-        let mut source = StringSource::new(input, "test");
-        let unit = compiler.compile_program(&mut source).unwrap();
+        let mut source = StringSource::new(input);
+        let unit = compiler.compile(&mut source).unwrap();
         unit.closure.code().clone()
     }
 

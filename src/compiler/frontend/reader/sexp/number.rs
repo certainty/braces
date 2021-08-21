@@ -4,7 +4,7 @@ use nom::bytes::complete::tag;
 use nom::character::complete::char;
 use nom::character::complete::one_of;
 use nom::combinator::{map, opt, value};
-use nom::error::{ErrorKind, ParseError, VerboseError};
+use nom::error::{Error, ErrorKind, ParseError};
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 
@@ -76,7 +76,7 @@ fn parse_signed_real<'a>(prefix: Prefix) -> impl FnMut(Input<'a>) -> ParseResult
         if let Some(num) = apply_exactness(num.sign(sign), &prefix.exactness) {
             Ok((s, num))
         } else {
-            Err(nom::Err::Error(VerboseError::from_error_kind(
+            Err(nom::Err::Error(Error::from_error_kind(
                 s,
                 ErrorKind::Verify,
             )))

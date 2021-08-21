@@ -1,5 +1,6 @@
-use super::error::Error;
+use super::frontend::error::Error;
 use super::{Expression, ParseResult, Parser, Result};
+use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
@@ -50,35 +51,36 @@ impl Parser {
         self.do_parse_if(datum).map(Expression::If).into()
     }
 
-    pub fn do_parse_if(&mut self, datum: &Datum, loc: &Location) -> Result<IfExpression> {
+    pub fn do_parse_if(&mut self, datum: &Datum) -> Result<IfExpression> {
         match self.parse_list(datum)? {
             [_if, test, consequent, alternate] => {
-                let test_expr = self.parse(&test)?;
-                let consequent_expr = self.parse(&consequent)?;
-                let alternate_expr = self.parse(&alternate)?;
+                let test_expr = self.do_parse(&test)?;
+                let consequent_expr = self.do_parse(&consequent)?;
+                let alternate_expr = self.do_parse(&alternate)?;
 
                 Ok(IfExpression::new(
                     test_expr,
                     consequent_expr,
                     Some(alternate_expr),
-                    loc.clone(),
+                    datum.source_location().clone(),
                 ))
             }
             [test, consequent] => {
-                let test_expr = self.parse(&test)?;
-                let consequent_expr = self.parse(&consequent)?;
+                let test_expr = self.do_parse(&test)?;
+                let consequent_expr = self.do_parse(&consequent)?;
 
                 Ok(IfExpression::new(
                     test_expr,
                     consequent_expr,
                     None,
-                    loc.clone(),
+                    datum.source_location().clone(),
                 ))
             }
-            _ => Error::parse_error(
+            _ => Err(Error::parse_error(
                 "Expected (if <test> <consequent> <alternate>?)",
-                loc.clone(),
-            ),
+                Detail::new("", datum.source_location().clone()),
+                vec![],
+            )),
         }
     }
 }

@@ -2,10 +2,11 @@ use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::define::DefinitionExpression;
-use super::error::Error;
+use super::frontend::error::Error;
 use super::Expression;
 use super::Parser;
 use super::Result;
+use crate::compiler::frontend::error::Detail;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BodyExpression {
@@ -41,7 +42,7 @@ impl From<DefinitionExpression> for BodyExpression {
 }
 
 impl HasSourceLocation for BodyExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         match (self.definitions.first(), self.sequence.first()) {
             (Some(def), _) => def.source_location(),
             (_, Some(seq)) => seq.source_location(),
@@ -80,7 +81,7 @@ impl Parser {
 
         // parse definitions*
         while cur.is_some() {
-            match self.parse_definition(cur.unwrap()).res() {
+            match self.do_parse_definition(cur.unwrap()) {
                 Ok(expr) => {
                     definitions.push(expr);
                     cur = iter.next();
@@ -91,15 +92,16 @@ impl Parser {
 
         // nothing left to parse
         if cur.is_none() {
-            return Error::parse_error(
+            return Err(Error::parse_error(
                 "Invalid body definition. Expected (<definition>* sequence)",
-                loc.clone(),
-            );
+                Detail::new("", loc.clone()),
+                vec![],
+            ));
         }
 
         //parse the rest as sequence
-        let mut sequence = vec![Expression::parse(cur.unwrap())?];
-        let rest: Result<Vec<Expression>> = iter.map(Expression::parse).collect();
+        let mut sequence = vec![self.do_parse(cur.unwrap())?];
+        let rest: Result<Vec<Expression>> = iter.map(|e| self.do_parse(e)).collect();
         sequence.extend(rest?);
 
         Ok(BodyExpression {

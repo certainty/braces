@@ -8,7 +8,7 @@ type NomError<'a> = Error<Input<'a>>;
 
 impl<'a> From<(Input<'a>, ErrorKind)> for error::Detail {
     fn from(e: (Input<'a>, ErrorKind)) -> error::Detail {
-        let (input, kind) = e;
+        let (input, _kind) = e;
         let content = input.fragment();
         let span = input.location_offset()..input.fragment().len();
         let location = Location::new(input.extra.clone(), span);

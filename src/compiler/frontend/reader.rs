@@ -6,6 +6,7 @@ use crate::compiler::source::Source;
 use nom::error::context;
 use nom::multi::many1;
 
+#[derive(Clone, Debug)]
 pub struct Reader;
 
 impl Reader {
@@ -13,13 +14,9 @@ impl Reader {
         Self
     }
 
-    pub fn parse<'a>(
-        &self,
-        source: &'a Source<'a>,
-    ) -> std::result::Result<SexpAST, frontend::error::Error> {
+    pub fn parse(&self, source: &Source) -> frontend::Result<SexpAST> {
         let input = sexp::Input::new_extra(&source.code, source.id.clone());
         let (_rest, datum) = context("program", many1(sexp::parse_datum))(input)?;
-
         Ok(SexpAST::new(datum))
     }
 }
@@ -35,27 +32,33 @@ mod tests {
     // test helpers to use in the sexp parser
     pub fn assert_parse_as(inp: &str, expected: Sexp) {
         let mut registry = Registry::new();
-        let source = registry.add(BufferSource::new(inp, "datum-parser-test"));
+        let source = registry
+            .add(&mut BufferSource::new(inp, "datum-parser-test"))
+            .unwrap();
         let reader = Reader::new();
-        let datum = reader.parse(source).unwrap();
+        let datum = reader.parse(&source).unwrap();
 
-        assert_eq!(datum[0].sexp, expected);
+        assert_eq!(datum.to_vec()[0].sexp, expected);
     }
 
     pub fn assert_parse_ok(inp: &str) {
         let mut registry = Registry::new();
-        let source = registry.add(BufferSource::new(inp, "datum-parser-test"));
+        let source = registry
+            .add(&mut BufferSource::new(inp, "datum-parser-test"))
+            .unwrap();
         let reader = Reader::new();
-        let parsed = reader.parse(source);
+        let parsed = reader.parse(&source);
 
         assert!(parsed.is_ok(), "expected to parse successfully")
     }
 
     pub fn assert_parse_error(inp: &str) {
         let mut registry = Registry::new();
-        let source = registry.add(BufferSource::new(inp, "datum-parser-test"));
+        let source = registry
+            .add(&mut BufferSource::new(inp, "datum-parser-test"))
+            .unwrap();
         let reader = Reader::new();
-        let parsed = reader.parse(source);
+        let parsed = reader.parse(&source);
 
         assert!(parsed.is_err(), "expected  parse error")
     }

@@ -19,6 +19,6 @@ impl HasOrigin for StringSource {
 
 impl std::io::Read for StringSource {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        buf.write(self.0.as_bytes())
+        self.0.as_bytes().to_vec().write(buf)
     }
 }

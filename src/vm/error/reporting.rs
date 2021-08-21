@@ -9,7 +9,7 @@ pub struct ErrorReporter<'a> {
 }
 
 impl<'a> ErrorReporter<'a> {
-    pub fn new(source_registry: Registry<'a>) -> Self {
+    pub fn new(source_registry: &'a Registry) -> Self {
         Self {
             compiler_reporter: CompilerErrorReporter::new(source_registry),
         }
@@ -19,9 +19,10 @@ impl<'a> ErrorReporter<'a> {
 impl<'a> ErrorReporter<'a> {
     pub fn report_error(&self, e: Error) {
         match e {
+            Error::CompilerBug(msg) => eprintln!("Bug: {}", msg),
             Error::CompilerError(e) => self.compiler_reporter.report_error(&e),
-            Error::RuntimeError(e, _, stack_trace, label) => {
-                self.report_runtime_error(e, stack_trace, label)
+            Error::RuntimeError(e, line, stack_trace, label) => {
+                self.report_runtime_error(e, line, stack_trace, label)
             }
         }
     }
@@ -29,12 +30,15 @@ impl<'a> ErrorReporter<'a> {
     pub fn report_runtime_error(
         &self,
         e: RuntimeError,
+        line: usize,
         stack_trace: StackTrace,
         label: Option<String>,
     ) {
-        println!(
-            "{} \n stack trace: {}",
-            self.runtime_error_message(e),
+        eprintln!(
+            "{} on line {} [in {}]\n{}",
+            e,
+            line,
+            label.unwrap_or_default(),
             stack_trace.as_string()
         )
     }

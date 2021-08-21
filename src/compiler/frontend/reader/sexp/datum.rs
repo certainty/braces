@@ -59,6 +59,13 @@ impl Sexp {
         }
     }
 
+    pub fn is_symbol(&self) -> bool {
+        match self {
+            Self::Symbol(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn vector<I>(elements: I) -> Self
     where
         I: IntoIterator,
@@ -90,10 +97,14 @@ impl Datum {
     pub fn location(&self) -> &Location {
         &self.location
     }
+
+    pub fn is_symbol(&self) -> bool {
+        self.sexp.is_symbol()
+    }
 }
 
 impl HasSourceLocation for Datum {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         &self.location
     }
 }

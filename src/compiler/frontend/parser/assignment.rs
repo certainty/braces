@@ -1,8 +1,9 @@
-use super::error::Error;
+use super::frontend::error::Error;
 use super::identifier;
 use super::Expression;
 use super::Result;
 use super::{ParseResult, Parser};
+use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
@@ -24,7 +25,7 @@ impl SetExpression {
 }
 
 impl HasSourceLocation for SetExpression {
-    fn source_location<'a>(&'a self) -> &'a Location {
+    fn source_location(&self) -> &Location {
         &self.location
     }
 }
@@ -48,15 +49,19 @@ impl Parser {
         self.do_parse_set(datum).map(Expression::Assign).into()
     }
 
-    fn do_parse_set(&mut self, datum: &Datum, loc: &Location) -> Result<SetExpression> {
-        match datum.sexp() {
+    fn do_parse_set(&mut self, datum: &Datum) -> Result<SetExpression> {
+        match self.parse_list(datum)? {
             [_, identifier, expr] => Ok(SetExpression::new(
-                self.parse_identifier(identifier).res()?,
-                Expression::parse(expr)?,
-                loc.clone(),
+                self.do_parse_identifier(identifier).res()?,
+                self.do_parse(expr)?,
+                datum.source_location().clone(),
             )),
 
-            _other => Error::parse_error("Expected (set! <identifier> <expression>)", loc.clone()),
+            _other => Err(Error::parse_error(
+                "Expected (set! <identifier> <expression>)",
+                Detail::new("", datum.source_location().clone()),
+                vec![],
+            )),
         }
     }
 }
@@ -73,7 +78,7 @@ mod tests {
             Expression::assign(
                 identifier::Identifier::synthetic("foo"),
                 Expression::constant(make_datum(Sexp::Bool(true), 1, 11)),
-                location(1, 1),
+                location(1..1),
             ),
         );
 

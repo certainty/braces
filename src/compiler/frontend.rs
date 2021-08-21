@@ -1,9 +1,10 @@
 pub mod error;
 pub mod parser;
 pub mod reader;
-use super::representation::CoreAST;
+pub mod syntax;
+
+use super::representation::{CoreAST, SexpAST};
 use super::source::Source;
-use reader::sexp::datum::Datum;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
@@ -21,17 +22,17 @@ impl Frontend {
         }
     }
 
-    pub fn pass<'a>(&self, source: &Source<'a>) -> Result<CoreAST> {
-        self.parse(self.read(source)?)
+    pub fn pass<'a>(&mut self, source: &Source) -> Result<CoreAST> {
+        self.parse(&self.read(source)?)
     }
 
-    pub fn read<'a>(&self, source: &Source<'a>) -> Result<Vec<Datum>> {
-        let datum = self.reader.parse(source)?;
-        Ok(datum)
+    pub fn read<'a>(&self, source: &Source) -> Result<SexpAST> {
+        let ast = self.reader.parse(source)?;
+        Ok(ast)
     }
 
-    pub fn parse(&self, datum: &Vec<Datum>) -> Result<CoreAST> {
-        let ast = self.parser.parse(&datum)?;
+    pub fn parse(&mut self, sexps: &SexpAST) -> Result<CoreAST> {
+        let ast = self.parser.parse(sexps)?;
         Ok(ast)
     }
 }

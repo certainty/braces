@@ -12,7 +12,6 @@ pub mod value;
 
 use self::value::procedure::foreign;
 use self::value::procedure::native;
-use crate::compiler::source::{BufferSource, FileSource, HasOrigin};
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
 use crate::vm::disassembler::Disassembler;
@@ -21,7 +20,6 @@ use instance::Instance;
 use scheme::core;
 use scheme::writer::Writer;
 use std::io::stdout;
-use std::path::PathBuf;
 use thiserror::Error;
 use value::Value;
 
@@ -58,20 +56,6 @@ impl VM {
         self.writer.write(value, &self.values).to_string()
     }
 
-    pub fn run<S: HasOrigin + std::io::Read>(&mut self, source: S) -> Result<Value> {
-        let mut compiler = Compiler::new();
-        let unit = compiler.compile(source)?;
-        self.interprete(unit)
-    }
-
-    pub fn run_file(&mut self, path: PathBuf) -> Result<Value> {
-        self.run(FileSource::new(path))
-    }
-
-    pub fn run_string(&mut self, inp: &str, context: &str) -> Result<Value> {
-        self.run(BufferSource::new(inp, context))
-    }
-
     pub fn register_foreign(&mut self, proc: foreign::Procedure) -> Result<()> {
         let name = self.values.sym(proc.name.clone());
         let proc_value = self.values.foreign_procedure(proc);
@@ -80,13 +64,13 @@ impl VM {
     }
 
     pub fn disassemble(&self, proc: &native::Procedure) -> Result<()> {
-        let mut dissassembler = Disassembler::new(stdout());
+        let mut disassembler = Disassembler::new(stdout());
 
-        dissassembler.disassemble(&proc.chunk, &proc.name.clone().unwrap_or(String::from("")));
+        disassembler.disassemble(&proc.chunk, &proc.name.clone().unwrap_or(String::from("")));
         Ok(())
     }
 
-    fn interprete(&mut self, unit: CompilationUnit) -> Result<Value> {
+    pub fn interpret(&mut self, unit: CompilationUnit) -> Result<Value> {
         let debug_mode = self.settings.is_enabled(&Setting::Debug);
         self.values.absorb(unit.values);
 
@@ -97,6 +81,10 @@ impl VM {
             &mut self.values,
             debug_mode,
         )
+    }
+
+    pub fn print_error(&self, _e: &Error, _compiler: &Compiler) {
+        todo!()
     }
 }
 
