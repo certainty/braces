@@ -71,6 +71,7 @@ pub struct SyntaxEnvironment {
 impl SyntaxEnvironment {
     pub fn standard() -> Self {
         let mut env = Self::empty();
+
         env.extend(Symbol::forged("quote"), Denotation::Special(Special::Quote));
         env.extend(
             Symbol::forged("quasi-quote"),
@@ -116,6 +117,7 @@ impl SyntaxEnvironment {
     // extended with the unforgable set! and lambda
     pub fn basic() -> Self {
         let mut env = Self::standard();
+
         env.extend(
             Symbol::unforgeable("lambda"),
             Denotation::Special(Special::Lambda),

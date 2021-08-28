@@ -1,11 +1,13 @@
-use super::body::BodyExpression;
-use super::frontend::error::Error;
-use super::identifier::Identifier;
-use super::{Expression, ParseResult, Parser, Result};
 use crate::compiler::frontend::error::Detail;
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::value::procedure::Arity;
+
+use super::body::BodyExpression;
+use super::frontend::error::Error;
+use super::identifier::Identifier;
+use super::{Expression, ParseResult, Result};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LambdaExpression {
@@ -81,7 +83,7 @@ impl Expression {
     }
 }
 
-impl Parser {
+impl CoreParser {
     #[inline]
     pub fn parse_lambda(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_lambda(datum).map(Expression::Lambda).into()
@@ -130,9 +132,10 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::tests::*;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
+
+    use super::*;
 
     #[test]
     fn test_parse_lambda() {

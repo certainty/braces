@@ -1,6 +1,8 @@
-use super::{Expression, ParseResult, Parser};
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::{HasSourceLocation, Location};
+
+use super::{Expression, ParseResult};
 
 #[repr(transparent)]
 #[derive(Clone, PartialEq, Debug)]
@@ -28,7 +30,7 @@ impl HasSourceLocation for LiteralExpression {
     }
 }
 
-impl Parser {
+impl CoreParser {
     #[inline]
     pub fn parse_literal(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_literal(datum).map(Expression::Literal)
@@ -47,10 +49,11 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::tests::*;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
     use crate::vm::value::number::Number;
+
+    use super::*;
 
     // Literals
     // See: r7rs page 12 for all examples of literals we need to support

@@ -1,10 +1,12 @@
-use super::frontend::error::Error;
-use super::Expression;
-use super::Result;
-use super::{ParseResult, Parser};
 use crate::compiler::frontend::error::Detail;
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::source::{HasSourceLocation, Location};
+
+use super::frontend::error::Error;
+use super::Expression;
+use super::ParseResult;
+use super::Result;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApplicationExpression {
@@ -40,7 +42,7 @@ impl Expression {
     }
 }
 
-impl Parser {
+impl CoreParser {
     pub fn parse_apply(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_apply(datum).map(Expression::Apply).into()
     }
@@ -49,9 +51,9 @@ impl Parser {
         match datum.sexp() {
             Sexp::List(ls) => {
                 if let [operator, operands @ ..] = &ls[..] {
-                    let operator_expr = self.do_parse(&operator)?;
+                    let operator_expr = self.parse(&operator)?;
                     let operands_expr: Result<Vec<Expression>> =
-                        operands.iter().map(|e| self.do_parse(e)).collect();
+                        operands.iter().map(|e| self.parse(e)).collect();
 
                     Ok(ApplicationExpression::new(
                         operator_expr,
@@ -78,9 +80,10 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::tests::*;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
+
+    use super::*;
 
     #[test]
     pub fn test_apply() {

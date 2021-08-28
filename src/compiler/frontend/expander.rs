@@ -1,27 +1,28 @@
+use crate::compiler::frontend::parser::core_parser::CoreParser;
+use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::syntax;
+use crate::compiler::frontend::syntax::symbol::Symbol;
+use crate::compiler::source::{HasSourceLocation, Location};
+use crate::compiler::CoreCompiler;
+
 // experiment if I can write an expander that does just SEXP -> SEXP transformation
 // without duplicating too much parser logic
 use super::error::Error;
 use super::syntax::environment::{Denotation, Special, SyntaxEnvironment};
 use super::Result;
-use crate::compiler::frontend::parser::Parser;
-use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
-use crate::compiler::frontend::syntax;
-use crate::compiler::frontend::syntax::symbol::Symbol;
-use crate::compiler::source::{HasSourceLocation, Location};
-use crate::compiler::Compiler;
 
 #[derive(Debug)]
 pub struct Expander {
-    compiler: Compiler,
-    parser: Box<Parser>,
+    compiler: CoreCompiler,
+    parser: CoreParser,
     expansion_env: SyntaxEnvironment,
 }
 
 impl Expander {
     pub fn new() -> Self {
-        Expander {
-            compiler: Compiler::new(),
-            parser: Box::new(Parser::new()),
+        Self {
+            compiler: CoreCompiler::new(),
+            parser: CoreParser::new(),
             expansion_env: SyntaxEnvironment::basic(),
         }
     }
@@ -34,6 +35,8 @@ impl Expander {
         match datum.list_slice() {
             Some([operator, operands @ ..]) if operator.is_symbol() => {
                 let denotation = self.denotation_of(operator)?;
+                log::trace!("denotation of {:?} is {:?}", datum, denotation);
+
                 match denotation {
                     Denotation::Special(special) => match special {
                         Special::Define => self.expand_define(&datum, &operator, &operands),
@@ -52,7 +55,10 @@ impl Expander {
                 self.expand_apply(operator, operands, datum.source_location().clone())
             }
             Some(_) => Err(Error::expansion_error("Unexpected unquoted list", &datum)),
-            None => Ok(datum.clone()),
+            None => {
+                log::trace!("nothing to expand. Returning datum as is.");
+                Ok(datum.clone())
+            }
         }
     }
 
@@ -110,7 +116,11 @@ impl Expander {
         }
     }
 
-    fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
+    fn expand_macro(
+        &mut self,
+        _datum: &Datum,
+        _transformer: &syntax::Transformer,
+    ) -> Result<Datum> {
         todo!()
     }
 
@@ -175,12 +185,12 @@ impl Expander {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::compiler::frontend::parser::identifier::Identifier;
+    use std::fmt::Debug;
+
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
     use crate::compiler::frontend::reader::tests::*;
-    use crate::compiler::frontend::syntax::symbol::Symbol;
-    use std::fmt::Debug;
+
+    use super::*;
 
     #[test]
     fn test_expand_atoms() -> Result<()> {

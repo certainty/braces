@@ -4,9 +4,9 @@ use crate::compiler::source::{HasSourceLocation, Location};
 use super::define::DefinitionExpression;
 use super::frontend::error::Error;
 use super::Expression;
-use super::Parser;
 use super::Result;
 use crate::compiler::frontend::error::Detail;
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BodyExpression {
@@ -73,7 +73,7 @@ impl Expression {
 /// <command>      -> <expression>
 /// ```
 
-impl Parser {
+impl CoreParser {
     pub fn parse_body(&mut self, datum: &[Datum], loc: &Location) -> Result<BodyExpression> {
         let mut definitions: Vec<DefinitionExpression> = vec![];
         let mut iter = datum.iter();
@@ -100,8 +100,8 @@ impl Parser {
         }
 
         //parse the rest as sequence
-        let mut sequence = vec![self.do_parse(cur.unwrap())?];
-        let rest: Result<Vec<Expression>> = iter.map(|e| self.do_parse(e)).collect();
+        let mut sequence = vec![self.parse(cur.unwrap())?];
+        let rest: Result<Vec<Expression>> = iter.map(|e| self.parse(e)).collect();
         sequence.extend(rest?);
 
         Ok(BodyExpression {

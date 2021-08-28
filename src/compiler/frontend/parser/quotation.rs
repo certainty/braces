@@ -1,8 +1,10 @@
-use super::frontend::error::Error;
-use super::{Expression, ParseResult, Parser, Result};
 use crate::compiler::frontend::error::Detail;
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
+
+use super::frontend::error::Error;
+use super::{Expression, ParseResult, Result};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum QuotationExpression {
@@ -40,7 +42,7 @@ impl Expression {
 /// Quoted values are special in the sense that they maintain a reference
 /// to the quote `Datum`. They're treated as unevaluated expressions.
 
-impl Parser {
+impl CoreParser {
     #[inline]
     pub fn parse_quote(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_quote(datum).map(Expression::Quotation).into()
@@ -60,9 +62,10 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::tests::*;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
+
+    use super::*;
 
     #[test]
     fn test_parse_quote() {

@@ -1,11 +1,11 @@
+use super::representation::{CoreAST, SexpAST};
+use super::source::Source;
+
 pub mod error;
 mod expander;
 pub mod parser;
 pub mod reader;
 pub mod syntax;
-
-use super::representation::{CoreAST, SexpAST};
-use super::source::Source;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 

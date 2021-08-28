@@ -1,8 +1,10 @@
-use super::frontend::error::Error;
-use super::{Expression, ParseResult, Parser, Result};
 use crate::compiler::frontend::error::Detail;
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
+
+use super::frontend::error::Error;
+use super::{Expression, ParseResult, Result};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BeginExpression {
@@ -33,7 +35,7 @@ impl Expression {
     }
 }
 
-impl Parser {
+impl CoreParser {
     pub fn parse_begin(&mut self, datum: &Datum) -> ParseResult<Expression> {
         log::trace!("parsing begin: {:?} ", datum);
         self.do_parse_begin(datum).map(Expression::Begin).into()
@@ -42,9 +44,9 @@ impl Parser {
     fn do_parse_begin(&mut self, datum: &Datum) -> Result<BeginExpression> {
         match self.parse_list(datum)? {
             [_, first, rest @ ..] => {
-                let parsed_first = self.do_parse(first);
+                let parsed_first = self.parse(first);
                 let parsed_exprs: Result<Vec<Expression>> =
-                    rest.iter().map(|d| self.do_parse(d)).collect();
+                    rest.iter().map(|d| self.parse(d)).collect();
 
                 Ok(BeginExpression::new(
                     parsed_first?,
@@ -63,9 +65,10 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::tests::*;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
+
+    use super::*;
 
     #[test]
     fn test_parse_begin() {

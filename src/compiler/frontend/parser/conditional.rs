@@ -1,8 +1,10 @@
-use super::frontend::error::Error;
-use super::{Expression, ParseResult, Parser, Result};
 use crate::compiler::frontend::error::Detail;
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::sexp::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
+
+use super::frontend::error::Error;
+use super::{Expression, ParseResult, Result};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct IfExpression {
@@ -56,7 +58,7 @@ impl Expression {
 /// <alternate>   -> <expression> | <empty>
 /// ```
 
-impl Parser {
+impl CoreParser {
     #[inline]
     pub fn parse_if(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_if(datum).map(Expression::If).into()
@@ -65,9 +67,9 @@ impl Parser {
     pub fn do_parse_if(&mut self, datum: &Datum) -> Result<IfExpression> {
         match self.parse_list(datum)? {
             [_if, test, consequent, alternate] => {
-                let test_expr = self.do_parse(&test)?;
-                let consequent_expr = self.do_parse(&consequent)?;
-                let alternate_expr = self.do_parse(&alternate)?;
+                let test_expr = self.parse(&test)?;
+                let consequent_expr = self.parse(&consequent)?;
+                let alternate_expr = self.parse(&alternate)?;
 
                 Ok(IfExpression::new(
                     test_expr,
@@ -77,8 +79,8 @@ impl Parser {
                 ))
             }
             [_if, test, consequent] => {
-                let test_expr = self.do_parse(&test)?;
-                let consequent_expr = self.do_parse(&consequent)?;
+                let test_expr = self.parse(&test)?;
+                let consequent_expr = self.parse(&consequent)?;
 
                 Ok(IfExpression::new(
                     test_expr,
@@ -98,9 +100,10 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::tests::*;
     use crate::compiler::frontend::reader::sexp::datum::Sexp;
+
+    use super::*;
 
     #[test]
     fn one_armed_if() {

@@ -1,8 +1,10 @@
-use super::Expression;
-use super::{ParseResult, Parser};
+use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location, SourceId};
+
+use super::Expression;
+use super::ParseResult;
 
 #[derive(Clone, Debug)]
 pub struct Identifier {
@@ -55,7 +57,7 @@ impl Expression {
     }
 }
 
-impl Parser {
+impl CoreParser {
     pub fn parse_identifier(&mut self, datum: &Datum) -> ParseResult<Expression> {
         self.do_parse_identifier(datum).map(Expression::Identifier)
     }
@@ -72,8 +74,9 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::compiler::frontend::parser::tests::*;
+
+    use super::*;
 
     #[test]
     fn test_identifier_equals() {
