@@ -76,6 +76,14 @@ impl Number {
     }
 }
 
+impl ToString for Number {
+    fn to_string(&self) -> String {
+        match self {
+            Number::Real(r) => r.to_string(),
+        }
+    }
+}
+
 // conversions and casts
 
 impl<I: Into<real::RealNumber>> From<I> for Number {

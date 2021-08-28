@@ -18,6 +18,11 @@ pub struct Expander {
     expansion_env: SyntaxEnvironment,
 }
 
+pub enum QuoteJoin {
+    Cons(Datum),
+    Append(Datum),
+}
+
 impl Expander {
     pub fn new() -> Self {
         Self {
@@ -44,7 +49,18 @@ impl Expander {
                         Special::DefineSyntax => todo!(),
                         Special::LetSyntax => todo!(),
                         Special::LetrecSyntax => todo!(),
-                        Special::Quote => Ok(datum.clone()), // already expanded in phase 0
+                        Special::Unquote => Err(Error::expansion_error(
+                            "unexpected unquote outside of quasi-quote",
+                            &datum,
+                        )),
+                        Special::UnquoteSplicing => Err(Error::expansion_error(
+                            "unexpected unquote-splicing outside of quasi-quote",
+                            &datum,
+                        )),
+                        Special::QuasiQuote => {
+                            self.expand_quasi_quotation(&datum, &operator, &operands)
+                        }
+                        Special::Quote => Ok(datum.clone()),
                         _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                     },
                     Denotation::Macro(transformer) => self.expand_macro(&datum, &transformer),
@@ -114,6 +130,144 @@ impl Expander {
                 &datum,
             )),
         }
+    }
+
+    fn expand_quasi_quotation(
+        &mut self,
+        datum: &Datum,
+        _operator: &Datum,
+        operands: &[Datum],
+    ) -> Result<Datum> {
+        if operands.len() != 1 {
+            return Err(Error::expansion_error(
+                "Invalid quasi-quoted expression",
+                &datum,
+            ));
+        }
+
+        let quasi_quoted_sexp = operands[0].clone();
+        match quasi_quoted_sexp.sexp() {
+            // (quasi-quote (..))
+            Sexp::List(elements) => {
+                self.expand_quasi_quoted_elements(elements, datum.source_location().clone())
+            }
+            // (quasi-quote (_ . _))
+            Sexp::ImproperList(head, tail) => {
+                let expanded_head =
+                    self.expand_quasi_quoted_elements(head, datum.source_location().clone())?;
+                let expanded_tail = self.expand_quasi_quoted_element(tail)?;
+                let expanded_tail = self
+                    .join_expanded_elements(vec![expanded_tail], tail.source_location().clone())?;
+                let mut output = vec![Datum::new(
+                    Sexp::Symbol(Symbol::unforgeable("cons")),
+                    datum.source_location().clone(),
+                )];
+                output.push(expanded_head);
+                output.push(expanded_tail);
+
+                Ok(self.quote_datum(Datum::new(
+                    Sexp::List(output),
+                    datum.source_location().clone(),
+                )))
+            }
+            // (quasi-quote #(..))
+            Sexp::Vector(elements) => {
+                let mut output = vec![Datum::new(
+                    Sexp::Symbol(Symbol::unforgeable("vector")),
+                    datum.source_location().clone(),
+                )];
+
+                let expanded_elements =
+                    self.expand_quasi_quoted_elements(elements, datum.source_location().clone())?;
+                output.push(expanded_elements);
+
+                Ok(self.quote_datum(Datum::new(
+                    Sexp::List(output),
+                    datum.source_location().clone(),
+                )))
+            }
+            // (quasi-quote datum)
+            _ => Ok(self.quote_datum(quasi_quoted_sexp)),
+        }
+    }
+
+    fn join_expanded_elements(&mut self, elements: Vec<QuoteJoin>, loc: Location) -> Result<Datum> {
+        let empty_list = self.quote_datum(Datum::new(Sexp::List(vec![]), loc));
+
+        let result = elements.iter().rev().fold(empty_list, |tail, e| match e {
+            QuoteJoin::Cons(e) => Datum::new(
+                Sexp::List(vec![
+                    Datum::new(
+                        Sexp::Symbol(Symbol::unforgeable("cons")),
+                        e.source_location().clone(),
+                    ),
+                    e.clone(),
+                    tail,
+                ]),
+                e.source_location().clone(),
+            ),
+            QuoteJoin::Append(e) => Datum::new(
+                Sexp::List(vec![
+                    Datum::new(
+                        Sexp::Symbol(Symbol::unforgeable("append")),
+                        e.source_location().clone(),
+                    ),
+                    e.clone(),
+                    tail,
+                ]),
+                e.source_location().clone(),
+            ),
+        });
+
+        Ok(result)
+    }
+
+    #[inline]
+    fn expand_quasi_quoted_elements(
+        &mut self,
+        elements: &Vec<Datum>,
+        loc: Location,
+    ) -> Result<Datum> {
+        let expanded: Result<Vec<QuoteJoin>> = elements
+            .iter()
+            .map(|e| self.expand_quasi_quoted_element(&e))
+            .collect();
+
+        self.join_expanded_elements(expanded?, loc)
+    }
+
+    // unquote an element in a quasi-quoted list/cons/vector
+    fn expand_quasi_quoted_element(&mut self, datum: &Datum) -> Result<QuoteJoin> {
+        match datum.list_slice() {
+            Some([operator, operand]) if operator.is_symbol() => {
+                match self.denotation_of(operator)? {
+                    Denotation::Special(Special::QuasiQuote) => Err(Error::expansion_error(
+                        "quasi-quote can't be nested",
+                        &datum,
+                    )),
+                    Denotation::Special(Special::Unquote) => {
+                        Ok(QuoteJoin::Cons(self.expand(operand)?))
+                    }
+                    Denotation::Special(Special::UnquoteSplicing) => {
+                        let expanded = self.expand(operand)?;
+                        Ok(QuoteJoin::Append(expanded))
+                    }
+                    _ => Ok(QuoteJoin::Cons(datum.clone())),
+                }
+            }
+            _ => Ok(QuoteJoin::Cons(self.quote_datum(datum.clone()))),
+        }
+    }
+
+    fn quote_datum(&mut self, datum: Datum) -> Datum {
+        let loc = datum.source_location().clone();
+        Datum::new(
+            Sexp::List(vec![
+                Datum::new(Sexp::Symbol(Symbol::unforgeable("quote")), loc.clone()),
+                datum,
+            ]),
+            loc,
+        )
     }
 
     fn expand_macro(
@@ -225,10 +379,22 @@ mod tests {
     #[test]
     fn test_expand_quasi_quote() -> Result<()> {
         assert_expands_equal("`3", "'3", false)?;
-        assert_expands_equal("`(3 4 ,5)", "(list '3 '4 5)", false)?;
-        assert_expands_equal("`(3 4 ,@(5 6 7 8))", "(list '3 '4 5 6 7 8)", false)?;
-        assert_expands_equal("`(3 4 ,(car x y))", "(list '3 '4 (car x y))", false)?;
-        assert_expands_equal("`(3 4 ,'(1 2))", "(list '3 '4 '(1 2))", false)?;
+        assert_expands_equal("`(3 4 ,5)", "(cons '3 (cons '4 (cons 5 '())))", false)?;
+        assert_expands_equal(
+            "`(3 4 ,@(list 5 6 7 8) 9 10)",
+            "(cons '3 (cons '4 (append (list 5 6 7 8) (cons '9 (cons '10 '())))))",
+            false,
+        )?;
+        assert_expands_equal(
+            "`(3 4 ,(car x y))",
+            "(cons '3 (cons '4 (cons (car x y) '())))",
+            false,
+        )?;
+        assert_expands_equal(
+            "`(3 4 ,'(1 2))",
+            "(cons '3 (cons '4 (cons '(1 2) '())))",
+            false,
+        )?;
         assert_expands_equal("''foo", "'(quote foo)", false)?;
 
         assert!(expand_form("`(1 2 `3)").is_err(), "expected error");
@@ -241,6 +407,7 @@ mod tests {
         let expected_sexp = parse_datum(rhs);
         let expanded = exp.expand(&actual_sexp)?;
 
+        println!("Expanded: {} ", expanded.to_string());
         assert_struct_eq(&expanded, &expected_sexp, pedantic);
         Ok(())
     }

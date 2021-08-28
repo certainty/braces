@@ -26,6 +26,12 @@ impl Fixnum {
     }
 }
 
+impl ToString for Fixnum {
+    fn to_string(&self) -> String {
+        self.inner.to_string()
+    }
+}
+
 impl<I: Into<Integer>> From<I> for Fixnum {
     fn from(num: I) -> Fixnum {
         Fixnum::new(num.into())

@@ -26,6 +26,12 @@ impl Rational {
     }
 }
 
+impl ToString for Rational {
+    fn to_string(&self) -> String {
+        self.inner.to_string()
+    }
+}
+
 impl<I: Into<rug::Rational>> From<I> for Rational {
     fn from(n: I) -> Rational {
         Rational { inner: n.into() }

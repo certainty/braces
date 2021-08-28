@@ -84,6 +84,34 @@ impl Sexp {
     }
 }
 
+impl ToString for Sexp {
+    fn to_string(&self) -> String {
+        match self {
+            Sexp::Bool(v) => v.to_string(),
+            Sexp::Symbol(v) => format!("{}", v.as_str().to_string()),
+            Sexp::String(v) => format!("{:?}", v),
+            Sexp::Char(v) => v.to_string(),
+            Sexp::Number(n) => n.to_string(),
+            Sexp::List(inner) => {
+                let elts: Vec<_> = inner.iter().map(|e| e.to_string()).collect();
+                format!("( {} )", elts.join(" "))
+            }
+            Sexp::ImproperList(head, tail) => {
+                let head_elts: Vec<_> = head.iter().map(|e| e.to_string()).collect();
+                format!("({} . {})", head_elts.join(" "), tail.to_string())
+            }
+            Sexp::Vector(inner) => {
+                let elts: Vec<_> = inner.iter().map(|e| e.to_string()).collect();
+                format!("#( {} )", elts.join(" "))
+            }
+            Sexp::ByteVector(inner) => {
+                let elts: Vec<_> = inner.iter().map(|e| format!("{:x?}", e)).collect();
+                format!("u8({})", elts.join(" "))
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Datum {
     pub location: Location,
@@ -145,6 +173,12 @@ impl Datum {
             Sexp::List(ls) => Some(&ls[..]),
             _ => None,
         }
+    }
+}
+
+impl ToString for Datum {
+    fn to_string(&self) -> String {
+        self.sexp().to_string()
     }
 }
 

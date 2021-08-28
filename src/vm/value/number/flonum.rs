@@ -40,6 +40,12 @@ impl Flonum {
     }
 }
 
+impl ToString for Flonum {
+    fn to_string(&self) -> String {
+        self.inner.to_string()
+    }
+}
+
 // cast and coerce
 impl From<Integer> for Flonum {
     fn from(num: Integer) -> Flonum {
