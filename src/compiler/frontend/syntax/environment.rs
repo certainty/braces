@@ -74,6 +74,10 @@ impl SyntaxEnvironment {
 
         env.extend(Symbol::forged("quote"), Denotation::Special(Special::Quote));
         env.extend(
+            Symbol::unforgeable("quote"),
+            Denotation::Special(Special::Quote),
+        );
+        env.extend(
             Symbol::forged("quasi-quote"),
             Denotation::Special(Special::QuasiQuote),
         );

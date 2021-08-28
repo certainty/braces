@@ -42,6 +42,7 @@ impl CoreParser {
             Sexp::Char(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
             Sexp::String(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
             Sexp::Number(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
+            Sexp::Vector(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
             _ => ParseResult::ignore("Expected literal", datum.source_location().clone()),
         }
     }

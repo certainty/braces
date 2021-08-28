@@ -43,7 +43,7 @@ impl RefValue {
         self.inner.borrow().clone()
     }
 
-    pub fn as_ref<'a>(&'a self) -> Ref<Value> {
+    pub fn as_ref(&self) -> Ref<Value> {
         self.inner.borrow()
     }
 
@@ -65,6 +65,7 @@ pub enum Value {
     Symbol(Symbol),
     Char(char),
     Number(number::Number),
+    Vector(Vec<Value>),
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
@@ -82,7 +83,49 @@ impl Value {
     }
 }
 
+impl SchemeEqual<Vec<Value>> for Vec<Value> {
+    fn is_eq(&self, other: &Vec<Value>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        } else {
+            self.iter().zip(other.iter()).all(|(a, b)| a.is_eq(b))
+        }
+    }
+
+    fn is_eqv(&self, other: &Vec<Value>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        } else {
+            self.iter().zip(other.iter()).all(|(a, b)| a.is_eqv(b))
+        }
+    }
+
+    fn is_equal(&self, other: &Vec<Value>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        } else {
+            self.iter().zip(other.iter()).all(|(a, b)| a.is_equal(b))
+        }
+    }
+}
+
 impl SchemeEqual<Value> for Value {
+    fn is_eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
+            (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
+            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
+            (Value::UninternedString(_), Value::InternedString(_)) => false,
+            (Value::UninternedString(_), Value::UninternedString(_)) => false,
+            (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eq(rhs),
+            (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
+            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
+            (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
+            (Value::Unspecified, Value::Unspecified) => false,
+            _ => false,
+        }
+    }
+
     fn is_eqv(&self, other: &Value) -> bool {
         match (self, other) {
             (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
@@ -91,24 +134,10 @@ impl SchemeEqual<Value> for Value {
             (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eqv(rhs),
             (Value::UninternedString(_), Value::InternedString(_)) => false,
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
+            (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eqv(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
-            (Value::Unspecified, Value::Unspecified) => false,
-            _ => false,
-        }
-    }
-
-    fn is_eq(&self, other: &Value) -> bool {
-        match (self, other) {
-            (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
-            (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
-            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
-            (Value::UninternedString(_), Value::InternedString(_)) => false,
-            (Value::UninternedString(_), Value::UninternedString(_)) => false,
-            (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
-            (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
-            (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
             _ => false,
         }
@@ -124,6 +153,7 @@ impl SchemeEqual<Value> for Value {
                 lhs.as_str() == rhs.as_str()
             }
             (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
+            (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_equal(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),
@@ -233,6 +263,7 @@ impl Factory {
             }
             Sexp::Char(c) => self.character(*c),
             Sexp::Number(num) => Value::Number(num.clone()),
+            Sexp::Vector(v) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
             _ => todo!(),
         }
     }

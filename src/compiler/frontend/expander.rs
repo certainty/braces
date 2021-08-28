@@ -152,41 +152,13 @@ impl Expander {
                 self.expand_quasi_quoted_list(elements, datum.source_location().clone())
             }
             // (quasi-quote (_ . _))
-            Sexp::ImproperList(head, tail) => self.expand_quasi_quoted_improper_list(head, tail, datum.source_location().clone()),
-            /*
-                let expanded_head =
-                    self.expand_quasi_quoted_elements(head, datum.source_location().clone())?;
-                let expanded_tail = self.expand_quasi_quoted_element(tail)?;
-                let expanded_tail = self
-                    .join_expanded_elements(vec![expanded_tail], tail.source_location().clone())?;
-                let mut output = vec![Datum::new(
-                    Sexp::Symbol(Symbol::unforgeable("cons")),
-                    datum.source_location().clone(),
-                )];
-                output.push(expanded_head);
-                output.push(expanded_tail);
-
-                Ok(self.quote_datum(Datum::new(
-                    Sexp::List(output),
-                    datum.source_location().clone(),
-                )))
-            }*/
+            Sexp::ImproperList(head, tail) => {
+                self.expand_quasi_quoted_improper_list(head, tail, datum.source_location().clone())
+            }
             // (quasi-quote #(..))
-            Sexp::Vector(elements) => self.expand_quasi_quoted_vector(elements, datum.source_location().clone()), /*{
-                let mut output = vec![Datum::new(
-                    Sexp::Symbol(Symbol::unforgeable("vector")),
-                    datum.source_location().clone(),
-                )];
-
-                let expanded_elements =
-                    self.expand_quasi_quoted_elements(elements, datum.source_location().clone())?;
-                output.push(expanded_elements);
-
-                Ok(self.quote_datum(Datum::new(
-                    Sexp::List(output),
-                    datum.source_location().clone(),
-                )))
-            } */
+            Sexp::Vector(elements) => {
+                self.expand_quasi_quoted_vector(elements, datum.source_location().clone())
+            }
             // (quasi-quote datum)
             _ => Ok(self.quote_datum(quasi_quoted_sexp)),
         }
@@ -459,13 +431,9 @@ mod tests {
         assert_expands_equal("`(1 2 . 3)", "(cons '1 (cons '2 '3)) ", false)?;
         assert_expands_equal("`(1 . ,(list 2 2))", "(cons '1 (list 2 2))", false)?;
 
-        assert_expands_equal("`#(1 2)", "(vector-cons '1 '2)", false)?;
-        assert_expands_equal(
-            "`#(1 2 ,3)",
-            "(vector-cons '1 (vector-cons '2 (vector-cons 3 #())))",
-            false,
-        )?;
         assert_expands_equal("`(1 . ,(list 2 2))", "(cons '1 (list 2 2))", false)?;
+
+        //assert_expands_equal("`#(1 2)", "(vector-cons '1 (vector-cons '2 #()))", false)?;
 
         assert!(expand_form("`(1 2 `3)").is_err(), "expected error");
         Ok(())

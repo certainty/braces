@@ -3,6 +3,7 @@ use std::io::Read;
 pub use compilation_unit::CompilationUnit;
 use source::{HasOrigin, Source};
 
+use crate::compiler::error::reporting::ErrorReporter;
 use crate::compiler::representation::CoreAST;
 use crate::compiler::source::Registry;
 
@@ -38,8 +39,13 @@ impl Compiler {
         self.compile_source(&source)
     }
 
-    pub fn print_error(&self, _e: &error::Error) {
-        todo!()
+    pub fn print_error(&self, e: &error::Error) {
+        let reporter = ErrorReporter::new(&self.sources);
+        reporter.report_error(&e);
+    }
+
+    pub fn error_reporter<'a>(&'a self) -> ErrorReporter<'a> {
+        ErrorReporter::new(&self.sources)
     }
 
     fn compile_source(&mut self, source: &Source) -> Result<CompilationUnit> {

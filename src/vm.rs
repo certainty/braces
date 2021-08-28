@@ -23,6 +23,8 @@ use std::io::stdout;
 use thiserror::Error;
 use value::Value;
 
+use crate::compiler::error::reporting::ErrorReporter as CompilerErrorReporter;
+use crate::vm::error::reporting::ErrorReporter;
 pub use error::Error;
 pub use settings::{Setting, Settings};
 
@@ -83,8 +85,11 @@ impl VM {
         )
     }
 
-    pub fn print_error(&self, _e: &Error, _compiler: &Compiler) {
-        todo!()
+    pub fn print_error(&self, e: &Error, compiler: &Compiler) {
+        let compiler_reporter = compiler.error_reporter();
+        let reporter = ErrorReporter::new(&compiler_reporter);
+
+        reporter.report_error(e.clone())
     }
 }
 

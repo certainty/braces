@@ -12,6 +12,7 @@ pub mod list;
 pub mod number;
 pub mod string;
 pub mod symbol;
+pub mod vector;
 pub mod whitespace;
 
 use crate::compiler::source::SourceId;
@@ -52,6 +53,7 @@ fn parse_compound_datum<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     context(
         "compound datum",
         alt((
+            context("vector", vector::parse_vector),
             context("improper list", list::parse_improper_list),
             context("list", list::parse_proper_list),
             context("abbreviation", abbreviation::parse),

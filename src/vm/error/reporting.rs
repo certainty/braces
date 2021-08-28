@@ -5,31 +5,31 @@ use crate::vm::stack_trace::StackTrace;
 use crate::vm::value::error::RuntimeError;
 
 pub struct ErrorReporter<'a> {
-    compiler_reporter: CompilerErrorReporter<'a>,
+    compiler_reporter: &'a CompilerErrorReporter<'a>,
 }
 
 impl<'a> ErrorReporter<'a> {
-    pub fn new(source_registry: &'a Registry) -> Self {
+    pub fn new(reporter: &'a CompilerErrorReporter) -> Self {
         Self {
-            compiler_reporter: CompilerErrorReporter::new(source_registry),
+            compiler_reporter: reporter,
         }
     }
 }
 
 impl<'a> ErrorReporter<'a> {
-    pub fn report_error(&self, e: Error) {
+    pub fn report_error(&self, e: &Error) {
         match e {
             Error::CompilerBug(msg) => eprintln!("Bug: {}", msg),
             Error::CompilerError(e) => self.compiler_reporter.report_error(&e),
             Error::RuntimeError(e, line, stack_trace, label) => {
-                self.report_runtime_error(e, line, stack_trace, label)
+                self.report_runtime_error(e, line.clone(), stack_trace.clone(), label.clone())
             }
         }
     }
 
     pub fn report_runtime_error(
         &self,
-        e: RuntimeError,
+        e: &RuntimeError,
         line: usize,
         stack_trace: StackTrace,
         label: Option<String>,

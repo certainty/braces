@@ -45,6 +45,14 @@ impl Writer {
                 self.write_procedure(&procedure::Procedure::Native(closure.procedure_rc()))
             }
             Value::Procedure(proc) => self.write_procedure(&proc),
+            Value::Vector(elts) => {
+                let body: Vec<String> = elts
+                    .iter()
+                    .map(|e| self.write_impl(&e, values, false))
+                    .collect();
+
+                format!("#({})", body.join(" "))
+            }
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()

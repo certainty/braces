@@ -1,9 +1,15 @@
 impl std::fmt::Display for Origin {
     fn fmt(
         &self,
-        _formatter: &mut std::fmt::Formatter<'_>,
+        formatter: &mut std::fmt::Formatter<'_>,
     ) -> std::result::Result<(), std::fmt::Error> {
-        todo!()
+        match self {
+            Self::Synthetic => formatter.write_str("synthetic"),
+            Self::Buffer(name) => formatter.write_fmt(format_args!("buffer({})", name)),
+            Self::File(path) => {
+                formatter.write_fmt(format_args!("file({})", path.to_str().unwrap_or("")))
+            }
+        }
     }
 }
 

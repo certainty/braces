@@ -74,7 +74,6 @@ impl CoreParser {
         match special_form {
             Special::Define => self.parse_definition(&datum).res(),
             Special::Quote => self.parse_quote(&datum).res(),
-            Special::QuasiQuote => self.parse_quote(&datum).res(),
             Special::Lambda => self.parse_lambda(&datum).res(),
             Special::Set => self.parse_set(&datum).res(),
             Special::Begin => self.parse_begin(&datum).res(),
