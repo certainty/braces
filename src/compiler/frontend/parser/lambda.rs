@@ -8,6 +8,7 @@ use super::body::BodyExpression;
 use super::frontend::error::Error;
 use super::identifier::Identifier;
 use super::{Expression, ParseResult, Result};
+use crate::compiler::frontend::syntax::environment::Denotation;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct LambdaExpression {
@@ -93,7 +94,22 @@ impl CoreParser {
         match self.parse_list(datum)? {
             [_, formals, body @ ..] => {
                 let formals = self.parse_formals(formals)?;
+
+                // bind formals in parsing environment
+                // so that we know if special forms are shadowed
+                self.environment.push_scope();
+                for identifier in formals.identifiers() {
+                    let sym = identifier.symbol().clone();
+                    self.environment
+                        .extend(sym.clone(), Denotation::identifier(sym));
+                }
+
+                // parse the body with the extended environment
                 let body = self.parse_body(body, &datum.source_location().clone())?;
+
+                // pop of the scope as it was only valid for the duration of the parse of body
+                self.environment.pop_scope();
+
                 Ok(LambdaExpression::new(
                     formals,
                     body,

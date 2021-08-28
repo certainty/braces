@@ -8,7 +8,7 @@ use crate::compiler::source::HasSourceLocation;
 
 #[derive(Debug)]
 pub struct CoreParser {
-    environment: syntax::environment::SyntaxEnvironment,
+    pub environment: syntax::environment::SyntaxEnvironment,
 }
 
 impl CoreParser {
@@ -76,10 +76,7 @@ impl CoreParser {
             Special::Define => self.parse_definition(&datum).res(),
             Special::Quote => self.parse_quote(&datum).res(),
             Special::Lambda => self.parse_lambda(&datum).res(),
-            Special::Set => {
-                println!("parsing set!");
-                self.parse_set(&datum).res()
-            }
+            Special::Set => self.parse_set(&datum).res(),
             Special::Begin => self.parse_begin(&datum).res(),
             Special::If => self.parse_if(&datum).res(),
             _ => {

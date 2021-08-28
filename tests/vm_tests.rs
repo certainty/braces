@@ -106,6 +106,24 @@ fn test_vm_lambda() {
 }
 
 #[test]
+fn test_vm_shadow_bindings() {
+    let mut vm = VM::default();
+
+    // the parameter called `if` shadows the core if form
+    let result = run_code(&mut vm, "(define (foo if) (if #t 'yes 'no)) (foo 3)");
+
+    assert_matches!(
+        result,
+        Err(Error::RuntimeError(
+            error::RuntimeError::NoncallableError(_),
+            _,
+            _,
+            _
+        ))
+    )
+}
+
+#[test]
 fn test_vm_lambda_formals() {
     let mut vm = VM::default();
     let bool_false = vm.values.bool_false();

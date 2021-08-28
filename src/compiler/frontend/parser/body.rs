@@ -83,6 +83,7 @@ impl CoreParser {
         while cur.is_some() {
             match self.do_parse_definition(cur.unwrap()) {
                 Ok(expr) => {
+                    // TODO: register binding of internal define in parsing environment
                     definitions.push(expr);
                     cur = iter.next();
                 }

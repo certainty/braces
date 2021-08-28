@@ -171,7 +171,7 @@ impl SyntaxEnvironment {
     }
 
     pub fn get(&self, id: &Symbol) -> Denotation {
-        for scope in &self.scopes {
+        for scope in self.scopes.iter().rev() {
             if let Some(denotation) = scope.get(id) {
                 return denotation.clone();
             }
