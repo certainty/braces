@@ -78,11 +78,29 @@ impl CoreParser {
                     datum.source_location().clone(),
                 ))
             }
-            _ => Err(Error::parse_error(
-                "Expected (if <test> <consequent> <alternate>?)",
-                Detail::new("", datum.source_location().clone()),
-                vec![],
+            [ope, test] => Err(Error::parse_error(
+                "Missing consequent",
+                Detail::new(
+                    "(if <consequent> <alternative>) requires at least one consequent",
+                    ope.source_location().clone(),
+                ),
+                vec![Detail::new(
+                    "define what branch of code should be executed if this test evaluates to #t",
+                    test.source_location().clone(),
+                )],
             )),
+            [op, _rest @ ..] => Err(Error::parse_error(
+                "Not enough arguments for `if` special form",
+                Detail::new(
+                    "Expected (if <test> <consequent>) or (if <test> <consequent> <alternate>)",
+                    op.source_location().clone(),
+                ),
+                vec![Detail::new(
+                    "Expected (if <test> <consequent>) or (if <test> <consequent> <alternate>)",
+                    op.source_location().clone(),
+                )],
+            )),
+            _ => Err(Error::bug("Unexpected shape for `if` special form")),
         }
     }
 }
