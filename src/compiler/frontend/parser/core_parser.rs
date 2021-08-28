@@ -37,7 +37,7 @@ impl CoreParser {
     /// ```
 
     pub fn parse(&mut self, datum: &Datum) -> frontend::Result<Expression> {
-        //let datum = self.expander.expand(datum)?;
+        println!("CoreParsing: {}", datum.to_string());
         match datum.sexp() {
             Sexp::List(ls) => match &ls[..] {
                 [operator, _operands @ ..] if operator.is_symbol() => {

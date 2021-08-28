@@ -61,6 +61,15 @@ impl Writer {
 
                 format!("'({})", body.join(" "))
             }
+            Value::ImproperList(head, tail) => {
+                let head_body: Vec<String> = head
+                    .iter()
+                    .map(|e| self.write_impl(&e, values, false))
+                    .collect();
+                let tail_body = self.write_impl(&tail, values, false);
+
+                format!("'({} . {})", head_body.join(" "), tail_body)
+            }
             Value::Unspecified => "#<unspecified>".to_string(),
         }
     }

@@ -69,6 +69,7 @@ pub enum Value {
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
+    ImproperList(list::List, Box<Value>),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
     Unspecified,
@@ -119,6 +120,9 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eq(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
+            (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
+                lhs_head.is_eq(rhs_head) && rhs_tail.is_eq(rhs_tail)
+            }
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
@@ -136,6 +140,9 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eqv(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
+            (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
+                lhs_head.is_eqv(rhs_head) && rhs_tail.is_eqv(rhs_tail)
+            }
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
@@ -155,6 +162,9 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_equal(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
+            (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
+                lhs_head.is_equal(rhs_head) && rhs_tail.is_equal(rhs_tail)
+            }
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),
             (Value::Unspecified, Value::Unspecified) => true,

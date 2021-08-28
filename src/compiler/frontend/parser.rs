@@ -76,7 +76,7 @@ impl Parser {
 
     fn do_parse(&mut self, datum: &Datum) -> Result<Expression> {
         let expanded = self.expander.expand(datum)?;
-        log::trace!(
+        println!(
             "expanded input {} \n ==== \n {}",
             datum.to_string(),
             expanded.to_string()

@@ -94,6 +94,7 @@ impl SyntaxEnvironment {
             Symbol::forged("lambda"),
             Denotation::Special(Special::Lambda),
         );
+
         env.extend(Symbol::forged("set!"), Denotation::Special(Special::Set));
         env.extend(Symbol::forged("if"), Denotation::Special(Special::If));
         env.extend(Symbol::forged("begin"), Denotation::Special(Special::Begin));

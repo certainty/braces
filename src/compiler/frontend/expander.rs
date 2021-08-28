@@ -102,28 +102,30 @@ impl Expander {
         operands: &[Datum],
     ) -> Result<Datum> {
         match operands {
-            [formals, body @ ..] => match self.parser.parse_formals(&formals) {
-                Ok(parsed_formals) => {
-                    self.expansion_env.push_scope();
-                    for identifier in parsed_formals.identifiers() {
-                        let sym = identifier.symbol().clone();
-                        self.expansion_env
-                            .extend(sym.clone(), Denotation::identifier(sym));
-                    }
-                    let expanded_body = self.expand_all(body)?;
-                    self.expansion_env.pop_scope();
+            [formals, body @ ..] => {
+                match self.parser.parse_formals(&formals) {
+                    Ok(parsed_formals) => {
+                        self.expansion_env.push_scope();
+                        for identifier in parsed_formals.identifiers() {
+                            let sym = identifier.symbol().clone();
+                            self.expansion_env
+                                .extend(sym.clone(), Denotation::identifier(sym));
+                        }
+                        let expanded_body = self.expand_all(body)?;
+                        self.expansion_env.pop_scope();
 
-                    Ok(self.build_lambda(
-                        &[formals.clone()],
-                        &expanded_body,
-                        datum.source_location().clone(),
-                    ))
+                        Ok(self.build_lambda(
+                            &formals,
+                            &expanded_body,
+                            datum.source_location().clone(),
+                        ))
+                    }
+                    Err(_) => Err(Error::expansion_error(
+                        "Malformed formals of lambda",
+                        &datum,
+                    )),
                 }
-                Err(_) => Err(Error::expansion_error(
-                    "Malformed formals of lambda",
-                    &datum,
-                )),
-            },
+            }
             // ignore invalid form?
             _ => Err(Error::expansion_error(
                 "Malformed lambda expression",
@@ -320,8 +322,14 @@ impl Expander {
                 match definition.list_slice() {
                     //(define (<ID> <def-formals> <body>)
                     Some([identifier, def_formals @ ..]) => {
-                        let lambda =
-                            self.build_lambda(def_formals, exprs, datum.source_location().clone());
+                        let lambda = self.build_lambda(
+                            &Datum::new(
+                                Sexp::List(def_formals.to_vec()),
+                                datum.source_location().clone(),
+                            ),
+                            exprs,
+                            datum.source_location().clone(),
+                        );
 
                         Ok(Datum::new(
                             Sexp::List(vec![operator.clone(), identifier.clone(), lambda]),
@@ -348,10 +356,10 @@ impl Expander {
         }
     }
 
-    fn build_lambda(&self, def_formals: &[Datum], body: &[Datum], loc: Location) -> Datum {
+    fn build_lambda(&self, def_formals: &Datum, body: &[Datum], loc: Location) -> Datum {
         let mut lambda = vec![
             Datum::new(Sexp::Symbol(Symbol::unforgeable("lambda")), loc.clone()),
-            Datum::new(Sexp::List(def_formals.to_vec()), loc.clone()),
+            def_formals.clone(),
         ];
 
         lambda.extend_from_slice(body);
@@ -396,6 +404,13 @@ mod tests {
             "(define foo (lambda (x y) x))",
             false,
         )?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_expand_lambda() -> Result<()> {
+        assert_expands_equal("(lambda all #t)", "(lambda all #t)", false)?;
+
         Ok(())
     }
 

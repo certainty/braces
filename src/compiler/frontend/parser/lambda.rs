@@ -90,6 +90,7 @@ impl CoreParser {
     }
 
     pub fn do_parse_lambda(&mut self, datum: &Datum) -> Result<LambdaExpression> {
+        println!("parsing lambda: {}", datum.to_string());
         match self.parse_list(datum)? {
             [_, formals, body @ ..] => {
                 let formals = self.parse_formals(formals)?;
@@ -110,6 +111,7 @@ impl CoreParser {
     }
 
     pub fn parse_formals(&mut self, datum: &Datum) -> Result<Formals> {
+        println!("Formals are: {}", datum.to_string());
         match datum.sexp() {
             Sexp::List(ls) => {
                 let identifiers: Result<Vec<Identifier>> =
@@ -138,7 +140,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_lambda() {
+    fn test_parse_rest_args() {
         assert_parse_as(
             "(lambda all #t)",
             Expression::lambda(
@@ -148,7 +150,10 @@ mod tests {
                 location(0..15),
             ),
         );
+    }
 
+    #[test]
+    fn test_parse_lambda() {
         assert_parse_as(
             "(lambda (x y) #t)",
             Expression::lambda(
