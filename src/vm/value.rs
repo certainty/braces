@@ -121,7 +121,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eq(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
             (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
-                lhs_head.is_eq(rhs_head) && rhs_tail.is_eq(rhs_tail)
+                lhs_head.is_eq(rhs_head) && lhs_tail.is_eq(rhs_tail)
             }
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
@@ -141,7 +141,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eqv(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
             (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
-                lhs_head.is_eqv(rhs_head) && rhs_tail.is_eqv(rhs_tail)
+                lhs_head.is_eqv(rhs_head) && lhs_tail.is_eqv(rhs_tail)
             }
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
@@ -163,7 +163,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_equal(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
             (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
-                lhs_head.is_equal(rhs_head) && rhs_tail.is_equal(rhs_tail)
+                lhs_head.is_equal(rhs_head) && lhs_tail.is_equal(rhs_tail)
             }
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),

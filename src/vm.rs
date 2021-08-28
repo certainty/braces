@@ -23,7 +23,6 @@ use std::io::stdout;
 use thiserror::Error;
 use value::Value;
 
-use crate::compiler::error::reporting::ErrorReporter as CompilerErrorReporter;
 use crate::vm::error::reporting::ErrorReporter;
 pub use error::Error;
 pub use settings::{Setting, Settings};

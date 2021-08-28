@@ -1,6 +1,5 @@
 use super::Error;
 use crate::compiler::error::reporting::ErrorReporter as CompilerErrorReporter;
-use crate::compiler::source::Registry;
 use crate::vm::stack_trace::StackTrace;
 use crate::vm::value::error::RuntimeError;
 

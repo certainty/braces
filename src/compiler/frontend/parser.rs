@@ -6,7 +6,7 @@ use crate::compiler::frontend::expander::Expander;
 use crate::compiler::representation::{CoreAST, SexpAST};
 use crate::compiler::source::{HasSourceLocation, Location};
 
-use super::reader::sexp::datum::{Datum, Sexp};
+use super::reader::sexp::datum::Datum;
 pub use super::Result;
 
 pub mod apply;
@@ -75,12 +75,9 @@ impl Parser {
     }
 
     fn do_parse(&mut self, datum: &Datum) -> Result<Expression> {
+        log::trace!("parsing: {}", datum.to_string());
         let expanded = self.expander.expand(datum)?;
-        println!(
-            "expanded input {} \n ==== \n {}",
-            datum.to_string(),
-            expanded.to_string()
-        );
+        log::trace!("expanded: {}", expanded.to_string());
         self.core_parser.parse(&expanded)
     }
 }
@@ -93,6 +90,7 @@ pub mod tests {
     use crate::compiler::source::{BufferSource, Registry, SourceId};
 
     use super::*;
+    use crate::compiler::frontend::reader::sexp::datum::Sexp;
 
     pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut registry = Registry::new();

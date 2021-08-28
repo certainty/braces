@@ -460,7 +460,6 @@ mod tests {
         let expected_sexp = parse_datum(rhs);
         let expanded = exp.expand(&actual_sexp)?;
 
-        println!("Expanded: {} ", expanded.to_string());
         assert_struct_eq(&expanded, &expected_sexp, pedantic);
         Ok(())
     }

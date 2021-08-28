@@ -132,7 +132,7 @@ pub fn list_append(args: Vec<Value>) -> FunctionResult<Value> {
             Ok(Value::ImproperList(lhs.append(rhs_head), rhs_tail.clone()))
         }
         (lhs, Value::ProperList(_)) => Err(error::argument_error(lhs.clone(), "Expected list")),
-        (lhs, Value::ImproperList(rhs_head, rhs_tail)) => {
+        (lhs, Value::ImproperList(_rhs_head, _rhs_tail)) => {
             Err(error::argument_error(lhs.clone(), "Expected list"))
         }
         (Value::ProperList(_), rhs) => Err(error::argument_error(rhs.clone(), "Expected list")),

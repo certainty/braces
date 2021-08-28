@@ -36,17 +36,6 @@ impl HasSourceLocation for IfExpression {
     }
 }
 
-impl Expression {
-    fn conditional(
-        test: Expression,
-        consequent: Expression,
-        alternate: Option<Expression>,
-        loc: Location,
-    ) -> Expression {
-        Expression::If(IfExpression::new(test, consequent, alternate, loc.clone()))
-    }
-}
-
 /// Parse an if-expression
 ///
 /// Ref: r7rs 7.1.3
@@ -109,12 +98,12 @@ mod tests {
     fn one_armed_if() {
         assert_parse_as(
             "(if #t #f)",
-            Expression::conditional(
+            Expression::If(IfExpression::new(
                 Expression::constant(make_datum(Sexp::Bool(true), 4, 6)),
                 Expression::constant(make_datum(Sexp::Bool(false), 7, 9)),
                 None,
                 location(0..10),
-            ),
+            )),
         )
     }
 
@@ -122,12 +111,12 @@ mod tests {
     fn two_armed_if() {
         assert_parse_as(
             "(if #t #f #\\a)",
-            Expression::conditional(
+            Expression::If(IfExpression::new(
                 Expression::constant(make_datum(Sexp::Bool(true), 4, 6)),
                 Expression::constant(make_datum(Sexp::Bool(false), 7, 9)),
                 Some(Expression::constant(make_datum(Sexp::Char('a'), 10, 13))),
                 location(0..14),
-            ),
+            )),
         )
     }
 }

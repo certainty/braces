@@ -6,6 +6,7 @@ use crate::compiler::source::{HasSourceLocation, Location};
 use super::frontend::error::Error;
 use super::identifier::Identifier;
 use super::{Expression, ParseResult, Result};
+use crate::compiler::frontend::syntax::environment::{Denotation, Special};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum DefinitionExpression {
@@ -55,11 +56,18 @@ impl CoreParser {
 
     pub fn do_parse_definition(&mut self, datum: &Datum) -> Result<DefinitionExpression> {
         match self.parse_list(datum)? {
-            [_, identifier, expr] => Ok(DefinitionExpression::DefineSimple(
-                self.do_parse_identifier(&identifier).res()?,
-                Box::new(self.parse(&expr)?),
-                datum.source_location().clone(),
-            )),
+            [op, identifier, expr] if op.is_symbol() => match self.denotation_of(op)? {
+                Denotation::Special(Special::Define) => Ok(DefinitionExpression::DefineSimple(
+                    self.do_parse_identifier(&identifier).res()?,
+                    Box::new(self.parse(&expr)?),
+                    datum.source_location().clone(),
+                )),
+                _ => Err(Error::parse_error(
+                    "Not a definition",
+                    Detail::new("", datum.source_location().clone()),
+                    vec![],
+                )),
+            },
             _ => Err(Error::parse_error(
                 "Invalid definition",
                 Detail::new(

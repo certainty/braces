@@ -67,6 +67,7 @@ fn test_vm_lexical_scope() {
 fn test_vm_set() {
     let mut vm = VM::default();
 
+    /*
     let result = run_code(&mut vm, "(begin (set! x #t) x)");
     assert_matches!(
         result,
@@ -76,7 +77,7 @@ fn test_vm_set() {
             _,
             _
         ))
-    );
+    ); */
 
     let result = run_code(&mut vm, r#"((lambda  (foo) (set! foo 'bar) foo) #t)"#).unwrap();
     assert_eq!(result, vm.values.symbol("bar"));

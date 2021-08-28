@@ -90,7 +90,6 @@ impl CoreParser {
     }
 
     pub fn do_parse_lambda(&mut self, datum: &Datum) -> Result<LambdaExpression> {
-        println!("parsing lambda: {}", datum.to_string());
         match self.parse_list(datum)? {
             [_, formals, body @ ..] => {
                 let formals = self.parse_formals(formals)?;
@@ -111,7 +110,6 @@ impl CoreParser {
     }
 
     pub fn parse_formals(&mut self, datum: &Datum) -> Result<Formals> {
-        println!("Formals are: {}", datum.to_string());
         match datum.sexp() {
             Sexp::List(ls) => {
                 let identifiers: Result<Vec<Identifier>> =
