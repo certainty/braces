@@ -6,8 +6,8 @@ use nom::combinator::{map_opt, map_res, value};
 use nom::error::context;
 use nom::sequence::{delimited, preceded};
 
-use super::datum::{Datum, Sexp};
 use super::{map_datum, Input, ParseResult};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 
 /// Character parser
 pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {

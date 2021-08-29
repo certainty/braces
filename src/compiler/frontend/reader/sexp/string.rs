@@ -11,8 +11,8 @@ use super::{
     whitespace::{consume_line_ending, parse_intra_line_ws},
 };
 
-use super::datum::{Datum, Sexp};
 use super::{map_datum, Input, ParseResult};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 
 //////////////////////////////
 // String parser

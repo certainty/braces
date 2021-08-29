@@ -8,8 +8,8 @@ use nom::error::{Error, ErrorKind, ParseError};
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 
-use super::datum::{Datum, Sexp};
 use super::{map_datum, Input, ParseResult};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 
 use crate::vm::value::number::rational::Rational;
 use crate::vm::value::number::{flonum::Flonum, real::RealNumber, Exactness, SchemeNumber, Sign};

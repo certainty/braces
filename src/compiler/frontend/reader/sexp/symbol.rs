@@ -10,7 +10,7 @@ use super::{
     map_datum, Input, ParseResult,
 };
 
-use super::datum::{Datum, Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 
 //////////////////////////////////////////
 // Identifier / Symbol

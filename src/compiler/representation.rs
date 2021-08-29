@@ -1,5 +1,5 @@
 use super::frontend::parser::Expression;
-use super::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::reader::datum::Datum;
 
 #[derive(Clone, Debug)]
 pub struct CoreAST {

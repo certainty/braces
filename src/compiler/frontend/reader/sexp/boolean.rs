@@ -2,8 +2,8 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::value;
 
-use super::datum::{Datum, Sexp};
-use super::{map_datum, Input, ParseResult};
+use super::{parser::map_datum, parser::Input, parser::ParseResult};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 
 /// Boolean parser
 ///

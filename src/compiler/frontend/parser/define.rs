@@ -1,6 +1,6 @@
 use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::frontend::error::Error;
@@ -83,7 +83,7 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::sexp::Sexp;
 
     use super::*;
 

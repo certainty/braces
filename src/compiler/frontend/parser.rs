@@ -6,8 +6,8 @@ use crate::compiler::frontend::expander::Expander;
 use crate::compiler::representation::{CoreAST, SexpAST};
 use crate::compiler::source::{HasSourceLocation, Location};
 
-use super::reader::sexp::datum::Datum;
 pub use super::Result;
+use crate::compiler::frontend::reader::datum::Datum;
 
 pub mod apply;
 pub mod assignment;
@@ -90,7 +90,7 @@ pub mod tests {
     use crate::compiler::source::{BufferSource, Registry, SourceId};
 
     use super::*;
-    use crate::compiler::frontend::reader::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::sexp::Sexp;
 
     pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut registry = Registry::new();

@@ -1,7 +1,7 @@
 use crate::compiler::frontend;
 use crate::compiler::frontend::error::{Detail, Error};
 use crate::compiler::frontend::parser::Expression;
-use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::environment::{Denotation, Special};
 use crate::compiler::source::HasSourceLocation;

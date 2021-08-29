@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::sexp::datum::{Datum, Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::{Expression, ParseResult};
@@ -13,7 +13,7 @@ impl LiteralExpression {
         Self(datum)
     }
 
-    pub fn datum<'a>(&'a self) -> &'a Datum {
+    pub fn datum(&self) -> &Datum {
         &self.0
     }
 }
@@ -51,7 +51,7 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::datum::Sexp;
+    use crate::compiler::frontend::reader::sexp::Sexp;
     use crate::vm::value::number::Number;
 
     use super::*;

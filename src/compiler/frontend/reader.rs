@@ -1,10 +1,13 @@
-pub mod error;
-pub mod sexp;
+use nom::error::context;
+use nom::multi::many1;
+
 use crate::compiler::frontend;
 use crate::compiler::representation::SexpAST;
 use crate::compiler::source::Source;
-use nom::error::context;
-use nom::multi::many1;
+
+pub mod datum;
+pub mod error;
+pub mod sexp;
 
 #[derive(Clone, Debug)]
 pub struct Reader;
@@ -23,11 +26,10 @@ impl Reader {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{
-        sexp::datum::{Datum, Sexp},
-        Reader,
-    };
+    use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
     use crate::compiler::source::{BufferSource, Location, Registry, SourceId, Span};
+
+    use super::Reader;
 
     pub fn parse_datum(inp: &str) -> Datum {
         let mut registry = Registry::new();

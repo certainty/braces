@@ -1,4 +1,4 @@
-use crate::compiler::frontend::reader::sexp::datum::Datum;
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::define::DefinitionExpression;
