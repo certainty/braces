@@ -470,18 +470,22 @@ impl<'a> CodeGenerator<'a> {
 
     fn emit_lit(&mut self, datum: &Datum) -> Result<()> {
         match datum.sexp() {
-            Sexp::Bool(true) => self.emit_instruction(Instruction::True, &datum.location)?,
-            Sexp::Bool(false) => self.emit_instruction(Instruction::False, &datum.location)?,
+            Sexp::Bool(true) => {
+                self.emit_instruction(Instruction::True, &datum.source_location())?
+            }
+            Sexp::Bool(false) => {
+                self.emit_instruction(Instruction::False, &datum.source_location())?
+            }
             Sexp::List(ls) if ls.is_empty() => {
-                self.emit_instruction(Instruction::Nil, &datum.location)?
+                self.emit_instruction(Instruction::Nil, &datum.source_location())?
             }
             Sexp::String(s) => {
                 let interned = self.intern(s);
-                self.emit_constant(interned, &datum.location)?;
+                self.emit_constant(interned, &datum.source_location())?;
             }
             _ => {
                 let value = self.values.from_datum(datum);
-                self.emit_constant(value, &datum.location)?
+                self.emit_constant(value, &datum.source_location())?
             }
         }
 

@@ -262,7 +262,7 @@ impl Factory {
 
     // TODO: decide if this should this consume datum instead
     pub fn from_datum(&mut self, d: &Datum) -> Value {
-        match &d.sexp {
+        match d.sexp() {
             Sexp::Bool(true) => self.bool_true().clone(),
             Sexp::Bool(false) => self.bool_false().clone(),
             Sexp::Symbol(s) => self.symbol(s),

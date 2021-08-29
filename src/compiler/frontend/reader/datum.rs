@@ -5,8 +5,8 @@ use crate::vm::value::{number, Value};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Datum {
-    pub location: Location,
-    pub sexp: Sexp,
+    location: Location,
+    sexp: Sexp,
 }
 
 impl Datum {

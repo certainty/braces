@@ -51,7 +51,7 @@ pub mod tests {
         let reader = Reader::new();
         let datum = reader.parse(&source).unwrap();
 
-        assert_eq!(datum.to_vec()[0].sexp, expected);
+        assert_eq!(datum.to_vec()[0].sexp(), &expected);
     }
 
     pub fn assert_parse_ok(inp: &str) {
