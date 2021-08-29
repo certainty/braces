@@ -4,10 +4,10 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn compiler_benchmark(c: &mut Criterion) {
     let mut compiler = Compiler::new();
-    let mut source = StringSource::new("#true", "bench");
+    let mut source = StringSource::new("#true");
 
     c.bench_function("compile_expression", |b| {
-        b.iter(|| compiler.compile_expression(black_box(&mut source)))
+        b.iter(|| compiler.compile(black_box(&mut source)))
     });
 }
 

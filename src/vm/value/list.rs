@@ -19,6 +19,29 @@ impl List {
         List::Cons(Vector::new())
     }
 
+    pub fn cons(&self, v: Value) -> List {
+        match self {
+            List::Nil => List::Cons(Vector::from(vec![v])),
+            List::Cons(elts) => {
+                let mut new_elts = elts.clone();
+                new_elts.push_front(v);
+                List::Cons(new_elts)
+            }
+        }
+    }
+
+    pub fn append(&self, other: &List) -> List {
+        match (self, other) {
+            (List::Nil, _) => other.clone(),
+            (_, List::Nil) => self.clone(),
+            (List::Cons(lhs), List::Cons(rhs)) => {
+                let mut elts = lhs.clone();
+                elts.append(rhs.clone());
+                List::Cons(elts)
+            }
+        }
+    }
+
     pub fn is_null(&self) -> bool {
         match self {
             Self::Nil => true,

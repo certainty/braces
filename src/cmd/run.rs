@@ -1,7 +1,8 @@
-use crate::compiler::error::UserMessage;
-use crate::vm;
+use crate::compiler::source::FileSource;
+use crate::compiler::Compiler;
 use crate::vm::VM;
 use clap::Clap;
+use std::path::PathBuf;
 
 #[derive(Clap, Debug)]
 #[clap(
@@ -15,19 +16,16 @@ pub struct Opts {
 
 pub fn execute(opts: &Opts) -> anyhow::Result<()> {
     let mut vm = VM::default();
+    let mut source = FileSource::new(PathBuf::from(opts.input.clone()));
+    let mut compiler = Compiler::new();
 
-    match vm.run_file(std::path::PathBuf::from(opts.input.clone())) {
-        Ok(_) => (),
-        Err(vm::Error::CompilerError(e)) => e.print_user_friendly_message(),
-        Err(vm::Error::RuntimeError(msg, line, stack_trace, Some(ctx))) => {
-            eprintln!("{}:{} [in {}]\n{}", msg, line, ctx, stack_trace.as_string())
-        }
-
-        Err(vm::Error::RuntimeError(msg, line, stack_trace, _)) => {
-            eprintln!("{}:{}\n{}", msg, line, stack_trace.as_string())
-        }
-
-        Err(e @ vm::Error::CompilerBug(_)) => eprintln!("{}", e),
+    match compiler.compile(&mut source) {
+        Ok(unit) => match vm.interpret(unit) {
+            Ok(_) => (),
+            Err(e) => vm.print_error(&e, &compiler),
+        },
+        Err(e) => compiler.print_error(&e),
     }
+
     Ok(())
 }

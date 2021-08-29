@@ -15,43 +15,42 @@
 // of execution since it allows to easily activate individual procedures without having to do extensive
 // computation of addresses.
 
-use crate::vm::value::closure::Closure;
-use crate::vm::value::procedure::Arity;
+use thiserror::Error;
 
-use super::variables::{Variables, VariablesRef};
-use crate::compiler::frontend::parser::expression::lambda::{Formals, LambdaExpression};
-use crate::compiler::frontend::parser::expression::Expression;
-use crate::compiler::frontend::parser::expression::{
-    apply::ApplicationExpression, assignment::SetExpression,
+use crate::compiler::frontend::parser::{
+    apply::ApplicationExpression,
+    assignment::SetExpression,
+    body::BodyExpression,
+    conditional::IfExpression,
+    define::DefinitionExpression,
+    identifier::Identifier,
+    lambda::{Formals, LambdaExpression},
+    sequence::BeginExpression,
+    Expression,
 };
-use crate::compiler::frontend::parser::expression::{
-    body::BodyExpression, sequence::BeginExpression,
-};
-use crate::compiler::frontend::parser::expression::{
-    conditional::IfExpression, define::DefinitionExpression,
-};
-use crate::compiler::frontend::parser::sexp::datum;
-use crate::compiler::source_location::{HasSourceLocation, SourceLocation};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::representation::CoreAST;
+use crate::compiler::source::{HasSourceLocation, Location, Registry};
 use crate::compiler::CompilationUnit;
+use crate::vm::byte_code::chunk::AddressType;
 use crate::vm::byte_code::chunk::Chunk;
 use crate::vm::byte_code::Instruction;
 #[cfg(feature = "debug_code")]
 use crate::vm::disassembler::Disassembler;
 use crate::vm::value;
+use crate::vm::value::closure::Closure;
+use crate::vm::value::procedure::Arity;
 use crate::vm::value::Value;
-use crate::{
-    compiler::frontend::parser::expression::identifier::Identifier,
-    vm::byte_code::chunk::AddressType,
-};
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+use super::variables::{Variables, VariablesRef};
+
+#[derive(Error, Debug, Clone)]
 pub enum Error {
     #[error("Too many locals defined")]
     TooManyLocals,
     #[error("Too many up values defined")]
     TooManyUpValues,
-    #[error("CompilerBug: {0}")]
+    #[error("CompilerBug: {}", 0)]
     CompilerBug(String),
 }
 
@@ -63,7 +62,8 @@ pub enum Target {
     Procedure(Option<String>),
 }
 
-pub struct CodeGenerator {
+pub struct CodeGenerator<'a> {
+    source_registry: &'a Registry,
     variables: VariablesRef,
     values: value::Factory,
     target: Target,
@@ -85,11 +85,16 @@ impl Context {
     }
 }
 
-impl CodeGenerator {
-    pub fn new(target: Target, parent_variables: Option<VariablesRef>) -> Self {
+impl<'a> CodeGenerator<'a> {
+    pub fn new(
+        target: Target,
+        parent_variables: Option<VariablesRef>,
+        source_registry: &'a Registry,
+    ) -> Self {
         let variables = Variables::child(parent_variables);
 
-        CodeGenerator {
+        Self {
+            source_registry,
             variables,
             target,
             values: value::Factory::default(),
@@ -97,11 +102,12 @@ impl CodeGenerator {
         }
     }
 
-    pub fn generate(&mut self, ast: Vec<Expression>) -> Result<CompilationUnit> {
+    pub fn generate(&mut self, ast: &CoreAST) -> Result<CompilationUnit> {
         let proc = Self::generate_procedure(
+            self.source_registry,
             None,
             Target::TopLevel,
-            &Expression::body(ast),
+            &Expression::body(ast.expressions.clone()),
             &Formals::empty(),
         )?;
 
@@ -112,12 +118,13 @@ impl CodeGenerator {
     }
 
     pub fn generate_procedure(
+        registry: &Registry,
         parent_variables: Option<VariablesRef>,
         target: Target,
         ast: &BodyExpression,
         formals: &Formals,
     ) -> Result<value::procedure::native::Procedure> {
-        let mut generator = CodeGenerator::new(target.clone(), parent_variables);
+        let mut generator = CodeGenerator::new(target.clone(), parent_variables, registry);
 
         generator.begin_scope();
         for argument in formals.identifiers() {
@@ -171,10 +178,9 @@ impl CodeGenerator {
         if processed_variables.len() > 0 {
             for (addr, was_captured) in processed_variables {
                 if was_captured {
-                    self.current_chunk()
-                        .write_instruction(Instruction::CloseUpValue(addr));
+                    self.emit_instruction_without_location(Instruction::CloseUpValue(addr));
                 } else if pop_locals {
-                    self.current_chunk().write_instruction(Instruction::Pop);
+                    self.emit_instruction_without_location(Instruction::Pop);
                 }
             }
         }
@@ -226,12 +232,10 @@ impl CodeGenerator {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
             Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
-            Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr, context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(expr) => self.emit_begin(expr, context)?,
-            Expression::Command(expr) => self.emit_instructions(expr, context)?,
             Expression::Apply(expr) => self.emit_apply(expr, context)?,
         }
         Ok(())
@@ -269,7 +273,7 @@ impl CodeGenerator {
         Ok(())
     }
 
-    fn emit_jump(&mut self, instr: Instruction, loc: &SourceLocation) -> Result<AddressType> {
+    fn emit_jump(&mut self, instr: Instruction, loc: &Location) -> Result<AddressType> {
         self.emit_instruction(instr, loc)?;
         Ok(self.current_chunk().size() - 1)
     }
@@ -342,6 +346,7 @@ impl CodeGenerator {
 
     fn emit_lambda(&mut self, expr: &LambdaExpression) -> Result<()> {
         let lambda = Self::generate_procedure(
+            &self.source_registry,
             Some(self.variables.clone()),
             Target::Procedure(expr.label.clone()),
             &expr.body,
@@ -397,12 +402,13 @@ impl CodeGenerator {
     }
 
     fn emit_return(&mut self) -> Result<()> {
-        self.current_chunk().write_instruction(Instruction::Return);
+        self.emit_instruction_without_location(Instruction::Return);
         Ok(())
     }
 
     fn emit_definition(&mut self, definition: &DefinitionExpression) -> Result<()> {
         match definition {
+            /*
             DefinitionExpression::DefineProcedure(id, lambda_expr, _loc) => {
                 // name of procedure is part is the label of the lambda expression
                 self.emit_lambda(lambda_expr)?;
@@ -418,7 +424,7 @@ impl CodeGenerator {
                     // internal define sets a local variable instead
                     todo!()
                 }
-            }
+            }*/
             DefinitionExpression::DefineSimple(id, expr, _loc) => {
                 self.emit_instructions(expr, &Context::NonTail)?;
                 let id_sym = self.sym(&id.string());
@@ -434,57 +440,50 @@ impl CodeGenerator {
                     todo!()
                 }
             }
-            DefinitionExpression::Begin(_inner, _loc) => todo!(),
         }
     }
 
-    fn emit_constant(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
-        let const_addr = self.current_chunk().add_constant(value);
-        let inst_addr = self
-            .current_chunk()
-            .write_instruction(Instruction::Const(const_addr));
-
-        self.current_chunk()
-            .write_line(inst_addr, inst_addr, loc.line);
+    fn emit_constant(&mut self, value: Value, loc: &Location) -> Result<()> {
+        let const_address = self.current_chunk().add_constant(value);
+        self.emit_instruction(Instruction::Const(const_address), &loc)?;
         Ok(())
     }
 
     // a closure is compiled to a sequence of up-value markers followed by the closure
-    fn emit_closure(&mut self, value: Value, loc: &SourceLocation) -> Result<()> {
+    fn emit_closure(&mut self, value: Value, loc: &Location) -> Result<()> {
         // add up-values
         let up_values = self.variables.up_values_vec();
         for up_value in up_values {
-            self.current_chunk()
-                .write_instruction(Instruction::UpValue(up_value.address, up_value.is_local));
+            self.emit_instruction_without_location(Instruction::UpValue(
+                up_value.address,
+                up_value.is_local,
+            ));
         }
 
         // now add the closure
-        let const_addr = self.current_chunk().add_constant(value);
-        let inst_addr = self
-            .current_chunk()
-            .write_instruction(Instruction::Closure(const_addr));
-        self.current_chunk()
-            .write_line(inst_addr, inst_addr, loc.line);
-
+        let const_address = self.current_chunk().add_constant(value);
+        self.emit_instruction(Instruction::Closure(const_address), &loc)?;
         Ok(())
     }
 
-    fn emit_lit(&mut self, datum: &datum::Datum) -> Result<()> {
-        match datum.sexp() {
-            datum::Sexp::Bool(true) => self.emit_instruction(Instruction::True, &datum.location)?,
-            datum::Sexp::Bool(false) => {
-                self.emit_instruction(Instruction::False, &datum.location)?
+    fn emit_lit(&mut self, datum: &Datum) -> Result<()> {
+        match datum.s_expression() {
+            SExpression::Bool(true) => {
+                self.emit_instruction(Instruction::True, &datum.source_location())?
             }
-            datum::Sexp::List(ls) if ls.is_empty() => {
-                self.emit_instruction(Instruction::Nil, &datum.location)?
+            SExpression::Bool(false) => {
+                self.emit_instruction(Instruction::False, &datum.source_location())?
             }
-            datum::Sexp::String(s) => {
+            SExpression::List(ls) if ls.is_empty() => {
+                self.emit_instruction(Instruction::Nil, &datum.source_location())?
+            }
+            SExpression::String(s) => {
                 let interned = self.intern(s);
-                self.emit_constant(interned, &datum.location)?;
+                self.emit_constant(interned, &datum.source_location())?;
             }
             _ => {
                 let value = self.values.from_datum(datum);
-                self.emit_constant(value, &datum.location)?
+                self.emit_constant(value, &datum.source_location())?
             }
         }
 
@@ -492,20 +491,27 @@ impl CodeGenerator {
     }
 
     fn emit_pop(&mut self) -> Result<()> {
-        self.current_chunk().write_instruction(Instruction::Pop);
+        self.emit_instruction_without_location(Instruction::Pop);
         Ok(())
     }
 
-    fn emit_instruction(
-        &mut self,
-        instr: Instruction,
-        source_location: &SourceLocation,
-    ) -> Result<()> {
-        let addr = self.current_chunk().write_instruction(instr);
-
-        self.current_chunk()
-            .write_line(addr, addr, source_location.line);
+    fn emit_instruction(&mut self, instr: Instruction, source_location: &Location) -> Result<()> {
+        let address = self.emit_instruction_without_location(instr);
+        self.write_line(address, address, &source_location);
         Ok(())
+    }
+
+    #[inline]
+    fn emit_instruction_without_location(&mut self, instr: Instruction) -> AddressType {
+        self.current_chunk().write_instruction(instr)
+    }
+
+    #[inline]
+    fn write_line(&mut self, from: AddressType, to: AddressType, loc: &Location) {
+        match loc.line(&self.source_registry) {
+            Some(line) => self.current_chunk().write_line(from, to, line),
+            _ => (),
+        }
     }
 
     #[inline]
@@ -516,11 +522,13 @@ impl CodeGenerator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::rc::Rc;
+
     use crate::compiler::source::StringSource;
     use crate::compiler::Compiler;
     use crate::vm::value::procedure::native;
-    use std::rc::Rc;
+
+    use super::*;
 
     // Test tail context and tail calls
     // R7RS Section 3.5
@@ -683,8 +691,8 @@ mod tests {
 
     fn compile(input: &str) -> Chunk {
         let mut compiler = Compiler::new();
-        let mut source = StringSource::new(input, "test");
-        let unit = compiler.compile_program(&mut source).unwrap();
+        let mut source = StringSource::new(input);
+        let unit = compiler.compile(&mut source).unwrap();
         unit.closure.code().clone()
     }
 

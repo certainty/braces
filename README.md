@@ -14,6 +14,9 @@ make repl
 ```
 
 ## State 
+This is beyond the toy state but the code is messy and experimental at times.
+However, the compiler and the VM is coming together and I will go on with this to see 
+how fare I can bring it. 
 
 ### Language Support 
 
@@ -22,10 +25,10 @@ make repl
   - [x] symbol
   - [x] char
   - [x] number
-  - [ ] vector
+  - [x] vector
   - [ ] byte-vector
   - [x] proper list
-  - [ ] improper list
+  - [x] improper list
   - [x] string
   - [x] quoted constants
 - [x] variables
@@ -41,10 +44,10 @@ make repl
 - [ ] collect all errors in sexp parser 
 - [ ] collect all errors in expr parser 
 - [ ] bytecode serialization
-- [ ] Module System 
+- [ ] libraries  
 - [ ] optimization pass 
 - [x] identify tail calls
-- [ ] quasiquote / Quote 
+- [x] quasi quote 
 
 #### Macros
 - [ ] add macro expansion phase
@@ -73,3 +76,13 @@ make repl
 
 ### Continuations
 - [ ] figure out how to implement them
+
+### Problems
+There are plenty :D 
+
+* Runtime representation of values isn't at all optimised. It likely uses way too many allocations and holds the types wrong
+* The parser bails after the first error (you'd want to collect all)
+* I'm not sure if the custom ParseResult I use is really needed? (I will have to figure that out)
+* No proper macro expander yet. (There is an expansion phase which expands using rust code but that's very limited for now)
+* No support for internal defines (we might get away by adding an expansion to letrec*)
+* I'm not sure the location tracking works all the time

@@ -1,5 +1,6 @@
 pub mod numbers;
 use super::ffi::*;
+use crate::vm::value::error;
 use crate::vm::value::procedure::foreign;
 use crate::vm::value::Value;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
@@ -11,6 +12,7 @@ macro_rules! register_core {
             .unwrap()
     };
 }
+use crate::vm::value::list::List;
 pub(crate) use register_core;
 
 pub fn register(vm: &mut VM) {
@@ -26,6 +28,12 @@ pub fn register(vm: &mut VM) {
 
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
     register_core!(vm, "inspect", inspect, Arity::Exactly(1));
+
+    register_core!(vm, "cons", list_cons, Arity::Exactly(2));
+    register_core!(vm, "append", list_append, Arity::Exactly(2));
+
+    register_core!(vm, "vector-cons", vector_cons, Arity::Exactly(2));
+    register_core!(vm, "vector-append", vector_append, Arity::Exactly(2));
 
     numbers::register(vm);
 }
@@ -105,4 +113,52 @@ pub fn bool_not(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn inspect(args: Vec<Value>) -> FunctionResult<Value> {
     println!("Debug: {:?}", args.first().unwrap());
     Ok(Value::Unspecified)
+}
+
+pub fn list_cons(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (v, Value::ProperList(elts)) => Ok(Value::ProperList(elts.cons(v.clone()))),
+        (lhs, rhs) => Ok(Value::ImproperList(
+            List::Cons(vec![lhs.clone()].into()),
+            Box::new(rhs.clone()),
+        )),
+    }
+}
+
+pub fn list_append(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (Value::ProperList(lhs), Value::ProperList(rhs)) => Ok(Value::ProperList(lhs.append(rhs))),
+        (Value::ProperList(lhs), Value::ImproperList(rhs_head, rhs_tail)) => {
+            Ok(Value::ImproperList(lhs.append(rhs_head), rhs_tail.clone()))
+        }
+        (lhs, Value::ProperList(_)) => Err(error::argument_error(lhs.clone(), "Expected list")),
+        (lhs, Value::ImproperList(_rhs_head, _rhs_tail)) => {
+            Err(error::argument_error(lhs.clone(), "Expected list"))
+        }
+        (Value::ProperList(_), rhs) => Err(error::argument_error(rhs.clone(), "Expected list")),
+        (lhs, _) => Err(error::argument_error(lhs.clone(), "Expected list")),
+    }
+}
+pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (v, Value::Vector(elts)) => {
+            let mut new_vec = elts.clone();
+            new_vec.push(v.clone());
+            Ok(Value::Vector(new_vec))
+        }
+        (_, other) => Err(error::argument_error(other.clone(), "Expected vector")),
+    }
+}
+
+pub fn vector_append(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (Value::Vector(lhs), Value::Vector(rhs)) => {
+            let mut out = lhs.clone();
+            out.extend(rhs.clone());
+            Ok(Value::Vector(out))
+        }
+        (lhs, Value::Vector(_)) => Err(error::argument_error(lhs.clone(), "Expected vector")),
+        (Value::Vector(_), rhs) => Err(error::argument_error(rhs.clone(), "Expected vector")),
+        (lhs, _) => Err(error::argument_error(lhs.clone(), "Expected vector")),
+    }
 }

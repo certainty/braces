@@ -47,6 +47,7 @@ hashbrown = "0.11"
 fasthash = "0.4.0"
 rustc-hash = "1.1.0"
 arrayvec = "0.7.0"
+codespan-reporting = "0.11"
 
 #parser
 nom_locate = "3.0"

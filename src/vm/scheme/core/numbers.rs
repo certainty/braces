@@ -133,6 +133,8 @@ define_ordering!(num_eq, ==);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::source::StringSource;
+    use crate::compiler::Compiler;
     use crate::vm::VM;
 
     #[test]
@@ -229,7 +231,10 @@ mod tests {
     }
 
     fn run_string(inp: &str) -> Value {
+        let mut source = StringSource::new(inp);
+        let mut compiler = Compiler::new();
         let mut vm = VM::default();
-        vm.run_string(inp, "test numbers").unwrap()
+        let unit = compiler.compile(&mut source).unwrap();
+        vm.interpret(unit).unwrap()
     }
 }

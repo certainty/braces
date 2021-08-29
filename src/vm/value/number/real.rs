@@ -73,16 +73,14 @@ impl SchemeNumberExactness for RealNumber {
     }
 }
 
-impl RealNumber {
-    /*
-    pub fn lt(&self, other: Self) -> bool {
-        match (self, other) {
-            (Self::Fixnum(lhs), Self::Fixnum(rhs)) => lhs.lt(rhs),
-            (Self::Fixnum(lhs), Self::Flonum(rhs)) => lhs.to_inexact().unwrap().lt(rhs),
-            (Self::Flonum(lhs), Self::Flonum(rhs)) => lhs.cmp(rhs),
-            (Self::Rational(lhs), Self::Rational(rhs)) => lhs.cmp(rhs),
+impl ToString for RealNumber {
+    fn to_string(&self) -> String {
+        match self {
+            RealNumber::Fixnum(f) => f.to_string(),
+            RealNumber::Flonum(f) => f.to_string(),
+            RealNumber::Rational(f) => f.to_string(),
         }
-    }*/
+    }
 }
 
 impl<I: Into<fixnum::Fixnum>> From<I> for RealNumber {

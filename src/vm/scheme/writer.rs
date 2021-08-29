@@ -1,4 +1,4 @@
-use crate::compiler::frontend::parser::sexp;
+use crate::compiler::frontend::reader;
 use crate::vm::value::number::fixnum::Fixnum;
 use crate::vm::value::number::flonum::Flonum;
 use crate::vm::value::number::{real::RealNumber, Number, SchemeNumber};
@@ -19,9 +19,10 @@ pub struct Writer {
 
 impl Writer {
     pub fn new() -> Self {
-        let special_initial: HashSet<char> = String::from(sexp::symbol::SYMBOL_SPECIAL_INITIAL)
-            .chars()
-            .collect();
+        let special_initial: HashSet<char> =
+            String::from(reader::sexp::symbol::SYMBOL_SPECIAL_INITIAL)
+                .chars()
+                .collect();
         Writer {
             symbol_special_initial: special_initial,
         }
@@ -44,6 +45,14 @@ impl Writer {
                 self.write_procedure(&procedure::Procedure::Native(closure.procedure_rc()))
             }
             Value::Procedure(proc) => self.write_procedure(&proc),
+            Value::Vector(elts) => {
+                let body: Vec<String> = elts
+                    .iter()
+                    .map(|e| self.write_impl(&e, values, false))
+                    .collect();
+
+                format!("#({})", body.join(" "))
+            }
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
@@ -51,6 +60,15 @@ impl Writer {
                     .collect();
 
                 format!("'({})", body.join(" "))
+            }
+            Value::ImproperList(head, tail) => {
+                let head_body: Vec<String> = head
+                    .iter()
+                    .map(|e| self.write_impl(&e, values, false))
+                    .collect();
+                let tail_body = self.write_impl(&tail, values, false);
+
+                format!("'({} . {})", head_body.join(" "), tail_body)
             }
             Value::Unspecified => "#<unspecified>".to_string(),
         }
@@ -207,8 +225,9 @@ impl Writer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::frontend::parser::sexp;
-    use crate::compiler::source::StringSource;
+    use crate::compiler::frontend;
+    use crate::compiler::frontend::reader;
+    use crate::compiler::source::{Registry, StringSource};
     use crate::vm::value::arbitrary::SymbolString;
     use crate::vm::value::Value;
     use quickcheck;
@@ -315,11 +334,13 @@ mod tests {
         read_my_write(&sym, &mut values).is_ok()
     }
 
-    fn read_my_write(val: &Value, values: &mut Factory) -> sexp::Result<Value> {
+    fn read_my_write(val: &Value, values: &mut Factory) -> frontend::Result<Value> {
         let writer = Writer::new();
         let external = writer.write(&val, &values);
-        let mut source = StringSource::new(&external, "");
-
-        sexp::parse(&mut source).map(|e| values.from_datum(&e))
+        let mut registry = Registry::new();
+        let source = registry.add(&mut StringSource::new(&external)).unwrap();
+        let reader = reader::Reader::new();
+        let ast = reader.parse(&source)?;
+        Ok(values.from_datum(ast.first()))
     }
 }
