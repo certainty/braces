@@ -159,7 +159,7 @@ mod tests {
             "(lambda all #t)",
             Expression::lambda(
                 Formals::RestArg(Identifier::synthetic("all")),
-                Expression::constant(make_datum(SExpression::Bool(true), 12, 14))
+                Expression::literal(make_datum(SExpression::Bool(true), 12, 14))
                     .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..15),
@@ -173,7 +173,7 @@ mod tests {
             "(lambda (x y) #t)",
             Expression::lambda(
                 Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
-                Expression::constant(make_datum(SExpression::Bool(true), 14, 16))
+                Expression::literal(make_datum(SExpression::Bool(true), 14, 16))
                     .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..17),
@@ -184,7 +184,7 @@ mod tests {
             "(lambda () #t)",
             Expression::lambda(
                 Formals::ArgList(vec![]),
-                Expression::constant(make_datum(SExpression::Bool(true), 11, 13))
+                Expression::literal(make_datum(SExpression::Bool(true), 11, 13))
                     .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..14),
@@ -198,7 +198,7 @@ mod tests {
                     vec![Identifier::synthetic("x"), Identifier::synthetic("y")],
                     Identifier::synthetic("z"),
                 ),
-                Expression::constant(make_datum(SExpression::Bool(true), 18, 20))
+                Expression::literal(make_datum(SExpression::Bool(true), 18, 20))
                     .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..21),

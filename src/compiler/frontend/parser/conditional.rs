@@ -117,8 +117,8 @@ mod tests {
         assert_parse_as(
             "(if #t #f)",
             Expression::If(IfExpression::new(
-                Expression::constant(make_datum(SExpression::Bool(true), 4, 6)),
-                Expression::constant(make_datum(SExpression::Bool(false), 7, 9)),
+                Expression::literal(make_datum(SExpression::Bool(true), 4, 6)),
+                Expression::literal(make_datum(SExpression::Bool(false), 7, 9)),
                 None,
                 location(0..10),
             )),
@@ -130,9 +130,9 @@ mod tests {
         assert_parse_as(
             "(if #t #f #\\a)",
             Expression::If(IfExpression::new(
-                Expression::constant(make_datum(SExpression::Bool(true), 4, 6)),
-                Expression::constant(make_datum(SExpression::Bool(false), 7, 9)),
-                Some(Expression::constant(make_datum(
+                Expression::literal(make_datum(SExpression::Bool(true), 4, 6)),
+                Expression::literal(make_datum(SExpression::Bool(false), 7, 9)),
+                Some(Expression::literal(make_datum(
                     SExpression::Char('a'),
                     10,
                     13,

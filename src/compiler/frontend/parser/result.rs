@@ -31,8 +31,8 @@ impl<T> ParseResult<T> {
         ParseResult::Applicable(Err(e))
     }
 
-    pub fn ignore<S: Into<String>>(message: S, location: Location) -> ParseResult<T> {
-        ParseResult::NonApplicable(message.into(), location)
+    pub fn ignore<S: Into<String>>(message: S, location: &Location) -> ParseResult<T> {
+        ParseResult::NonApplicable(message.into(), location.clone())
     }
 
     pub fn or<F: FnOnce() -> ParseResult<T>>(self, op: F) -> ParseResult<T> {
@@ -171,10 +171,10 @@ mod tests {
 
     #[test]
     fn test_parse_result_predicates() {
-        let res: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
+        let res: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
         assert!(res.is_non_applicable(), "Expected non-applicable");
 
-        let res: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
+        let res: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
         assert!(!res.is_applicable(), "Expected non-applicable");
 
         let res: ParseResult<u32> = ParseResult::Applicable(Ok(10));
@@ -186,14 +186,14 @@ mod tests {
 
     #[test]
     fn test_parse_result_and() {
-        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
+        let res1: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
         let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
         assert!(
             res1.and(|| res2).is_non_applicable(),
             "Expected non-applicable"
         );
 
-        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
+        let res1: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
         let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
         assert!(
             res2.and(|| res1).is_non_applicable(),
@@ -207,16 +207,16 @@ mod tests {
 
     #[test]
     fn test_parse_result_or() {
-        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
+        let res1: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
         let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
         assert_eq!(res1.or(|| res2).res().unwrap(), 10);
 
-        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
+        let res1: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
         let res2: ParseResult<u32> = ParseResult::Applicable(Ok(10));
         assert_eq!(res1.or(|| res2).res().unwrap(), 10);
 
-        let res1: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
-        let res2: ParseResult<u32> = ParseResult::ignore("test", location(0..1));
+        let res1: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
+        let res2: ParseResult<u32> = ParseResult::ignore("test", &location(0..1));
 
         assert!(
             res1.or(|| res2).is_non_applicable(),

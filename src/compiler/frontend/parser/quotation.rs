@@ -34,16 +34,16 @@ mod tests {
     fn test_parse_quote() {
         assert_parse_as(
             "(quote #t)",
-            Expression::constant(Datum::boolean(true, 7..9)),
+            Expression::literal(Datum::boolean(true, 7..9)),
         )
     }
 
     #[test]
     fn test_parse_literal_quoted_datum() {
-        assert_parse_as("'#t", Expression::constant(Datum::boolean(true, 1..3)));
+        assert_parse_as("'#t", Expression::literal(Datum::boolean(true, 1..3)));
 
-        assert_parse_as("'#\\a", Expression::constant(Datum::character('a', 1..4)));
+        assert_parse_as("'#\\a", Expression::literal(Datum::character('a', 1..4)));
 
-        assert_parse_as("'foo", Expression::constant(Datum::symbol("foo", 1..4)));
+        assert_parse_as("'foo", Expression::literal(Datum::symbol("foo", 1..4)));
     }
 }

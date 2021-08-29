@@ -31,7 +31,10 @@ impl Identifier {
     }
 
     pub fn synthetic(s: &str) -> Identifier {
-        Self::new(Symbol::forged(s), Location::new(SourceId::from(0), 0..0))
+        Self::new(
+            Symbol::forged(s),
+            Location::new(SourceId::synthetic(), 0..0),
+        )
     }
 
     pub fn string(&self) -> &String {
@@ -67,7 +70,7 @@ impl CoreParser {
             SExpression::Symbol(s) => {
                 ParseResult::accept(Identifier::new(s.clone(), datum.source_location().clone()))
             }
-            _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),
+            _ => ParseResult::ignore("Expected identifier", datum.source_location()),
         }
     }
 }

@@ -91,7 +91,7 @@ mod tests {
             "(foo #t)",
             Expression::apply(
                 Expression::identifier("foo".to_string(), location(1..4)),
-                vec![Expression::constant(make_datum(
+                vec![Expression::literal(make_datum(
                     SExpression::Bool(true),
                     5,
                     7,

@@ -75,7 +75,7 @@ mod tests {
         assert_parse_as(
             "(begin #t)",
             Expression::begin(
-                Expression::constant(make_datum(SExpression::Bool(true), 7, 9)),
+                Expression::literal(make_datum(SExpression::Bool(true), 7, 9)),
                 vec![],
                 location(0..10),
             ),

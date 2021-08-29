@@ -80,7 +80,7 @@ mod tests {
             "(set! foo #t)",
             Expression::assign(
                 identifier::Identifier::synthetic("foo"),
-                Expression::constant(make_datum(SExpression::Bool(true), 10, 12)),
+                Expression::literal(make_datum(SExpression::Bool(true), 10, 12)),
                 location(0..13),
             ),
         );

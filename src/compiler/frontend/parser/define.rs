@@ -93,7 +93,7 @@ mod tests {
             "(define x #t)",
             Expression::define(
                 Identifier::synthetic("x"),
-                Expression::constant(make_datum(SExpression::Bool(true), 10, 12)),
+                Expression::literal(make_datum(SExpression::Bool(true), 10, 12)),
                 location(0..13),
             ),
         )

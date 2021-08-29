@@ -236,7 +236,6 @@ impl<'a> CodeGenerator<'a> {
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(expr) => self.emit_begin(expr, context)?,
-            Expression::Command(expr) => self.emit_instructions(expr, context)?,
             Expression::Apply(expr) => self.emit_apply(expr, context)?,
         }
         Ok(())

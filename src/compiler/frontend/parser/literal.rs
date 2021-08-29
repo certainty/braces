@@ -18,8 +18,14 @@ impl LiteralExpression {
     }
 }
 
+impl From<&Datum> for LiteralExpression {
+    fn from(d: &Datum) -> Self {
+        Self::new(d.clone())
+    }
+}
+
 impl Expression {
-    pub fn constant(datum: Datum) -> Expression {
+    pub fn literal(datum: Datum) -> Expression {
         Expression::Literal(LiteralExpression::new(datum))
     }
 }
@@ -38,12 +44,12 @@ impl CoreParser {
 
     pub fn do_parse_literal(&mut self, datum: &Datum) -> ParseResult<LiteralExpression> {
         match datum.s_expression() {
-            SExpression::Bool(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            SExpression::Char(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            SExpression::String(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            SExpression::Number(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            SExpression::Vector(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            _ => ParseResult::ignore("Expected literal", datum.source_location().clone()),
+            SExpression::Bool(_) => ParseResult::accept(LiteralExpression::from(datum)),
+            SExpression::Char(_) => ParseResult::accept(LiteralExpression::from(datum)),
+            SExpression::String(_) => ParseResult::accept(LiteralExpression::from(datum)),
+            SExpression::Number(_) => ParseResult::accept(LiteralExpression::from(datum)),
+            SExpression::Vector(_) => ParseResult::accept(LiteralExpression::from(datum)),
+            _ => ParseResult::ignore("Expected literal", datum.source_location()),
         }
     }
 }
@@ -61,13 +67,13 @@ mod tests {
 
     #[test]
     fn test_parse_literal_constant() {
-        assert_parse_as("#t", Expression::constant(Datum::boolean(true, 0..2)));
+        assert_parse_as("#t", Expression::literal(Datum::boolean(true, 0..2)));
 
-        assert_parse_as("\"foo\"", Expression::constant(Datum::string("foo", 0..5)));
+        assert_parse_as("\"foo\"", Expression::literal(Datum::string("foo", 0..5)));
 
         assert_parse_as(
             "123",
-            Expression::constant(Datum::number(Number::fixnum(123), 0..3)),
+            Expression::literal(Datum::number(Number::fixnum(123), 0..3)),
         );
     }
 }

@@ -31,7 +31,6 @@ pub enum Expression {
     Assign(assignment::SetExpression),
     If(conditional::IfExpression),
     Apply(apply::ApplicationExpression),
-    Command(Box<Expression>),
     Begin(sequence::BeginExpression),
 }
 
@@ -45,7 +44,6 @@ impl HasSourceLocation for Expression {
             Self::If(expr) => expr.source_location(),
             Self::Lambda(proc) => proc.source_location(),
             Self::Apply(exp) => exp.source_location(),
-            Self::Command(exp) => exp.source_location(),
             Self::Begin(exp) => exp.source_location(),
         }
     }
