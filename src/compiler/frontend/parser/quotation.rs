@@ -1,56 +1,21 @@
 use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::source::{HasSourceLocation, Location};
+use crate::compiler::source::HasSourceLocation;
 
 use super::frontend::error::Error;
 use super::{Expression, ParseResult, Result};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum QuotationExpression {
-    Quote(Datum),
-}
-
-impl QuotationExpression {
-    pub fn new(datum: Datum) -> Self {
-        QuotationExpression::Quote(datum)
-    }
-
-    pub fn datum(&self) -> &Datum {
-        match self {
-            Self::Quote(d) => d,
-        }
-    }
-}
-
-impl HasSourceLocation for QuotationExpression {
-    fn source_location(&self) -> &Location {
-        match self {
-            Self::Quote(d) => d.source_location(),
-        }
-    }
-}
-
-impl Expression {
-    pub fn quoted_value(datum: Datum) -> Expression {
-        Expression::Quotation(QuotationExpression::new(datum))
-    }
-}
-
-/// Create a quotation expression
-///
-/// Quoted values are special in the sense that they maintain a reference
-/// to the quote `Datum`. They're treated as unevaluated expressions.
+use crate::compiler::frontend::parser::literal::LiteralExpression;
 
 impl CoreParser {
     #[inline]
     pub fn parse_quote(&mut self, datum: &Datum) -> ParseResult<Expression> {
-        self.do_parse_quote(datum).map(Expression::Quotation).into()
+        self.do_parse_quote(datum).map(Expression::Literal).into()
     }
 
-    pub fn do_parse_quote(&mut self, datum: &Datum) -> Result<QuotationExpression> {
+    pub fn do_parse_quote(&mut self, datum: &Datum) -> Result<LiteralExpression> {
         match self.parse_list(datum)? {
-            [_, value] => Ok(QuotationExpression::new(value.clone())),
+            [_, value] => Ok(LiteralExpression::new(value.clone())),
             _ => Err(Error::parse_error(
                 "Expected (quote <datum>) or (quasi-quote <datum>)",
                 Detail::new("", datum.source_location().clone()),
@@ -69,19 +34,16 @@ mod tests {
     fn test_parse_quote() {
         assert_parse_as(
             "(quote #t)",
-            Expression::quoted_value(Datum::boolean(true, 7..9)),
+            Expression::constant(Datum::boolean(true, 7..9)),
         )
     }
 
     #[test]
     fn test_parse_literal_quoted_datum() {
-        assert_parse_as("'#t", Expression::quoted_value(Datum::boolean(true, 1..3)));
+        assert_parse_as("'#t", Expression::constant(Datum::boolean(true, 1..3)));
 
-        assert_parse_as(
-            "'#\\a",
-            Expression::quoted_value(Datum::character('a', 1..4)),
-        );
+        assert_parse_as("'#\\a", Expression::constant(Datum::character('a', 1..4)));
 
-        assert_parse_as("'foo", Expression::quoted_value(Datum::symbol("foo", 1..4)));
+        assert_parse_as("'foo", Expression::constant(Datum::symbol("foo", 1..4)));
     }
 }

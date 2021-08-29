@@ -25,7 +25,6 @@ pub mod sequence;
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Identifier(identifier::Identifier),
-    Quotation(quotation::QuotationExpression),
     Literal(literal::LiteralExpression),
     Define(define::DefinitionExpression),
     Lambda(lambda::LambdaExpression),
@@ -41,7 +40,6 @@ impl HasSourceLocation for Expression {
         match self {
             Self::Identifier(id) => id.source_location(),
             Self::Literal(exp) => exp.source_location(),
-            Self::Quotation(exp) => exp.source_location(),
             Self::Assign(exp) => exp.source_location(),
             Self::Define(def) => def.source_location(),
             Self::If(expr) => expr.source_location(),

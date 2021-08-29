@@ -232,7 +232,6 @@ impl<'a> CodeGenerator<'a> {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
             Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
-            Expression::Quotation(quoted) => self.emit_lit(quoted.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr, context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
