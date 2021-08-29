@@ -13,6 +13,7 @@ use super::datum::Datum;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::vm::value::number::real::RealNumber;
 use crate::vm::value::number::Number;
+use std::fmt::Formatter;
 
 /// Representation of s-expressions for the frontend of the compiler
 ///
@@ -127,33 +128,37 @@ impl From<Vec<u8>> for SExpression {
     }
 }
 
-/// The `ToString` instance for s-expressions provides
+/// The `Display` instance for s-expressions provides
 /// a representation that can be used in debug output and logs.
 /// It's not as sophisticated as the `Writer`, so if you want a
 /// full faithful, valid, external representation of s-expressions use the `Writer` instead.
-impl ToString for SExpression {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for SExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SExpression::Bool(v) => v.to_string(),
-            SExpression::Symbol(v) => format!("{}", v.as_str().to_string()),
-            SExpression::String(v) => format!("{:?}", v),
-            SExpression::Char(v) => v.to_string(),
-            SExpression::Number(n) => n.to_string(),
+            SExpression::Bool(v) => f.write_fmt(format_args!("{}", v)),
+            SExpression::Symbol(v) => f.write_fmt(format_args!("{}", v.as_str().to_string())),
+            SExpression::String(v) => f.write_fmt(format_args!("\"{}\"", v)),
+            SExpression::Char(v) => f.write_fmt(format_args!("{}", v.to_string())),
+            SExpression::Number(n) => f.write_fmt(format_args!("{}", n.to_string())),
             SExpression::List(inner) => {
                 let elements: Vec<_> = inner.iter().map(|e| e.to_string()).collect();
-                format!("( {} )", elements.join(" "))
+                f.write_fmt(format_args!("( {} )", elements.join(" ")))
             }
             SExpression::ImproperList(head, tail) => {
                 let head_elements: Vec<_> = head.iter().map(|e| e.to_string()).collect();
-                format!("({} . {})", head_elements.join(" "), tail.to_string())
+                f.write_fmt(format_args!(
+                    "({} . {})",
+                    head_elements.join(" "),
+                    tail.to_string()
+                ))
             }
             SExpression::Vector(inner) => {
                 let elements: Vec<_> = inner.iter().map(|e| e.to_string()).collect();
-                format!("#( {} )", elements.join(" "))
+                f.write_fmt(format_args!("#( {} )", elements.join(" ")))
             }
             SExpression::ByteVector(inner) => {
                 let elements: Vec<_> = inner.iter().map(|e| format!("{:x?}", e)).collect();
-                format!("u8({})", elements.join(" "))
+                f.write_fmt(format_args!("u8({})", elements.join(" ")))
             }
         }
     }

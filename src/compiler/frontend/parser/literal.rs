@@ -51,8 +51,6 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
-    use crate::compiler::source::Location;
     use crate::vm::value::number::Number;
 
     use super::*;

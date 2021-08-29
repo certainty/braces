@@ -2,6 +2,7 @@ use crate::compiler::frontend::reader::sexp::SExpression;
 use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::value::number::Number;
 use crate::vm::value::Value;
+use std::fmt::Formatter;
 
 /// `Datum` is what the reader creates from the textual input.
 ///
@@ -139,18 +140,18 @@ impl Datum {
         }
     }
 }
-/// The `ToString` instance for `Datum` provides
+/// The `Display` instance for `Datum` provides
 /// a representation that can be used in debug output and logs.
 /// It's not as sophisticated as the `Writer`, so if you want a
 /// full faithful, valid, external representation of s-expressions use the `Writer` instead.
-impl ToString for Datum {
-    fn to_string(&self) -> String {
-        format!(
+impl std::fmt::Display for Datum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
             "[{}..{}]@{}",
             self.s_expression().to_string(),
             self.source_location().span.start(),
             self.source_location().span.end()
-        )
+        ))
     }
 }
 

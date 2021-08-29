@@ -69,8 +69,8 @@ pub fn parse_directive(input: Input) -> ParseResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use crate::compiler::frontend::reader::datum::Datum;
     use crate::compiler::frontend::reader::tests::*;
-    use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
     #[test]
     fn test_read_comments() {

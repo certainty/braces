@@ -64,7 +64,6 @@ impl CoreParser {
 mod tests {
     use super::*;
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
 
     #[test]
     fn test_parse_quote() {
