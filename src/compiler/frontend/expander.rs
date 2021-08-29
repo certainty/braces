@@ -1,17 +1,16 @@
+pub mod define;
+pub mod lambda;
 pub mod quotation;
 
+use super::error::Error;
+use super::syntax::environment::{Denotation, Special, SyntaxEnvironment};
+use super::Result;
 use crate::compiler::core_compiler::CoreCompiler;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
-
-// experiment if I can write an expander that does just SEXP -> SEXP transformation
-// without duplicating too much parser logic
-use super::error::Error;
-use super::syntax::environment::{Denotation, Special, SyntaxEnvironment};
-use super::Result;
 
 #[derive(Debug)]
 pub struct Expander {
@@ -91,43 +90,12 @@ impl Expander {
         Ok(Datum::new(SExpression::list(new_ls.into_iter()), loc))
     }
 
-    // expand a lambda expression
-    fn expand_lambda(
+    fn expand_macro(
         &mut self,
-        datum: &Datum,
-        _operator: &Datum,
-        operands: &[Datum],
+        _datum: &Datum,
+        _transformer: &syntax::Transformer,
     ) -> Result<Datum> {
-        match operands {
-            [formals, body @ ..] => {
-                match self.parser.parse_formals(&formals) {
-                    Ok(parsed_formals) => {
-                        self.expansion_env.push_scope();
-                        for identifier in parsed_formals.identifiers() {
-                            let sym = identifier.symbol().clone();
-                            self.expansion_env.extend(sym.clone(), Denotation::Id);
-                        }
-                        let expanded_body = self.expand_all(body)?;
-                        self.expansion_env.pop_scope();
-
-                        Ok(self.build_lambda(
-                            &formals,
-                            &expanded_body,
-                            datum.source_location().clone(),
-                        ))
-                    }
-                    Err(_) => Err(Error::expansion_error(
-                        "Malformed formals of lambda",
-                        &datum,
-                    )),
-                }
-            }
-            // ignore invalid form?
-            _ => Err(Error::expansion_error(
-                "Malformed lambda expression",
-                &datum,
-            )),
-        }
+        todo!()
     }
 
     fn build_apply(&mut self, op: Symbol, args: Vec<Datum>, loc: Location) -> Datum {
@@ -158,60 +126,6 @@ impl Expander {
         )
     }
 
-    fn expand_macro(
-        &mut self,
-        _datum: &Datum,
-        _transformer: &syntax::Transformer,
-    ) -> Result<Datum> {
-        todo!()
-    }
-
-    fn expand_define(
-        &mut self,
-        datum: &Datum,
-        operator: &Datum,
-        operands: &[Datum],
-    ) -> Result<Datum> {
-        match operands {
-            //(define (...) <body>)
-            [definition, exprs @ ..] if definition.s_expression().is_proper_list() => {
-                match definition.list_slice() {
-                    //(define (<ID> <def-formals> <body>)
-                    Some([identifier, def_formals @ ..]) => {
-                        let lambda = self.build_lambda(
-                            &Datum::new(
-                                SExpression::List(def_formals.to_vec()),
-                                datum.source_location().clone(),
-                            ),
-                            exprs,
-                            datum.source_location().clone(),
-                        );
-
-                        Ok(Datum::new(
-                            SExpression::List(vec![operator.clone(), identifier.clone(), lambda]),
-                            datum.source_location().clone(),
-                        ))
-                    }
-
-                    // (define ((<ID> <def-formals>) <body>))
-                    _ => Err(Error::expansion_error(
-                        "Expected procedure definition of higher order procedure definition",
-                        &datum,
-                    )),
-                }
-            }
-            //(define <id> <expr>)
-            [identifier, expr] => Ok(Datum::new(
-                SExpression::List(vec![operator.clone(), identifier.clone(), expr.clone()]),
-                datum.source_location().clone(),
-            )),
-            _ => Err(Error::expansion_error(
-                "Expected definition or procedure definition",
-                &datum,
-            )),
-        }
-    }
-
     fn build_lambda(&self, def_formals: &Datum, body: &[Datum], loc: Location) -> Datum {
         let mut lambda = vec![
             Datum::new(
@@ -235,11 +149,10 @@ impl Expander {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fmt::Debug;
-
+pub mod tests {
     use crate::compiler::frontend::reader::sexp::SExpression;
     use crate::compiler::frontend::reader::tests::*;
+    use std::fmt::Debug;
 
     use super::*;
 
@@ -251,69 +164,13 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_define_simple() -> Result<()> {
-        assert_expands_equal("(define x #t)", "(define x #t)", true)?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_expand_define_procedure() -> Result<()> {
-        assert_expands_equal(
-            "(define (foo x y) x)",
-            "(define foo (lambda (x y) x))",
-            false,
-        )?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_expand_lambda() -> Result<()> {
-        assert_expands_equal("(lambda all #t)", "(lambda all #t)", false)?;
-
-        Ok(())
-    }
-
-    #[test]
     fn test_expand_quote() -> Result<()> {
         assert_expands_equal("'3", "'3", true)?;
         assert_expands_equal("'(1 2 3)", "'(1 2 3)", true)?;
         Ok(())
     }
 
-    #[test]
-    fn test_expand_quasi_quote() -> Result<()> {
-        assert_expands_equal("`3", "'3", false)?;
-        assert_expands_equal("`(3 4 ,5)", "(cons '3 (cons '4 (cons 5 '())))", false)?;
-        assert_expands_equal(
-            "`(3 4 ,@(list 5 6 7 8) 9 10)",
-            "(cons '3 (cons '4 (append (list 5 6 7 8) (cons '9 (cons '10 '())))))",
-            false,
-        )?;
-        assert_expands_equal(
-            "`(3 4 ,(car x y))",
-            "(cons '3 (cons '4 (cons (car x y) '())))",
-            false,
-        )?;
-        assert_expands_equal(
-            "`(3 4 ,'(1 2))",
-            "(cons '3 (cons '4 (cons '(1 2) '())))",
-            false,
-        )?;
-        assert_expands_equal("''foo", "'(quote foo)", false)?;
-
-        assert_expands_equal("`(1 . 2)", "(cons '1 '2)", false)?;
-        assert_expands_equal("`(1 2 . 3)", "(cons '1 (cons '2 '3)) ", false)?;
-        assert_expands_equal("`(1 . ,(list 2 2))", "(cons '1 (list 2 2))", false)?;
-
-        assert_expands_equal("`(1 . ,(list 2 2))", "(cons '1 (list 2 2))", false)?;
-
-        //assert_expands_equal("`#(1 2)", "(vector-cons '1 (vector-cons '2 #()))", false)?;
-
-        assert!(expand_form("`(1 2 `3)").is_err(), "expected error");
-        Ok(())
-    }
-
-    fn assert_expands_equal(lhs: &str, rhs: &str, pedantic: bool) -> Result<()> {
+    pub fn assert_expands_equal(lhs: &str, rhs: &str, pedantic: bool) -> Result<()> {
         let mut exp = Expander::new();
         let actual_sexp = parse_datum(lhs);
         let expected_sexp = parse_datum(rhs);
@@ -323,12 +180,12 @@ mod tests {
         Ok(())
     }
 
-    fn expand_form(form: &str) -> Result<Datum> {
+    pub fn expand_form(form: &str) -> Result<Datum> {
         let mut exp = Expander::new();
         exp.expand(&parse_datum(form))
     }
 
-    fn assert_struct_eq(lhs: &Datum, rhs: &Datum, pedantic: bool) {
+    pub fn assert_struct_eq(lhs: &Datum, rhs: &Datum, pedantic: bool) {
         match (lhs.s_expression(), rhs.s_expression()) {
             (SExpression::List(inner_lhs), SExpression::List(inner_rhs)) => {
                 assert_vec_eq(&inner_lhs, &inner_rhs, |l, r| {

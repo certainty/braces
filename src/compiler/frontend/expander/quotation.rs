@@ -153,3 +153,42 @@ impl Expander {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::tests::*;
+    use super::super::Result;
+
+    #[test]
+    fn test_expand_quasi_quote() -> Result<()> {
+        assert_expands_equal("`3", "'3", false)?;
+        assert_expands_equal("`(3 4 ,5)", "(cons '3 (cons '4 (cons 5 '())))", false)?;
+        assert_expands_equal(
+            "`(3 4 ,@(list 5 6 7 8) 9 10)",
+            "(cons '3 (cons '4 (append (list 5 6 7 8) (cons '9 (cons '10 '())))))",
+            false,
+        )?;
+        assert_expands_equal(
+            "`(3 4 ,(car x y))",
+            "(cons '3 (cons '4 (cons (car x y) '())))",
+            false,
+        )?;
+        assert_expands_equal(
+            "`(3 4 ,'(1 2))",
+            "(cons '3 (cons '4 (cons '(1 2) '())))",
+            false,
+        )?;
+        assert_expands_equal("''foo", "'(quote foo)", false)?;
+
+        assert_expands_equal("`(1 . 2)", "(cons '1 '2)", false)?;
+        assert_expands_equal("`(1 2 . 3)", "(cons '1 (cons '2 '3)) ", false)?;
+        assert_expands_equal("`(1 . ,(list 2 2))", "(cons '1 (list 2 2))", false)?;
+
+        assert_expands_equal("`(1 . ,(list 2 2))", "(cons '1 (list 2 2))", false)?;
+
+        //assert_expands_equal("`#(1 2)", "(vector-cons '1 (vector-cons '2 #()))", false)?;
+
+        assert!(expand_form("`(1 2 `3)").is_err(), "expected error");
+        Ok(())
+    }
+}
