@@ -45,7 +45,6 @@ impl CoreParser {
                     let denotation = self.denotation_of(operator)?;
                     match denotation {
                         Denotation::Special(special) => self.parse_special(special, &datum),
-                        Denotation::Global(_) => self.parse_apply(&datum).res(),
                         Denotation::Id => self.parse_apply(&datum).res(),
                         _ => {
                             return Err(Error::bug(&format!(

@@ -32,16 +32,11 @@ pub enum Denotation {
     Special(Special),
     Macro(super::Transformer),
     Id,
-    Global(Symbol),
 }
 
 impl Denotation {
     pub fn identifier() -> Self {
         Self::Id
-    }
-
-    pub fn global(id: Symbol) -> Self {
-        Self::Global(id)
     }
 }
 
