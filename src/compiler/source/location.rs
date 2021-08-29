@@ -24,6 +24,12 @@ impl Location {
     }
 }
 
+impl<S: Into<Span>> From<S> for Location {
+    fn from(span: S) -> Self {
+        Self::new(SourceId::synthetic(), span.into())
+    }
+}
+
 pub trait HasSourceLocation {
     fn source_location(&self) -> &Location;
 }

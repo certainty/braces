@@ -66,7 +66,7 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
 
     use super::*;
 
@@ -75,7 +75,7 @@ mod tests {
         assert_parse_as(
             "(begin #t)",
             Expression::begin(
-                Expression::constant(make_datum(Sexp::Bool(true), 7, 9)),
+                Expression::constant(make_datum(SExpression::Bool(true), 7, 9)),
                 vec![],
                 location(0..10),
             ),

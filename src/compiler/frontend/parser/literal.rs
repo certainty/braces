@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::{Expression, ParseResult};
@@ -37,12 +37,12 @@ impl CoreParser {
     }
 
     pub fn do_parse_literal(&mut self, datum: &Datum) -> ParseResult<LiteralExpression> {
-        match datum.sexp() {
-            Sexp::Bool(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            Sexp::Char(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            Sexp::String(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            Sexp::Number(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
-            Sexp::Vector(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
+        match datum.s_expression() {
+            SExpression::Bool(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
+            SExpression::Char(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
+            SExpression::String(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
+            SExpression::Number(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
+            SExpression::Vector(_) => ParseResult::accept(LiteralExpression::new(datum.clone())),
             _ => ParseResult::ignore("Expected literal", datum.source_location().clone()),
         }
     }
@@ -51,7 +51,8 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
+    use crate::compiler::source::Location;
     use crate::vm::value::number::Number;
 
     use super::*;
@@ -62,19 +63,13 @@ mod tests {
 
     #[test]
     fn test_parse_literal_constant() {
-        assert_parse_as(
-            "#t",
-            Expression::constant(make_datum(Sexp::Bool(true), 0, 2)),
-        );
+        assert_parse_as("#t", Expression::constant(Datum::boolean(true, 0..2)));
 
-        assert_parse_as(
-            "\"foo\"",
-            Expression::constant(make_datum(Sexp::string("foo"), 0, 5)),
-        );
+        assert_parse_as("\"foo\"", Expression::constant(Datum::string("foo", 0..5)));
 
         assert_parse_as(
             "123",
-            Expression::constant(make_datum(Sexp::number(Number::fixnum(123)), 0, 3)),
+            Expression::constant(Datum::number(Number::fixnum(123), 0..3)),
         );
     }
 }

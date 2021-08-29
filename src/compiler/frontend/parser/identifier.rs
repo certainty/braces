@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location, SourceId};
 
@@ -63,8 +63,8 @@ impl CoreParser {
     }
 
     pub fn do_parse_identifier(&mut self, datum: &Datum) -> ParseResult<Identifier> {
-        match datum.sexp() {
-            Sexp::Symbol(s) => {
+        match datum.s_expression() {
+            SExpression::Symbol(s) => {
                 ParseResult::accept(Identifier::new(s.clone(), datum.source_location().clone()))
             }
             _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),

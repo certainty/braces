@@ -7,25 +7,25 @@ use nom::error::context;
 use nom::sequence::{delimited, preceded};
 
 use super::{map_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
 /// Character parser
-pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse(input: Input) -> ParseResult<Datum> {
     let char_literal = preceded(
         tag("#\\"),
         alt((parse_hex_char_literal, parse_named_char_literal, anychar)),
     );
 
-    map_datum(char_literal, Sexp::character)(input)
+    map_datum(char_literal, SExpression::from)(input)
 }
 
 #[inline]
-fn parse_hex_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_hex_char_literal(input: Input) -> ParseResult<char> {
     preceded(char('x'), parse_hex_literal)(input)
 }
 
 #[inline]
-fn parse_named_char_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_named_char_literal(input: Input) -> ParseResult<char> {
     alt((
         value(' ', tag("space")),
         value('\n', tag("newline")),
@@ -81,18 +81,18 @@ mod tests {
 
     #[test]
     fn test_read_char_hex_literal() {
-        assert_parse_as("#\\x43", Sexp::character('C'));
+        assert_parse_as("#\\x43", Datum::character('C', 0..5));
     }
 
     #[test]
     fn test_read_char_named_literal() {
-        assert_parse_as("#\\alarm", Sexp::character('\u{7}'));
+        assert_parse_as("#\\alarm", Datum::character('\u{7}', 0..7));
     }
 
     #[test]
     fn test_read_char_literal() {
-        assert_parse_as("#\\a", Sexp::character('a'));
+        assert_parse_as("#\\a", Datum::character('a', 0..3));
 
-        assert_parse_as("#\\☆", Sexp::character('☆'));
+        assert_parse_as("#\\☆", Datum::character('☆', 0..5));
     }
 }

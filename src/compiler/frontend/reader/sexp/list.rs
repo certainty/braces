@@ -4,7 +4,7 @@ use nom::sequence::{delimited, tuple};
 
 use super::whitespace::parse_inter_token_space;
 use super::{map_datum, parse_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
 /// Parse proper list
 /// Ref: r7rs 7.1.2
@@ -21,7 +21,7 @@ pub fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     );
     let list = delimited(char('('), many0(list_elements), char(')'));
 
-    map_datum(list, Sexp::list)(input)
+    map_datum(list, SExpression::list)(input)
 }
 
 /// Parse improper list
@@ -48,7 +48,7 @@ pub fn parse_improper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let improper_list = delimited(char('('), improper_elements, char(')'));
 
     map_datum(improper_list, |(improper_head, _, improper_tail)| {
-        Sexp::improper_list(improper_head, improper_tail)
+        SExpression::improper_list(improper_head, improper_tail)
     })(input)
 }
 
@@ -62,10 +62,10 @@ mod tests {
     fn test_span_is_correct() {
         assert_parse_as(
             "(#t    #f)",
-            Sexp::list(vec![
-                make_datum(Sexp::boolean(true), 1..3),
-                make_datum(Sexp::boolean(false), 7..9),
-            ]),
+            Datum::list(
+                vec![Datum::boolean(true, 1..3), Datum::boolean(false, 7..9)],
+                0..10,
+            ),
         );
     }
 
@@ -73,24 +73,24 @@ mod tests {
     fn test_read_proper_list() {
         assert_parse_as(
             "(#t    #f)",
-            Sexp::list(vec![
-                make_datum(Sexp::boolean(true), 1..3),
-                make_datum(Sexp::boolean(false), 7..9),
-            ]),
+            Datum::list(
+                vec![Datum::boolean(true, 1..3), Datum::boolean(false, 7..9)],
+                0..10,
+            ),
         );
         let v: Vec<Datum> = vec![];
 
-        assert_parse_as("()", Sexp::list(v));
+        assert_parse_as("()", Datum::list(v, 0..2));
 
         assert_parse_as(
             "((foo #t))",
-            Sexp::list(vec![make_datum(
-                Sexp::list(vec![
-                    make_datum(Sexp::symbol("foo"), 2..5),
-                    make_datum(Sexp::boolean(true), 6..8),
-                ]),
-                1..9,
-            )]),
+            Datum::list(
+                vec![Datum::list(
+                    vec![Datum::symbol("foo", 2..5), Datum::boolean(true, 6..8)],
+                    1..9,
+                )],
+                0..10,
+            ),
         );
     }
 
@@ -98,21 +98,23 @@ mod tests {
     fn test_read_improper_list() {
         assert_parse_as(
             "(#t  .  #f)",
-            Sexp::improper_list(
-                vec![make_datum(Sexp::boolean(true), 1..3)],
-                make_datum(Sexp::boolean(false), 8..10),
+            Datum::improper_list(
+                vec![Datum::boolean(true, 1..3)],
+                Datum::boolean(false, 8..10),
+                0..11,
             ),
         );
 
         assert_parse_as(
             "(#t #f #t .  #f)",
-            Sexp::improper_list(
+            Datum::improper_list(
                 vec![
-                    make_datum(Sexp::boolean(true), 1..3),
-                    make_datum(Sexp::boolean(false), 4..6),
-                    make_datum(Sexp::boolean(true), 7..9),
+                    Datum::boolean(true, 1..3),
+                    Datum::boolean(false, 4..6),
+                    Datum::boolean(true, 7..9),
                 ],
-                make_datum(Sexp::boolean(false), 13..15),
+                Datum::boolean(false, 13..15),
+                0..16,
             ),
         );
     }

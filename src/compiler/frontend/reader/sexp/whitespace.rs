@@ -69,18 +69,18 @@ pub fn parse_directive(input: Input) -> ParseResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::reader::sexp::Sexp;
     use crate::compiler::frontend::reader::tests::*;
+    use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
     #[test]
     fn test_read_comments() {
-        assert_parse_as(";foo bar\n #t", Sexp::boolean(true));
+        assert_parse_as(";foo bar\n #t", Datum::boolean(true, 10..12));
         assert_parse_as(
             "(#t \n #; foo\n #f)",
-            Sexp::list(vec![
-                make_datum(Sexp::boolean(true), 1..3),
-                make_datum(Sexp::boolean(false), 14..16),
-            ]),
+            Datum::list(
+                vec![Datum::boolean(true, 1..3), Datum::boolean(false, 14..16)],
+                0..17,
+            ),
         );
 
         //TODO: fix me

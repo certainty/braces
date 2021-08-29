@@ -108,7 +108,7 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
 
     use super::*;
 
@@ -117,8 +117,8 @@ mod tests {
         assert_parse_as(
             "(if #t #f)",
             Expression::If(IfExpression::new(
-                Expression::constant(make_datum(Sexp::Bool(true), 4, 6)),
-                Expression::constant(make_datum(Sexp::Bool(false), 7, 9)),
+                Expression::constant(make_datum(SExpression::Bool(true), 4, 6)),
+                Expression::constant(make_datum(SExpression::Bool(false), 7, 9)),
                 None,
                 location(0..10),
             )),
@@ -130,9 +130,13 @@ mod tests {
         assert_parse_as(
             "(if #t #f #\\a)",
             Expression::If(IfExpression::new(
-                Expression::constant(make_datum(Sexp::Bool(true), 4, 6)),
-                Expression::constant(make_datum(Sexp::Bool(false), 7, 9)),
-                Some(Expression::constant(make_datum(Sexp::Char('a'), 10, 13))),
+                Expression::constant(make_datum(SExpression::Bool(true), 4, 6)),
+                Expression::constant(make_datum(SExpression::Bool(false), 7, 9)),
+                Some(Expression::constant(make_datum(
+                    SExpression::Char('a'),
+                    10,
+                    13,
+                ))),
                 location(0..14),
             )),
         )

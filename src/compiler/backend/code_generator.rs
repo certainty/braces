@@ -28,7 +28,7 @@ use crate::compiler::frontend::parser::{
     sequence::BeginExpression,
     Expression,
 };
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::representation::CoreAST;
 use crate::compiler::source::{HasSourceLocation, Location, Registry};
 use crate::compiler::CompilationUnit;
@@ -469,17 +469,17 @@ impl<'a> CodeGenerator<'a> {
     }
 
     fn emit_lit(&mut self, datum: &Datum) -> Result<()> {
-        match datum.sexp() {
-            Sexp::Bool(true) => {
+        match datum.s_expression() {
+            SExpression::Bool(true) => {
                 self.emit_instruction(Instruction::True, &datum.source_location())?
             }
-            Sexp::Bool(false) => {
+            SExpression::Bool(false) => {
                 self.emit_instruction(Instruction::False, &datum.source_location())?
             }
-            Sexp::List(ls) if ls.is_empty() => {
+            SExpression::List(ls) if ls.is_empty() => {
                 self.emit_instruction(Instruction::Nil, &datum.source_location())?
             }
-            Sexp::String(s) => {
+            SExpression::String(s) => {
                 let interned = self.intern(s);
                 self.emit_constant(interned, &datum.source_location())?;
             }

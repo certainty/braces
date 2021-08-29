@@ -1,6 +1,6 @@
 use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::frontend::error::Error;
@@ -48,8 +48,8 @@ impl CoreParser {
     }
 
     pub fn do_parse_apply(&mut self, datum: &Datum) -> Result<ApplicationExpression> {
-        match datum.sexp() {
-            Sexp::List(ls) => {
+        match datum.s_expression() {
+            SExpression::List(ls) => {
                 if let [operator, operands @ ..] = &ls[..] {
                     let operator_expr = self.parse(&operator)?;
                     let operands_expr: Result<Vec<Expression>> =
@@ -81,7 +81,7 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
 
     use super::*;
 
@@ -91,7 +91,11 @@ mod tests {
             "(foo #t)",
             Expression::apply(
                 Expression::identifier("foo".to_string(), location(1..4)),
-                vec![Expression::constant(make_datum(Sexp::Bool(true), 5, 7))],
+                vec![Expression::constant(make_datum(
+                    SExpression::Bool(true),
+                    5,
+                    7,
+                ))],
                 location(0..8),
             ),
         )

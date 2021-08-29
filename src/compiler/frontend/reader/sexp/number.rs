@@ -9,10 +9,11 @@ use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 
 use super::{map_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
 use crate::vm::value::number::rational::Rational;
 use crate::vm::value::number::{flonum::Flonum, real::RealNumber, Exactness, SchemeNumber, Sign};
+use nom_locate::position;
 
 // Parse numbers
 // R7RS 7.1.2
@@ -31,10 +32,21 @@ use crate::vm::value::number::{flonum::Flonum, real::RealNumber, Exactness, Sche
 // we never construct only complex numbers if the number parser succeeds.
 // Instead we create either: Complex, FixNum, Flownum or Rational
 
-pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
-    let (s, pref) = parse_prefix(input)?;
+pub fn parse(input: Input) -> ParseResult<Datum> {
+    // We need to track the location ourselves
+    //
+    // at this point the position has advanced already by the prefix parser
+    // and map_datum can't capture the right position for us. It will always
+    // pointer to after the prefix
+    let (s, start) = position(input)?;
+    let (s, pref) = parse_prefix(s)?;
+    let (s, n) = parse_real(pref)(s)?;
+    let (s, end) = position(s)?;
+    let loc = s
+        .extra
+        .location(start.location_offset()..end.location_offset());
 
-    map_datum(parse_real(pref), Sexp::number)(s)
+    Ok((s, Datum::number(n, loc)))
 }
 
 //
@@ -101,7 +113,7 @@ fn apply_exactness<'a>(num: RealNumber, exactness: &Option<Exactness>) -> Option
     }
 }
 
-fn parse_inf_nan<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
+fn parse_inf_nan(input: Input) -> ParseResult<RealNumber> {
     alt((
         value(RealNumber::Flonum(Flonum::nan()), tag("+nan.0")),
         value(RealNumber::Flonum(Flonum::nan()), tag("-nan.0")),
@@ -147,13 +159,13 @@ fn parse_rational<'a>(prefix: Prefix) -> impl FnMut(Input<'a>) -> ParseResult<'a
 //   . <digit 10>+ <suffix> |
 //   <digit 10>+ . <digit 10>* suffix
 
-fn parse_decimal<'a>(input: Input<'a>) -> ParseResult<'a, RealNumber> {
+fn parse_decimal(input: Input) -> ParseResult<RealNumber> {
     map(alt((parse_decimal_short, parse_decimal_full)), |num| {
         RealNumber::Flonum(Flonum::from(num))
     })(input)
 }
 
-fn parse_decimal_full<'a>(input: Input<'a>) -> ParseResult<'a, f64> {
+fn parse_decimal_full(input: Input) -> ParseResult<f64> {
     let (s, (pref, _, decimal_places, exp)) = tuple((
         _parse_u64(many1(_parse_digits(10))),
         char('.'),
@@ -168,7 +180,7 @@ fn parse_decimal_full<'a>(input: Input<'a>) -> ParseResult<'a, f64> {
     Ok((s, apply_exponent(decimal, exp)))
 }
 
-fn parse_decimal_short<'a>(input: Input<'a>) -> ParseResult<'a, f64> {
+fn parse_decimal_short(input: Input) -> ParseResult<f64> {
     let (s, (_, decimal_places, exp)) = tuple((
         char('.'),
         _parse_u64(many1(_parse_digits(10))),
@@ -211,7 +223,7 @@ fn _parse_digits<'a>(radix: u8) -> impl FnMut(Input<'a>) -> ParseResult<'a, char
     one_of(digits)
 }
 // returns the exponent if present
-fn parse_suffix<'a>(input: Input<'a>) -> ParseResult<'a, Option<i32>> {
+fn parse_suffix(input: Input) -> ParseResult<Option<i32>> {
     let (s, result) = opt(tuple((char('e'), parse_sign, many1(_parse_digits(10)))))(input)?;
 
     match result {
@@ -234,7 +246,7 @@ struct Prefix {
     exactness: Option<Exactness>,
 }
 
-fn parse_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Prefix> {
+fn parse_prefix(input: Input) -> ParseResult<Prefix> {
     alt((
         (map(tuple((parse_exactness, parse_radix)), |res| Prefix {
             radix: res.1,
@@ -255,7 +267,7 @@ fn parse_prefix<'a>(input: Input<'a>) -> ParseResult<'a, Prefix> {
     ))(input)
 }
 
-fn parse_radix<'a>(input: Input<'a>) -> ParseResult<'a, u8> {
+fn parse_radix(input: Input) -> ParseResult<u8> {
     alt((
         value(2, tag("#b")),
         value(8, tag("#o")),
@@ -264,14 +276,14 @@ fn parse_radix<'a>(input: Input<'a>) -> ParseResult<'a, u8> {
     ))(input)
 }
 
-fn parse_exactness<'a>(input: Input<'a>) -> ParseResult<'a, Exactness> {
+fn parse_exactness(input: Input) -> ParseResult<Exactness> {
     alt((
         value(Exactness::Inexact, tag("#i")),
         value(Exactness::Exact, tag("#e")),
     ))(input)
 }
 
-pub fn parse_sign<'a>(input: Input<'a>) -> ParseResult<'a, Sign> {
+pub fn parse_sign(input: Input) -> ParseResult<Sign> {
     let (s, sign) = opt(alt((
         value(Sign::Plus, char('+')),
         value(Sign::Minus, char('-')),
@@ -289,57 +301,57 @@ mod tests {
 
     #[test]
     fn parse_integer_10() {
-        assert_parse_as("0", Sexp::number(Number::fixnum(0)));
-        assert_parse_as("10", Sexp::number(Number::fixnum(10)));
-        assert_parse_as("#d10", Sexp::number(Number::fixnum(10)));
-        assert_parse_as("#e#d10", Sexp::number(Number::fixnum(10)));
-        assert_parse_as("23434", Sexp::number(Number::fixnum(23434)));
-        assert_parse_as("-23434", Sexp::number(Number::fixnum(-23434)));
+        assert_parse_as("0", Datum::number(Number::fixnum(0), 0..1));
+        assert_parse_as("10", Datum::number(Number::fixnum(10), 0..2));
+        assert_parse_as("#d10", Datum::number(Number::fixnum(10), 0..4));
+        assert_parse_as("#e#d10", Datum::number(Number::fixnum(10), 0..6));
+        assert_parse_as("23434", Datum::number(Number::fixnum(23434), 0..5));
+        assert_parse_as("-23434", Datum::number(Number::fixnum(-23434), 0..6));
     }
 
     #[test]
     fn parse_integer_2() {
-        assert_parse_as("#b0", Sexp::number(Number::fixnum(0)));
-        assert_parse_as("#b01011", Sexp::number(Number::fixnum(11)));
+        assert_parse_as("#b0", Datum::number(Number::fixnum(0), 0..3));
+        assert_parse_as("#b01011", Datum::number(Number::fixnum(11), 0..7));
     }
 
     #[test]
     fn parse_integer_8() {
-        assert_parse_as("#o777", Sexp::number(Number::fixnum(511)));
-        assert_parse_as("#o0775", Sexp::number(Number::fixnum(509)));
+        assert_parse_as("#o777", Datum::number(Number::fixnum(511), 0..5));
+        assert_parse_as("#o0775", Datum::number(Number::fixnum(509), 0..6));
 
         //assert_parse_error("#o8989")
     }
 
     #[test]
     fn parse_decimal_short() {
-        assert_parse_as(".3", Sexp::number(Number::flonum(0.3)));
-        assert_parse_as(".3e1", Sexp::number(Number::flonum(3.0)));
+        assert_parse_as(".3", Datum::number(Number::flonum(0.3), 0..2));
+        assert_parse_as(".3e1", Datum::number(Number::flonum(3.0), 0..4));
         assert_parse_ok(".3e-1")
     }
 
     #[test]
     fn parse_decimal() {
-        assert_parse_as("135.3", Sexp::number(Number::flonum(135.3)));
-        assert_parse_as("-135.3", Sexp::number(Number::flonum(-135.3)));
-        assert_parse_as("1.3e2", Sexp::number(Number::flonum(130.0)));
+        assert_parse_as("135.3", Datum::number(Number::flonum(135.3), 0..5));
+        assert_parse_as("-135.3", Datum::number(Number::flonum(-135.3), 0..6));
+        assert_parse_as("1.3e2", Datum::number(Number::flonum(130.0), 0..5));
         assert_parse_ok("1.3e-1")
     }
 
     #[test]
     fn parse_rational() {
-        assert_parse_as("3/4", Sexp::number(Number::fraction(3, 4)));
-        assert_parse_as("#b111/100", Sexp::number(Number::fraction(7, 4)));
+        assert_parse_as("3/4", Datum::number(Number::fraction(3, 4), 0..3));
+        assert_parse_as("#b111/100", Datum::number(Number::fraction(7, 4), 0..9));
     }
 
     #[test]
     fn parse_with_exactness() {
-        assert_parse_as("#e0.25", Sexp::number(Number::fraction(1, 4)));
-        assert_parse_as("#i1", Sexp::number(Number::flonum(1.0)));
-        assert_parse_as("#i1/4", Sexp::number(Number::flonum(0.25)));
+        assert_parse_as("#e0.25", Datum::number(Number::fraction(1, 4), 0..6));
+        assert_parse_as("#i1", Datum::number(Number::flonum(1.0), 0..3));
+        assert_parse_as("#i1/4", Datum::number(Number::flonum(0.25), 0..5));
 
         // mix radix and exactness
-        assert_parse_as("#e#d0.25", Sexp::number(Number::fraction(1, 4)));
-        assert_parse_as("#d#e0.25", Sexp::number(Number::fraction(1, 4)));
+        assert_parse_as("#e#d0.25", Datum::number(Number::fraction(1, 4), 0..8));
+        assert_parse_as("#d#e0.25", Datum::number(Number::fraction(1, 4), 0..8));
     }
 }

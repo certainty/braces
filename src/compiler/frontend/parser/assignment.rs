@@ -70,7 +70,7 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
 
     use super::*;
 
@@ -80,7 +80,7 @@ mod tests {
             "(set! foo #t)",
             Expression::assign(
                 identifier::Identifier::synthetic("foo"),
-                Expression::constant(make_datum(Sexp::Bool(true), 10, 12)),
+                Expression::constant(make_datum(SExpression::Bool(true), 10, 12)),
                 location(0..13),
             ),
         );

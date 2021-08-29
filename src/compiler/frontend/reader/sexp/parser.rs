@@ -5,7 +5,7 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
 
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::source::SourceId;
 
 use super::{abbreviation, boolean, character, list, number, string, symbol, vector, whitespace};
@@ -54,7 +54,7 @@ pub fn map_datum<'a, O1, F, G>(
 ) -> impl FnMut(Input<'a>) -> ParseResult<'a, Datum>
 where
     F: FnMut(Input<'a>) -> ParseResult<'a, O1>,
-    G: FnMut(O1) -> Sexp,
+    G: FnMut(O1) -> SExpression,
 {
     move |input: Input<'a>| {
         let (s, p) = position(input)?;

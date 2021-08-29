@@ -9,7 +9,7 @@ pub mod procedure;
 pub mod string;
 pub mod symbol;
 use self::{string::InternedString, symbol::Symbol};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::utils::string_table::StringTable;
 use crate::vm::value::number::real::RealNumber;
 use std::cell::Ref;
@@ -262,18 +262,18 @@ impl Factory {
 
     // TODO: decide if this should this consume datum instead
     pub fn from_datum(&mut self, d: &Datum) -> Value {
-        match d.sexp() {
-            Sexp::Bool(true) => self.bool_true().clone(),
-            Sexp::Bool(false) => self.bool_false().clone(),
-            Sexp::Symbol(s) => self.symbol(s),
-            Sexp::String(s) => self.string(s),
-            Sexp::List(ls) => {
+        match d.s_expression() {
+            SExpression::Bool(true) => self.bool_true().clone(),
+            SExpression::Bool(false) => self.bool_false().clone(),
+            SExpression::Symbol(s) => self.symbol(s),
+            SExpression::String(s) => self.string(s),
+            SExpression::List(ls) => {
                 let elements = ls.iter().map(|e| self.from_datum(e)).collect();
                 self.proper_list(elements)
             }
-            Sexp::Char(c) => self.character(*c),
-            Sexp::Number(num) => Value::Number(num.clone()),
-            Sexp::Vector(v) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
+            SExpression::Char(c) => self.character(*c),
+            SExpression::Number(num) => Value::Number(num.clone()),
+            SExpression::Vector(v) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
             _ => todo!(),
         }
     }

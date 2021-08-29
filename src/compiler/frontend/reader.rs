@@ -26,7 +26,7 @@ impl Reader {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+    use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
     use crate::compiler::source::{BufferSource, Location, Registry, SourceId, Span};
 
     use super::Reader;
@@ -43,7 +43,7 @@ pub mod tests {
     }
 
     // test helpers to use in the sexp parser
-    pub fn assert_parse_as(inp: &str, expected: Sexp) {
+    pub fn assert_parse_as(inp: &str, expected: Datum) {
         let mut registry = Registry::new();
         let source = registry
             .add(&mut BufferSource::new(inp, "datum-parser-test"))
@@ -51,7 +51,7 @@ pub mod tests {
         let reader = Reader::new();
         let datum = reader.parse(&source).unwrap();
 
-        assert_eq!(datum.to_vec()[0].sexp(), &expected);
+        assert_eq!(&datum.to_vec()[0], &expected);
     }
 
     pub fn assert_parse_ok(inp: &str) {
@@ -80,7 +80,7 @@ pub mod tests {
         Location::new(source_id(), span)
     }
 
-    pub fn make_datum<S: Into<Span>>(sexp: Sexp, span: S) -> Datum {
+    pub fn make_datum<S: Into<Span>>(sexp: SExpression, span: S) -> Datum {
         Datum::new(sexp, location(span))
     }
 

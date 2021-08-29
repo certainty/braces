@@ -12,7 +12,7 @@ use super::{
 };
 
 use super::{map_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
 //////////////////////////////
 // String parser
@@ -41,7 +41,7 @@ pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 
     let string_literal = delimited(char('"'), string_elements, char('"'));
 
-    map_datum(string_literal, Sexp::String)(input)
+    map_datum(string_literal, SExpression::String)(input)
 }
 
 fn parse_string_element<'a>(input: Input<'a>) -> ParseResult<'a, StringElement<'a>> {
@@ -97,32 +97,35 @@ mod tests {
 
     #[test]
     fn test_read_string() {
-        assert_parse_as("\"this is my string\"", Sexp::string("this is my string"));
+        assert_parse_as(
+            "\"this is my string\"",
+            Datum::string("this is my string", 0..19),
+        );
 
         assert_parse_as(
             "\"this is my ☆ string ☆\"",
-            Sexp::string("this is my ☆ string ☆"),
+            Datum::string("this is my ☆ string ☆", 0..27),
         );
 
         assert_parse_as(
             "\"string with \\n and \\t \"",
-            Sexp::string("string with \n and \t "),
+            Datum::string("string with \n and \t ", 0..24),
         );
 
         assert_parse_as(
             "\"string with \\xa; and \\t \"",
-            Sexp::string("string with \n and \t "),
+            Datum::string("string with \n and \t ", 0..26),
         );
 
         assert_parse_as(
             "\"string with \\\n and the\\\n next line\"",
-            Sexp::string("string with  and the next line"),
+            Datum::string("string with  and the next line", 0..36),
         );
     }
 
     #[test]
     fn test_read_string_bugs() {
-        assert_parse_as("\"\"", Sexp::string(""));
-        assert_parse_as(r#""\\7""#, Sexp::string("\\7"));
+        assert_parse_as("\"\"", Datum::string("", 0..2));
+        assert_parse_as(r#""\\7""#, Datum::string("\\7", 0..5));
     }
 }

@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
@@ -91,7 +91,7 @@ impl Expander {
         let mut new_ls = vec![self.expand(operator)?];
         new_ls.extend(self.expand_all(operands)?);
 
-        Ok(Datum::new(Sexp::list(new_ls.into_iter()), loc))
+        Ok(Datum::new(SExpression::list(new_ls.into_iter()), loc))
     }
 
     // expand a lambda expression
@@ -148,17 +148,17 @@ impl Expander {
         }
 
         let quasi_quoted_sexp = operands[0].clone();
-        match quasi_quoted_sexp.sexp() {
+        match quasi_quoted_sexp.s_expression() {
             // (quasi-quote (..))
-            Sexp::List(elements) => {
+            SExpression::List(elements) => {
                 self.expand_quasi_quoted_list(elements, datum.source_location().clone())
             }
             // (quasi-quote (_ . _))
-            Sexp::ImproperList(head, tail) => {
+            SExpression::ImproperList(head, tail) => {
                 self.expand_quasi_quoted_improper_list(head, tail, datum.source_location().clone())
             }
             // (quasi-quote #(..))
-            Sexp::Vector(elements) => {
+            SExpression::Vector(elements) => {
                 self.expand_quasi_quoted_vector(elements, datum.source_location().clone())
             }
             // (quasi-quote datum)
@@ -255,17 +255,17 @@ impl Expander {
     }
 
     fn build_apply(&mut self, op: Symbol, args: Vec<Datum>, loc: Location) -> Datum {
-        let mut inner = vec![Datum::new(Sexp::Symbol(op), loc.clone())];
+        let mut inner = vec![Datum::new(SExpression::Symbol(op), loc.clone())];
         inner.extend(args);
-        Datum::new(Sexp::List(inner), loc)
+        Datum::new(SExpression::List(inner), loc)
     }
 
     fn empty_list(&mut self, loc: Location) -> Datum {
-        self.quote_datum(Datum::new(Sexp::List(vec![]), loc))
+        self.quote_datum(Datum::new(SExpression::List(vec![]), loc))
     }
 
     fn empty_vector(&mut self, loc: Location) -> Datum {
-        self.quote_datum(Datum::new(Sexp::Vector(vec![]), loc))
+        self.quote_datum(Datum::new(SExpression::Vector(vec![]), loc))
     }
 
     // unquote an element in a quasi-quoted list/cons/vector
@@ -294,8 +294,11 @@ impl Expander {
     fn quote_datum(&mut self, datum: Datum) -> Datum {
         let loc = datum.source_location().clone();
         Datum::new(
-            Sexp::List(vec![
-                Datum::new(Sexp::Symbol(Symbol::unforgeable("quote")), loc.clone()),
+            SExpression::List(vec![
+                Datum::new(
+                    SExpression::Symbol(Symbol::unforgeable("quote")),
+                    loc.clone(),
+                ),
                 datum,
             ]),
             loc,
@@ -318,13 +321,13 @@ impl Expander {
     ) -> Result<Datum> {
         match operands {
             //(define (...) <body>)
-            [definition, exprs @ ..] if definition.sexp().is_proper_list() => {
+            [definition, exprs @ ..] if definition.s_expression().is_proper_list() => {
                 match definition.list_slice() {
                     //(define (<ID> <def-formals> <body>)
                     Some([identifier, def_formals @ ..]) => {
                         let lambda = self.build_lambda(
                             &Datum::new(
-                                Sexp::List(def_formals.to_vec()),
+                                SExpression::List(def_formals.to_vec()),
                                 datum.source_location().clone(),
                             ),
                             exprs,
@@ -332,7 +335,7 @@ impl Expander {
                         );
 
                         Ok(Datum::new(
-                            Sexp::List(vec![operator.clone(), identifier.clone(), lambda]),
+                            SExpression::List(vec![operator.clone(), identifier.clone(), lambda]),
                             datum.source_location().clone(),
                         ))
                     }
@@ -346,7 +349,7 @@ impl Expander {
             }
             //(define <id> <expr>)
             [identifier, expr] => Ok(Datum::new(
-                Sexp::List(vec![operator.clone(), identifier.clone(), expr.clone()]),
+                SExpression::List(vec![operator.clone(), identifier.clone(), expr.clone()]),
                 datum.source_location().clone(),
             )),
             _ => Err(Error::expansion_error(
@@ -358,16 +361,19 @@ impl Expander {
 
     fn build_lambda(&self, def_formals: &Datum, body: &[Datum], loc: Location) -> Datum {
         let mut lambda = vec![
-            Datum::new(Sexp::Symbol(Symbol::unforgeable("lambda")), loc.clone()),
+            Datum::new(
+                SExpression::Symbol(Symbol::unforgeable("lambda")),
+                loc.clone(),
+            ),
             def_formals.clone(),
         ];
 
         lambda.extend_from_slice(body);
-        Datum::new(Sexp::List(lambda), loc.clone())
+        Datum::new(SExpression::List(lambda), loc.clone())
     }
 
     pub fn denotation_of(&mut self, datum: &Datum) -> Result<Denotation> {
-        if let Sexp::Symbol(sym) = datum.sexp() {
+        if let SExpression::Symbol(sym) = datum.s_expression() {
             Ok(self.expansion_env.get(&sym.clone().into()))
         } else {
             Err(Error::bug("unexpected symbol to determine denotation"))
@@ -379,7 +385,7 @@ impl Expander {
 mod tests {
     use std::fmt::Debug;
 
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
     use crate::compiler::frontend::reader::tests::*;
 
     use super::*;
@@ -470,24 +476,27 @@ mod tests {
     }
 
     fn assert_struct_eq(lhs: &Datum, rhs: &Datum, pedantic: bool) {
-        match (lhs.sexp(), rhs.sexp()) {
-            (Sexp::List(inner_lhs), Sexp::List(inner_rhs)) => {
+        match (lhs.s_expression(), rhs.s_expression()) {
+            (SExpression::List(inner_lhs), SExpression::List(inner_rhs)) => {
                 assert_vec_eq(&inner_lhs, &inner_rhs, |l, r| {
                     assert_struct_eq(l, r, pedantic)
                 })
             }
-            (Sexp::ImproperList(head_lhs, tail_lhs), Sexp::ImproperList(head_rhs, tail_rhs)) => {
+            (
+                SExpression::ImproperList(head_lhs, tail_lhs),
+                SExpression::ImproperList(head_rhs, tail_rhs),
+            ) => {
                 assert_vec_eq(&head_lhs, &head_rhs, |l, r| {
                     assert_struct_eq(l, r, pedantic)
                 });
                 assert_struct_eq(&tail_lhs, &tail_rhs, pedantic);
             }
-            (Sexp::Vector(inner_lhs), Sexp::Vector(inner_rhs)) => {
+            (SExpression::Vector(inner_lhs), SExpression::Vector(inner_rhs)) => {
                 assert_vec_eq(&inner_lhs, &inner_rhs, |l, r| {
                     assert_struct_eq(l, r, pedantic)
                 })
             }
-            (Sexp::Symbol(inner_lhs), Sexp::Symbol(inner_rhs)) if !pedantic => {
+            (SExpression::Symbol(inner_lhs), SExpression::Symbol(inner_rhs)) if !pedantic => {
                 assert_eq!(inner_lhs.as_str(), inner_rhs.as_str())
             }
             (sexp_lhs, sexp_rhs) => {

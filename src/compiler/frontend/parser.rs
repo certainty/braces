@@ -90,7 +90,7 @@ pub mod tests {
     use crate::compiler::source::{BufferSource, Registry, SourceId};
 
     use super::*;
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
 
     pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut registry = Registry::new();
@@ -125,7 +125,7 @@ pub mod tests {
         Location::new(SourceId::from(0), span)
     }
 
-    pub fn make_datum(sexp: Sexp, line: usize, col: usize) -> Datum {
+    pub fn make_datum(sexp: SExpression, line: usize, col: usize) -> Datum {
         Datum::new(sexp, location(line..col))
     }
 }

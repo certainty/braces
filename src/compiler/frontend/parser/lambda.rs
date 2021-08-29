@@ -1,6 +1,6 @@
 use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::value::procedure::Arity;
 
@@ -126,13 +126,13 @@ impl CoreParser {
     }
 
     pub fn parse_formals(&mut self, datum: &Datum) -> Result<Formals> {
-        match datum.sexp() {
-            Sexp::List(ls) => {
+        match datum.s_expression() {
+            SExpression::List(ls) => {
                 let identifiers: Result<Vec<Identifier>> =
                     ls.iter().map(|e| self.do_parse_identifier(e)).collect();
                 Ok(Formals::ArgList(identifiers?))
             }
-            Sexp::ImproperList(head, tail) => {
+            SExpression::ImproperList(head, tail) => {
                 let identifiers: Result<Vec<Identifier>> = head
                     .iter()
                     .map(|e| self.do_parse_identifier(e).res())
@@ -149,7 +149,7 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::Sexp;
+    use crate::compiler::frontend::reader::sexp::SExpression;
 
     use super::*;
 
@@ -159,7 +159,8 @@ mod tests {
             "(lambda all #t)",
             Expression::lambda(
                 Formals::RestArg(Identifier::synthetic("all")),
-                Expression::constant(make_datum(Sexp::Bool(true), 12, 14)).to_body_expression(),
+                Expression::constant(make_datum(SExpression::Bool(true), 12, 14))
+                    .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..15),
             ),
@@ -172,7 +173,8 @@ mod tests {
             "(lambda (x y) #t)",
             Expression::lambda(
                 Formals::ArgList(vec![Identifier::synthetic("x"), Identifier::synthetic("y")]),
-                Expression::constant(make_datum(Sexp::Bool(true), 14, 16)).to_body_expression(),
+                Expression::constant(make_datum(SExpression::Bool(true), 14, 16))
+                    .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..17),
             ),
@@ -182,7 +184,8 @@ mod tests {
             "(lambda () #t)",
             Expression::lambda(
                 Formals::ArgList(vec![]),
-                Expression::constant(make_datum(Sexp::Bool(true), 11, 13)).to_body_expression(),
+                Expression::constant(make_datum(SExpression::Bool(true), 11, 13))
+                    .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..14),
             ),
@@ -195,7 +198,8 @@ mod tests {
                     vec![Identifier::synthetic("x"), Identifier::synthetic("y")],
                     Identifier::synthetic("z"),
                 ),
-                Expression::constant(make_datum(Sexp::Bool(true), 18, 20)).to_body_expression(),
+                Expression::constant(make_datum(SExpression::Bool(true), 18, 20))
+                    .to_body_expression(),
                 Some(String::from("lambda")),
                 location(0..21),
             ),

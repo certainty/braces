@@ -3,7 +3,7 @@ use nom::bytes::complete::tag;
 use nom::combinator::value;
 
 use super::{parser::map_datum, parser::Input, parser::ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
 /// Boolean parser
 ///
@@ -12,7 +12,7 @@ use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
 /// ```grammar
 /// <BOOLEAN> -> #t | #f | #true | #false
 /// ```
-pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse(input: Input) -> ParseResult<Datum> {
     let bool_literal = alt((
         value(true, tag("#true")),
         value(false, tag("#false")),
@@ -20,7 +20,7 @@ pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
         value(false, tag("#f")),
     ));
 
-    map_datum(bool_literal, Sexp::boolean)(input)
+    map_datum(bool_literal, SExpression::from)(input)
 }
 
 #[cfg(test)]
@@ -30,10 +30,10 @@ mod tests {
 
     #[test]
     fn test_read_boolean_literal() {
-        assert_parse_as("#t", Sexp::boolean(true));
-        assert_parse_as("#true", Sexp::boolean(true));
+        assert_parse_as("#t", Datum::boolean(true, 0..2));
+        assert_parse_as("#true", Datum::boolean(true, 0..5));
 
-        assert_parse_as("#f", Sexp::boolean(false));
-        assert_parse_as("#false", Sexp::boolean(false));
+        assert_parse_as("#f", Datum::boolean(false, 0..2));
+        assert_parse_as("#false", Datum::boolean(false, 0..6));
     }
 }

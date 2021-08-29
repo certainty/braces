@@ -19,6 +19,9 @@ pub use string::StringSource;
 pub struct SourceId(usize);
 
 impl SourceId {
+    pub fn synthetic() -> Self {
+        SourceId(0)
+    }
     pub fn location<S: Into<Span>>(&self, span: S) -> Location {
         Location::new(self.clone(), span)
     }

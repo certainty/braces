@@ -10,7 +10,7 @@ use super::{
     map_datum, Input, ParseResult,
 };
 
-use crate::compiler::frontend::reader::{datum::Datum, sexp::Sexp};
+use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 
 //////////////////////////////////////////
 // Identifier / Symbol
@@ -22,18 +22,18 @@ enum SymbolElement<'a> {
     EscapedChar(char),
 }
 
-pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse(input: Input) -> ParseResult<Datum> {
     let symbol_literal = alt((
         parse_identifier,
         parse_delimited_identifier,
         parse_peculiar_identifier,
     ));
 
-    map_datum(symbol_literal, Sexp::symbol)(input)
+    map_datum(symbol_literal, SExpression::symbol)(input)
 }
 
 #[inline]
-fn parse_peculiar_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+fn parse_peculiar_identifier(input: Input) -> ParseResult<String> {
     let explicit_sign_str = map(parse_explicit_sign, String::from);
 
     alt((
@@ -45,7 +45,7 @@ fn parse_peculiar_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
 }
 
 #[inline]
-fn parse_peculiar_with_sign<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+fn parse_peculiar_with_sign(input: Input) -> ParseResult<String> {
     let (s, (sign, sign_sub, subseq)) = tuple((
         parse_explicit_sign,
         parse_sign_subsequent,
@@ -60,7 +60,7 @@ fn parse_peculiar_with_sign<'a>(input: Input<'a>) -> ParseResult<'a, String> {
 }
 
 #[inline]
-fn parse_peculiar_with_dot<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+fn parse_peculiar_with_dot(input: Input) -> ParseResult<String> {
     let (s, (dot, dot_subseq, subseq)) =
         tuple((char('.'), parse_dot_subsequent, many0(parse_subsequent)))(input)?;
 
@@ -72,7 +72,7 @@ fn parse_peculiar_with_dot<'a>(input: Input<'a>) -> ParseResult<'a, String> {
 }
 
 #[inline]
-fn parse_peculiar_with_sign_dot<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+fn parse_peculiar_with_sign_dot(input: Input) -> ParseResult<String> {
     let (s, (sign, sign_sub, dot_subseq)) =
         tuple((parse_explicit_sign, char('.'), parse_dot_subsequent))(input)?;
 
@@ -84,17 +84,17 @@ fn parse_peculiar_with_sign_dot<'a>(input: Input<'a>) -> ParseResult<'a, String>
 }
 
 #[inline]
-fn parse_dot_subsequent<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_dot_subsequent(input: Input) -> ParseResult<char> {
     alt((parse_sign_subsequent, char('.')))(input)
 }
 
 #[inline]
-fn parse_sign_subsequent<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_sign_subsequent(input: Input) -> ParseResult<char> {
     alt((parse_initial, parse_explicit_sign, char('@')))(input)
 }
 
 #[inline]
-fn parse_delimited_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+fn parse_delimited_identifier(input: Input) -> ParseResult<String> {
     let symbol_elements = fold_many0(
         parse_symbol_element,
         String::new(),
@@ -111,7 +111,7 @@ fn parse_delimited_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
 }
 
 #[inline]
-fn parse_symbol_element<'a>(input: Input<'a>) -> ParseResult<'a, SymbolElement<'a>> {
+fn parse_symbol_element(input: Input) -> ParseResult<SymbolElement> {
     let parse_symbol_escape = value('|', tag("\\|"));
 
     alt((
@@ -123,13 +123,13 @@ fn parse_symbol_element<'a>(input: Input<'a>) -> ParseResult<'a, SymbolElement<'
 }
 
 #[inline]
-fn parse_symbol_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
+fn parse_symbol_literal(input: Input) -> ParseResult<&str> {
     let (s, v) = is_not("|\\")(input)?;
 
     Ok((s, v.fragment()))
 }
 
-fn parse_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
+fn parse_identifier(input: Input) -> ParseResult<String> {
     let mut identifier = String::new();
     let (s, (init, subseq)) = pair(parse_initial, many0(parse_subsequent))(input)?;
 
@@ -142,7 +142,7 @@ fn parse_identifier<'a>(input: Input<'a>) -> ParseResult<'a, String> {
 pub const SYMBOL_SPECIAL_INITIAL: &str = "!$%&*/:<=>?^_~";
 
 #[inline]
-fn parse_initial<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_initial(input: Input) -> ParseResult<char> {
     let letter = verify(anychar, |c| c.is_alphabetic());
     let special_initial = one_of(SYMBOL_SPECIAL_INITIAL);
 
@@ -150,7 +150,7 @@ fn parse_initial<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 }
 
 #[inline]
-fn parse_subsequent<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_subsequent(input: Input) -> ParseResult<char> {
     let digit = verify(anychar, |c| c.is_digit(10));
     let special_subsequent = alt((parse_explicit_sign, char('.'), char('@')));
 
@@ -158,7 +158,7 @@ fn parse_subsequent<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 }
 
 #[inline]
-fn parse_explicit_sign<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_explicit_sign(input: Input) -> ParseResult<char> {
     alt((char('+'), char('-')))(input)
 }
 
@@ -171,36 +171,36 @@ mod tests {
     #[test]
     fn test_read_symbol() {
         let symbols = vec![
-            "<=?",
-            "->string",
-            "a34kTMNs",
-            "lambda",
-            "list->vector",
-            "q",
-            "V17a",
-            "the-word-recursion-has-many-meanings",
+            ("<=?", 0..3),
+            ("->string", 0..8),
+            ("a34kTMNs", 0..8),
+            ("lambda", 0..6),
+            ("list->vector", 0..12),
+            ("q", 0..1),
+            ("V17a", 0..4),
+            ("the-word-recursion-has-many-meanings", 0..36),
         ];
 
         for sym in symbols.iter() {
-            assert_parse_as(sym, Sexp::symbol(*sym))
+            assert_parse_as(sym.0, Datum::symbol(sym.0, sym.1.clone()))
         }
     }
 
     #[test]
     fn test_read_symbol_delimited() {
-        assert_parse_as("||", Sexp::symbol(""));
+        assert_parse_as("||", Datum::symbol("", 0..2));
 
-        assert_parse_as("|two words|", Sexp::symbol("two words"));
-        assert_parse_as(r#"|two\x20;words|"#, Sexp::symbol("two words"));
-        assert_parse_as(r#"|two\|words|"#, Sexp::symbol("two|words"));
+        assert_parse_as("|two words|", Datum::symbol("two words", 0..11));
+        assert_parse_as(r#"|two\x20;words|"#, Datum::symbol("two words", 0..15));
+        assert_parse_as(r#"|two\|words|"#, Datum::symbol("two|words", 0..12));
 
         assert_parse_as(
             r#"|test with \| escaped vertical lines|"#,
-            Sexp::symbol("test with | escaped vertical lines"),
+            Datum::symbol("test with | escaped vertical lines", 0..37),
         );
         assert_parse_as(
             r#"|:(\x80;\xfff6;]&\x5c;"|"#,
-            Sexp::symbol(":(\u{0080}\u{fff6}]&\\\""),
+            Datum::symbol(":(\u{0080}\u{fff6}]&\\\"", 0..24),
         );
     }
 }
