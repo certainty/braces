@@ -31,13 +31,13 @@ use rustc_hash::FxHashMap;
 pub enum Denotation {
     Special(Special),
     Macro(super::Transformer),
-    Id(Symbol),
+    Id,
     Global(Symbol),
 }
 
 impl Denotation {
-    pub fn identifier(id: Symbol) -> Self {
-        Self::Id(id)
+    pub fn identifier() -> Self {
+        Self::Id
     }
 
     pub fn global(id: Symbol) -> Self {
@@ -176,7 +176,7 @@ impl SyntaxEnvironment {
                 return denotation.clone();
             }
         }
-        Denotation::Id(id.clone())
+        Denotation::Id
     }
 
     // Given a syntactic environment env to be extended, an alist returned
@@ -195,7 +195,7 @@ impl SyntaxEnvironment {
     // identifiers.
     pub fn rename(&mut self, renamed_ids: Vec<Renaming>) {
         for (old, new) in renamed_ids {
-            let denotation = Denotation::identifier(new.clone());
+            let denotation = Denotation::Id;
             self.extend(old, denotation.clone());
             self.extend(new, denotation);
         }

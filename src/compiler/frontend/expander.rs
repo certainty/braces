@@ -108,8 +108,7 @@ impl Expander {
                         self.expansion_env.push_scope();
                         for identifier in parsed_formals.identifiers() {
                             let sym = identifier.symbol().clone();
-                            self.expansion_env
-                                .extend(sym.clone(), Denotation::identifier(sym));
+                            self.expansion_env.extend(sym.clone(), Denotation::Id);
                         }
                         let expanded_body = self.expand_all(body)?;
                         self.expansion_env.pop_scope();

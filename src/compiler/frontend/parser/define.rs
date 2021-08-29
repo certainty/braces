@@ -57,11 +57,18 @@ impl CoreParser {
     pub fn do_parse_definition(&mut self, datum: &Datum) -> Result<DefinitionExpression> {
         match self.parse_list(datum)? {
             [op, identifier, expr] if op.is_symbol() => match self.denotation_of(op)? {
-                Denotation::Special(Special::Define) => Ok(DefinitionExpression::DefineSimple(
-                    self.do_parse_identifier(&identifier).res()?,
-                    Box::new(self.parse(&expr)?),
-                    datum.source_location().clone(),
-                )),
+                Denotation::Special(Special::Define) => {
+                    let parsed_identifier = self.do_parse_identifier(&identifier).res()?;
+
+                    self.environment
+                        .extend(parsed_identifier.symbol().clone(), Denotation::Id);
+
+                    Ok(DefinitionExpression::DefineSimple(
+                        parsed_identifier,
+                        Box::new(self.parse(&expr)?),
+                        datum.source_location().clone(),
+                    ))
+                }
                 _ => Err(Error::parse_error(
                     "Not a definition",
                     Detail::new("", datum.source_location().clone()),

@@ -100,8 +100,7 @@ impl CoreParser {
                 self.environment.push_scope();
                 for identifier in formals.identifiers() {
                     let sym = identifier.symbol().clone();
-                    self.environment
-                        .extend(sym.clone(), Denotation::identifier(sym));
+                    self.environment.extend(sym.clone(), Denotation::Id);
                 }
 
                 // parse the body with the extended environment
