@@ -1,14 +1,14 @@
 use std::io::Read;
 
 pub use compilation_unit::CompilationUnit;
+use core_compiler::CoreCompiler;
 use source::{HasOrigin, Source};
 
 use crate::compiler::error::reporting::ErrorReporter;
-use crate::compiler::representation::CoreAST;
-use crate::compiler::source::Registry;
 
 pub mod backend;
 pub mod compilation_unit;
+mod core_compiler;
 pub mod error;
 pub mod frontend;
 pub mod representation;
@@ -44,7 +44,7 @@ impl Compiler {
         reporter.report_error(&e);
     }
 
-    pub fn error_reporter<'a>(&'a self) -> ErrorReporter<'a> {
+    pub fn error_reporter(&self) -> ErrorReporter {
         ErrorReporter::new(&self.sources)
     }
 
@@ -53,27 +53,6 @@ impl Compiler {
         log::trace!("frontend pass done: {:#?}", ast);
         let unit = self.core.compile(&ast, &self.sources)?;
         log::trace!("core pass done: {:#?}", unit);
-        Ok(unit)
-    }
-}
-
-#[derive(Debug)]
-pub struct CoreCompiler {
-    parser: frontend::parser::CoreParser,
-    backend: backend::Backend,
-}
-
-impl CoreCompiler {
-    pub fn new() -> Self {
-        Self {
-            parser: frontend::parser::CoreParser::new(),
-            backend: backend::Backend::new(),
-        }
-    }
-
-    pub fn compile(&mut self, ast: &CoreAST, registry: &Registry) -> Result<CompilationUnit> {
-        let unit = self.backend.pass(&ast, &registry)?;
-        log::trace!("backend pass done: {:#?}", unit);
         Ok(unit)
     }
 }

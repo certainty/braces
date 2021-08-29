@@ -1,9 +1,9 @@
+use crate::compiler::core_compiler::CoreCompiler;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
 use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
-use crate::compiler::CoreCompiler;
 
 // experiment if I can write an expander that does just SEXP -> SEXP transformation
 // without duplicating too much parser logic
