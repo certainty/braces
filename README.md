@@ -22,10 +22,10 @@ make repl
   - [x] symbol
   - [x] char
   - [x] number
-  - [ ] vector
+  - [x] vector
   - [ ] byte-vector
   - [x] proper list
-  - [ ] improper list
+  - [x] improper list
   - [x] string
   - [x] quoted constants
 - [x] variables

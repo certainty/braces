@@ -271,6 +271,13 @@ impl Factory {
                 let elements = ls.iter().map(|e| self.from_datum(e)).collect();
                 self.proper_list(elements)
             }
+            SExpression::ImproperList(head, tail) => {
+                let head_values = head.iter().map(|e| self.from_datum(e)).collect::<Vec<_>>();
+                Value::ImproperList(
+                    list::List::from(head_values),
+                    Box::new(self.from_datum(tail)),
+                )
+            }
             SExpression::Char(c) => self.character(*c),
             SExpression::Number(num) => Value::Number(num.clone()),
             SExpression::Vector(v) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
