@@ -3,7 +3,7 @@
 /// # Stack based virtual machine for our scheme implementation
 ///
 /// This is the implementation of the virtual machine for our scheme implementation. It's a standard stack based
-/// VM that borrows concepts from LUA's VM implementation to make it non-naive. However there is probably still alot
+/// VM that borrows concepts from LUA's VM implementation to make it non-naive. However there is probably still a lot
 /// of room for improvement in terms of performance.
 ///
 /// ## Usage
