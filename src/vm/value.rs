@@ -9,6 +9,7 @@ pub mod number;
 pub mod procedure;
 pub mod string;
 pub mod symbol;
+pub mod vector;
 
 use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
@@ -67,7 +68,7 @@ pub enum Value {
     Symbol(Symbol),
     Char(char),
     Number(number::Number),
-    Vector(Vec<Value>),
+    Vector(vector::Vector),
     ByteVector(byte_vector::ByteVector),
     InternedString(InternedString),
     UninternedString(std::string::String),
@@ -83,32 +84,6 @@ impl Value {
         match self {
             Self::Bool(false) => true,
             _ => false,
-        }
-    }
-}
-
-impl SchemeEqual<Vec<Value>> for Vec<Value> {
-    fn is_eq(&self, other: &Vec<Value>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_eq(b))
-        }
-    }
-
-    fn is_eqv(&self, other: &Vec<Value>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_eqv(b))
-        }
-    }
-
-    fn is_equal(&self, other: &Vec<Value>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_equal(b))
         }
     }
 }
