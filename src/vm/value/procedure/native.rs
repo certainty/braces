@@ -33,11 +33,11 @@ impl Procedure {
         }
     }
 
-    pub fn code<'a>(&'a self) -> &'a Chunk {
+    pub fn code(&self) -> &Chunk {
         &self.chunk
     }
 
-    pub fn name<'a>(&'a self) -> &'a Option<String> {
+    pub fn name(&self) -> &Option<String> {
         &self.name
     }
 }

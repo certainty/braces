@@ -62,10 +62,12 @@ type ValueStack = Stack<Value>;
 pub type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
-    // the value factory which can be shared between individual instance runs
+    // The value factory which can be shared between individual instance runs.
+    // The sharing is needed only in the `Repl` where we want to define bindings as we go
+    // and remember them for the next run of the `VM`.
     values: &'a mut value::Factory,
     // top level environment which can be shared between individual instance runs
-    toplevel: &'a mut TopLevel,
+    top_level: &'a mut TopLevel,
     // a simple stack to manage intermediate values and locals
     stack: ValueStack,
     // manage all live functions
@@ -84,7 +86,7 @@ impl<'a> Instance<'a> {
     pub fn new(
         initial_closure: value::closure::Closure,
         call_stack_size: usize,
-        toplevel: &'a mut TopLevel,
+        top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
         debug_mode: bool,
     ) -> Self {
@@ -103,21 +105,22 @@ impl<'a> Instance<'a> {
             values,
             stack,
             call_stack,
-            toplevel,
+            top_level,
             active_frame,
             open_up_values: FxHashMap::default(),
             debug_mode,
         }
     }
 
-    pub fn interprete(
+    pub fn interpret(
         initial_closure: value::closure::Closure,
         stack_size: usize,
-        toplevel: &'a mut TopLevel,
+        top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        // enables debug mode, which will print stack and instruction information for each cycle
         debug_mode: bool,
     ) -> Result<Value> {
-        let mut instance = Self::new(initial_closure, stack_size, toplevel, values, debug_mode);
+        let mut instance = Self::new(initial_closure, stack_size, top_level, values, debug_mode);
         instance.run()
     }
 
@@ -824,7 +827,7 @@ impl<'a> Instance<'a> {
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
-        self.toplevel.set(id.clone(), v.clone());
+        self.top_level.set(id.clone(), v.clone());
         self.push(self.values.unspecified())?;
         Ok(())
     }
@@ -837,7 +840,7 @@ impl<'a> Instance<'a> {
     fn get_global(&mut self, addr: ConstAddressType) -> Result<()> {
         let id = self.read_identifier(addr)?;
 
-        if let Some(value) = self.toplevel.get_owned(&id) {
+        if let Some(value) = self.top_level.get_owned(&id) {
             self.push(value)?;
         } else {
             self.runtime_error(error::undefined_variable(id), None)?;
@@ -849,13 +852,12 @@ impl<'a> Instance<'a> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
 
-        if !self.toplevel.get(&id).is_some() {
+        if !self.top_level.get(&id).is_some() {
             return self.runtime_error(error::undefined_variable(id.clone()), None);
         } else {
-            self.toplevel.set(id.clone(), v.clone());
+            self.top_level.set(id.clone(), v.clone());
             self.push(self.values.unspecified())?;
         }
-
         Ok(())
     }
 

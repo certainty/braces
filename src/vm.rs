@@ -74,7 +74,7 @@ impl VM {
     pub fn interpret(&mut self, unit: CompilationUnit) -> Result<Value> {
         let debug_mode = self.settings.is_enabled(&Setting::Debug);
 
-        Instance::interprete(
+        Instance::interpret(
             unit.closure,
             self.stack_size,
             &mut self.top_level,

@@ -1,20 +1,14 @@
-///////////////////////////////////////////////////////////////////////////////////////////////
-//
-//
-// ## Internals
-//
-//
-// ### Design choices
-//
-// #### Compilation of procedures
-//
-// The compile uses a chunk-per-procedure approach, which means that final compilation result
-// is not a single contingent chunk of instructions, but each procedure will be compiled to a chunk instead.
-// The individually compiled procedures are stored as values in the compilation units constants table
-// and will thus be accessible by the VM. This compilation model gives rather clear semantics in terms
-// of execution since it allows to easily activate individual procedures without having to do extensive
-// computation of addresses.
-
+/// The `CodeGenerator` compiles `Chunk`s from `CoreAST` forms.
+///
+///
+/// #### Compilation of procedures
+///
+/// The compiler uses a chunk-per-procedure approach, which means that final compilation result
+/// is not a single contingent chunk of instructions, but each procedure will be compiled to a chunk instead.
+/// The individually compiled procedures are stored as values in the compilation units constant table
+/// and will thus be accessible by the VM. This compilation model gives rather clear semantics in terms
+/// of execution since it allows to easily activate individual procedures without having to do extensive
+/// computation of addresses.
 use thiserror::Error;
 
 use crate::compiler::frontend::parser::{
@@ -164,11 +158,16 @@ impl<'a> CodeGenerator<'a> {
         self.values.interned_string(s)
     }
 
+    /// Begin a new lexical scope
+    ///
     #[inline]
     fn begin_scope(&mut self) {
         self.variables.begin_scope();
     }
 
+    /// When a scope is ended we need to take care of two things.
+    /// 1. pop uncaptured locals from the stack, since they left scope they will be released
+    /// 2. promote captured locals to up-values, so that they get closure-scope in during runtime
     fn end_scope(&mut self, pop_locals: bool) -> Result<()> {
         let processed_variables = self.variables.end_scope()?;
 
@@ -194,36 +193,30 @@ impl<'a> CodeGenerator<'a> {
         self.variables.resolve_local(name)
     }
 
-    /////////////////////////////////////////////////
-    //
-    // TODO: explain how up-values are handles
-    //
-    /////////////////////////////////////////////////
-
+    /// Returns the address of up-value that matches this identifier, if it exists
     #[inline]
     fn resolve_up_value(&mut self, name: &Identifier) -> Result<Option<usize>> {
         self.variables.resolve_up_value(name)
     }
 
+    /// we want to track a new binding, so we need to make it known to the generator
     #[inline]
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
+        // if we're at the top-level we don't need to track anything
+        // as during runtime the VM will just resolve this identifier, using the `TopLevel`
+        // environment.
         if self.variables.is_top_level() {
             return Ok(());
         }
-
-        //TODO: make sure the variable doesn't already exist in current scope
-
-        // register the local in current scope
+        // It's not top level, which means it's local.
+        // In this case we need to track it so that we can compute stack addresses
+        // correctly and take care of up-values.
         self.register_local(id.clone())?;
         Ok(())
     }
 
-    /////////////////////////////////////////////////////////////////////////
-    //
-    // VM instructions
-    //
-    /////////////////////////////////////////////////////////////////////////
-
+    // This is the main entry-point that turns Expressions into instructions, which
+    // are then written to the current chunk.
     fn emit_instructions(&mut self, ast: &Expression, context: &Context) -> Result<()> {
         match ast {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
@@ -276,13 +269,16 @@ impl<'a> CodeGenerator<'a> {
     }
 
     fn patch_jump(&mut self, jump_addr: AddressType) -> Result<()> {
-        let to_addr = self.current_chunk().size();
+        // The end of the jump is simply ad the end of the current chunk.
+        let to_address = self.current_chunk().size();
         let new_instruction = match self.current_chunk().at(jump_addr) {
-            &Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(to_addr),
-            &Instruction::Jump(_) => Instruction::Jump(to_addr),
+            &Instruction::JumpIfFalse(_) => Instruction::JumpIfFalse(to_address),
+            &Instruction::Jump(_) => Instruction::Jump(to_address),
             _ => return Err(Error::CompilerBug("Can't patch non-jump".to_string())),
         };
 
+        // Update the jump with the correct target address.
+        // This is only possible now after all instructions for all branches have been generated.
         self.current_chunk().patch(jump_addr, new_instruction);
         Ok(())
     }
@@ -299,7 +295,6 @@ impl<'a> CodeGenerator<'a> {
     // Const(1)
     // Const(2)
     // Call(2)
-    //
     //
     fn emit_apply(&mut self, application: &ApplicationExpression, context: &Context) -> Result<()> {
         self.emit_instructions(&application.operator, &Context::NonTail)?;
@@ -405,23 +400,6 @@ impl<'a> CodeGenerator<'a> {
 
     fn emit_definition(&mut self, definition: &DefinitionExpression) -> Result<()> {
         match definition {
-            /*
-            DefinitionExpression::DefineProcedure(id, lambda_expr, _loc) => {
-                // name of procedure is part is the label of the lambda expression
-                self.emit_lambda(lambda_expr)?;
-                let id_sym = self.sym(&id.string());
-                let const_addr = self.current_chunk().add_constant(id_sym);
-
-                if let Target::TopLevel = self.target {
-                    self.emit_instruction(
-                        Instruction::Define(const_addr),
-                        &definition.source_location(),
-                    )
-                } else {
-                    // internal define sets a local variable instead
-                    todo!()
-                }
-            }*/
             DefinitionExpression::DefineSimple(id, expr, _loc) => {
                 self.emit_instructions(expr, &Context::NonTail)?;
                 let id_sym = self.sym(&id.string());

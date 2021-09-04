@@ -15,6 +15,7 @@ impl Backend {
         Self {}
     }
 
+    /// compile the `CoreAST` into a `CompilationUnit`
     pub fn pass(
         &self,
         ast: &CoreAST,
