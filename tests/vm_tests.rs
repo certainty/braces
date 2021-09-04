@@ -21,12 +21,33 @@ fn assert_result_eq(vm: &mut VM, code: &str, expected: Value) {
 #[test]
 fn test_vm_literal() {
     let mut vm = VM::default();
+    let mut values = braces::vm::value::Factory::default();
 
-    assert_result_eq(&mut vm, "#t", Value::Bool(true));
-    assert_result_eq(&mut vm, "#t", Value::Bool(true));
-    assert_result_eq(&mut vm, "#false", Value::Bool(false));
-    assert_result_eq(&mut vm, "'#false", Value::Bool(false));
-    assert_result_eq(&mut vm, "'#true", Value::Bool(true));
+    assert_result_eq(&mut vm, "#t", values.bool_true());
+    assert_result_eq(&mut vm, "#f", values.bool_false());
+    assert_result_eq(&mut vm, "#\\c", values.character('c'));
+    assert_result_eq(&mut vm, "\"foo\"", values.interned_string("foo"));
+    assert_result_eq(&mut vm, "'foo", values.symbol("foo"));
+    assert_result_eq(&mut vm, "3", values.real(3));
+    assert_result_eq(
+        &mut vm,
+        "'(#t #f)",
+        values.proper_list(vec![values.bool_true(), values.bool_false()]),
+    );
+    assert_result_eq(
+        &mut vm,
+        "'(#t #t . #f)",
+        values.improper_list(
+            vec![values.bool_true(), values.bool_true()],
+            values.bool_false(),
+        ),
+    );
+    assert_result_eq(
+        &mut vm,
+        "#(#t #f)",
+        values.vector(vec![values.bool_true(), values.bool_false()]),
+    );
+    assert_result_eq(&mut vm, "#u8(255 10)", values.byte_vector(vec![255, 10]));
 }
 
 #[test]

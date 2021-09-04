@@ -49,7 +49,8 @@ impl CoreParser {
             SExpression::String(_) => ParseResult::accept(LiteralExpression::from(datum)),
             SExpression::Number(_) => ParseResult::accept(LiteralExpression::from(datum)),
             SExpression::Vector(_) => ParseResult::accept(LiteralExpression::from(datum)),
-            _ => ParseResult::ignore("Expected literal", datum.source_location()),
+            SExpression::ByteVector(_) => ParseResult::accept(LiteralExpression::from(datum)),
+            _ => ParseResult::ignore("Expected literal expression", datum.source_location()),
         }
     }
 }

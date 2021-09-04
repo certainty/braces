@@ -25,7 +25,7 @@ enum StringElement<'a> {
     Continuation,
 }
 
-pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse(input: Input) -> ParseResult<Datum> {
     let string_elements = fold_many0(
         parse_string_element,
         String::new(),
@@ -44,7 +44,7 @@ pub fn parse<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     map_datum(string_literal, SExpression::String)(input)
 }
 
-fn parse_string_element<'a>(input: Input<'a>) -> ParseResult<'a, StringElement<'a>> {
+fn parse_string_element(input: Input) -> ParseResult<StringElement> {
     alt((
         map(parse_mnemonic_escape, StringElement::EscapedChar),
         map(parse_string_escape, StringElement::EscapedChar),
@@ -76,7 +76,7 @@ fn parse_string_continuation<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
 }
 
 #[inline]
-fn parse_string_literal<'a>(input: Input<'a>) -> ParseResult<'a, &'a str> {
+fn parse_string_literal(input: Input) -> ParseResult<&str> {
     let (s, v) = is_not("\\\"")(input)?;
 
     if v.fragment().is_empty() {

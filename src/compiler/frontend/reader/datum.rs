@@ -90,6 +90,14 @@ impl Datum {
         Self::new(SExpression::vector(elements), location.into())
     }
 
+    pub fn byte_vector<I, L: Into<Location>>(bytes: I, location: L) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<u8>,
+    {
+        Self::new(SExpression::byte_vector(bytes), location.into())
+    }
+
     /// Create an s-expression from a value, if that's possible.
     ///
     /// Code is data, but this implementation doesn't use the same representation

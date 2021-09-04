@@ -53,6 +53,11 @@ impl Writer {
 
                 format!("#({})", body.join(" "))
             }
+            Value::ByteVector(elts) => {
+                let body: Vec<String> = elts.iter().map(|e| format!("{}", e)).collect();
+
+                format!("#u8({})", body.join(" "))
+            }
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()

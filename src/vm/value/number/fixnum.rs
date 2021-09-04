@@ -87,10 +87,10 @@ impl SchemeNumber for Fixnum {
         false
     }
 
-    fn is_nan(&self) -> bool {
+    fn is_neg_infinite(&self) -> bool {
         false
     }
-    fn is_neg_infinite(&self) -> bool {
+    fn is_nan(&self) -> bool {
         false
     }
 }

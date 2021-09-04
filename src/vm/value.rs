@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub mod arbitrary;
+pub mod byte_vector;
 pub mod closure;
 pub mod equality;
 pub mod error;
@@ -8,6 +9,8 @@ pub mod number;
 pub mod procedure;
 pub mod string;
 pub mod symbol;
+pub mod vector;
+
 use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::utils::string_table::StringTable;
@@ -65,7 +68,8 @@ pub enum Value {
     Symbol(Symbol),
     Char(char),
     Number(number::Number),
-    Vector(Vec<Value>),
+    Vector(vector::Vector),
+    ByteVector(byte_vector::ByteVector),
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
@@ -84,32 +88,6 @@ impl Value {
     }
 }
 
-impl SchemeEqual<Vec<Value>> for Vec<Value> {
-    fn is_eq(&self, other: &Vec<Value>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_eq(b))
-        }
-    }
-
-    fn is_eqv(&self, other: &Vec<Value>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_eqv(b))
-        }
-    }
-
-    fn is_equal(&self, other: &Vec<Value>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_equal(b))
-        }
-    }
-}
-
 impl SchemeEqual<Value> for Value {
     fn is_eq(&self, other: &Value) -> bool {
         match (self, other) {
@@ -119,6 +97,7 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::InternedString(_)) => false,
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eq(rhs),
+            (Value::ByteVector(lhs), Value::ByteVector(rhs)) => lhs.is_eq(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
             (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
                 lhs_head.is_eq(rhs_head) && lhs_tail.is_eq(rhs_tail)
@@ -139,6 +118,7 @@ impl SchemeEqual<Value> for Value {
             (Value::UninternedString(_), Value::InternedString(_)) => false,
             (Value::UninternedString(_), Value::UninternedString(_)) => false,
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eqv(rhs),
+            (Value::ByteVector(lhs), Value::ByteVector(rhs)) => lhs.is_eqv(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
             (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
                 lhs_head.is_eqv(rhs_head) && lhs_tail.is_eqv(rhs_tail)
@@ -161,6 +141,7 @@ impl SchemeEqual<Value> for Value {
             }
             (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_equal(rhs),
+            (Value::ByteVector(lhs), Value::ByteVector(rhs)) => lhs.is_equal(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
             (Value::ImproperList(lhs_head, lhs_tail), Value::ImproperList(rhs_head, rhs_tail)) => {
                 lhs_head.is_equal(rhs_head) && lhs_tail.is_equal(rhs_tail)
@@ -248,6 +229,18 @@ impl Factory {
         }
     }
 
+    pub fn improper_list(&self, head: Vec<Value>, tail: Value) -> Value {
+        Value::ImproperList(head.into(), Box::new(tail))
+    }
+
+    pub fn vector(&self, vals: Vec<Value>) -> Value {
+        Value::Vector(vals)
+    }
+
+    pub fn byte_vector(&self, vals: Vec<u8>) -> Value {
+        Value::ByteVector(vals)
+    }
+
     pub fn foreign_procedure(&mut self, v: procedure::foreign::Procedure) -> Value {
         Value::Procedure(procedure::Procedure::foreign(v))
     }
@@ -260,7 +253,6 @@ impl Factory {
         Value::Closure(closure::Closure::new(v, vec![]))
     }
 
-    // TODO: decide if this should this consume datum instead
     pub fn from_datum(&mut self, d: &Datum) -> Value {
         match d.s_expression() {
             SExpression::Bool(true) => self.bool_true().clone(),
@@ -281,7 +273,7 @@ impl Factory {
             SExpression::Char(c) => self.character(*c),
             SExpression::Number(num) => Value::Number(num.clone()),
             SExpression::Vector(v) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
-            _ => todo!(),
+            SExpression::ByteVector(v) => Value::ByteVector(v.clone()),
         }
     }
 

@@ -8,7 +8,9 @@ use nom_locate::{position, LocatedSpan};
 use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 use crate::compiler::source::SourceId;
 
-use super::{abbreviation, boolean, character, list, number, string, symbol, vector, whitespace};
+use super::{
+    abbreviation, boolean, byte_vector, character, list, number, string, symbol, vector, whitespace,
+};
 
 pub(crate) type Input<'a> = LocatedSpan<&'a str, SourceId>;
 
@@ -30,6 +32,7 @@ fn parse_simple_datum(input: Input) -> ParseResult<Datum> {
             context("boolean", boolean::parse),
             context("symbol", symbol::parse),
             context("string", string::parse),
+            context("byte-vector", byte_vector::parse),
         )),
     )(input)
 }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::vm::value::equality::SchemeEqual;
+use az::CheckedCast;
 use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -61,6 +62,15 @@ macro_rules! binop {
             }
         }
     };
+}
+
+impl CheckedCast<fixnum::Fixnum> for RealNumber {
+    fn checked_cast(self) -> Option<fixnum::Fixnum> {
+        match self {
+            Self::Fixnum(n) => Some(n),
+            _ => None,
+        }
+    }
 }
 
 impl SchemeNumberExactness for RealNumber {
@@ -147,11 +157,11 @@ impl SchemeNumber for RealNumber {
         with_realnum!(self, n, n.is_infinite())
     }
 
-    fn is_nan(&self) -> bool {
-        with_realnum!(self, n, n.is_nan())
-    }
     fn is_neg_infinite(&self) -> bool {
         with_realnum!(self, n, n.is_neg_infinite())
+    }
+    fn is_nan(&self) -> bool {
+        with_realnum!(self, n, n.is_nan())
     }
 }
 

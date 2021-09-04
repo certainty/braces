@@ -1,6 +1,7 @@
 pub use parser::*;
 pub mod abbreviation;
 pub mod boolean;
+pub mod byte_vector;
 pub mod character;
 pub mod list;
 pub mod number;
@@ -9,6 +10,7 @@ pub mod string;
 pub mod symbol;
 pub mod vector;
 pub mod whitespace;
+
 use super::datum::Datum;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::vm::value::number::real::RealNumber;
@@ -69,6 +71,14 @@ impl SExpression {
         I::Item: Into<Datum>,
     {
         Self::Vector(elements.into_iter().map(Into::into).collect())
+    }
+
+    pub fn byte_vector<I>(bytes: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<u8>,
+    {
+        Self::ByteVector(bytes.into_iter().map(Into::into).collect())
     }
 
     pub fn is_proper_list(&self) -> bool {
