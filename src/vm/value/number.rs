@@ -5,6 +5,7 @@ pub mod fixnum;
 pub mod flonum;
 pub mod rational;
 pub mod real;
+use az::CheckedAs;
 use std::ops::{Add, Div, Mul, Sub};
 
 type ArithResult<T> = std::result::Result<T, RuntimeError>;
@@ -73,6 +74,15 @@ impl Number {
             numer.into(),
             denom.into(),
         ))))
+    }
+
+    pub fn to_u8(&self) -> Option<u8> {
+        match self {
+            Self::Real(r) => r
+                .clone()
+                .checked_as::<fixnum::Fixnum>()
+                .and_then(|fx| fx.as_inner().to_u8()),
+        }
     }
 }
 
@@ -156,14 +166,14 @@ impl SchemeNumber for Number {
         }
     }
 
-    fn is_nan(&self) -> bool {
-        match self {
-            Self::Real(n) => n.is_nan(),
-        }
-    }
     fn is_neg_infinite(&self) -> bool {
         match self {
             Self::Real(n) => n.is_neg_infinite(),
+        }
+    }
+    fn is_nan(&self) -> bool {
+        match self {
+            Self::Real(n) => n.is_nan(),
         }
     }
 }
