@@ -22,6 +22,10 @@ path="src/lib.rs"
 name="compiler_benchmark"
 harness=false
 
+[[bench]]
+name="vm_benchmark"
+harness=false
+
 [features]
 debug_vm = []
 debug_code = []

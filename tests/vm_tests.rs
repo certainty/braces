@@ -88,7 +88,6 @@ fn test_vm_lexical_scope() {
 fn test_vm_set() {
     let mut vm = VM::default();
 
-    /*
     let result = run_code(&mut vm, "(begin (set! x #t) x)");
     assert_matches!(
         result,
@@ -98,7 +97,7 @@ fn test_vm_set() {
             _,
             _
         ))
-    ); */
+    );
 
     let result = run_code(&mut vm, r#"((lambda  (foo) (set! foo 'bar) foo) #t)"#).unwrap();
     assert_eq!(result, vm.values.symbol("bar"));
@@ -212,11 +211,8 @@ fn test_vm_conditional() {
     let mut vm = VM::default();
 
     assert_result_eq(&mut vm, "(if #f #t #f)", Value::Bool(false));
-
     assert_result_eq(&mut vm, "(if #t #t #f)", Value::Bool(true));
-
     assert_result_eq(&mut vm, "(if #f #t)", Value::Unspecified);
-
     assert_result_eq(&mut vm, "(if #t #t)", Value::Bool(true));
 }
 
@@ -225,13 +221,13 @@ fn test_vm_simple_closures() {
     let mut vm = VM::default();
     let result = run_code(
         &mut vm,
-        "
-               (define test
-                 ((lambda (x y) (lambda () (set! x (not x)) x)) #t 'ignored)
-               )
-               (define ls (lambda x x))
-               (ls (test) (test) (test))
-",
+        r#"
+        (define test
+          ((lambda (x y) (lambda () (set! x (not x)) x)) #t 'ignored)
+        )
+       (define ls (lambda x x))
+       (ls (test) (test) (test))
+        "#,
     )
     .unwrap();
 
@@ -246,25 +242,25 @@ fn test_vm_simple_closures() {
 
     let result = run_code(
         &mut vm,
-        "
-               (define test
-                 ((lambda (x y) (lambda () x)) #t 'ignored)
-               )
-               (test)
-",
+        r#"
+         (define test
+           ((lambda (x y) (lambda () x)) #t 'ignored)
+         )
+         (test)
+        "#,
     )
     .unwrap();
     assert_eq!(result, vm.values.bool_true());
 
     let result = run_code(
         &mut vm,
-        "
-               (define test
-                  ((lambda (x)
-                     ((lambda (proc) (set! x #f) proc)  (lambda () x)))
+        r#"
+        (define test
+          ((lambda (x)
+            ((lambda (proc) (set! x #f) proc)  (lambda () x)))
                    #t))
-               (test)
-",
+        (test)
+        "#,
     )
     .unwrap();
     assert_eq!(result, vm.values.bool_false());
@@ -275,18 +271,18 @@ fn test_vm_complex_closures() {
     let mut vm = VM::default();
     let result = run_code(
         &mut vm,
-        "
-               (define list (lambda ls ls))
-               (define set-x #t)
-               (define get-x #t)
-               (define make-closures (lambda (value)
-                 ((lambda (x)
-                   (set! get-x (lambda () x))
-                   (set! set-x (lambda (new) (set! x new)))) value)))
+        r#"
+        (define list (lambda ls ls))
+        (define set-x #t)
+        (define get-x #t)
+        (define make-closures (lambda (value)
+           ((lambda (x)
+             (set! get-x (lambda () x))
+              (set! set-x (lambda (new) (set! x new)))) value)))
 
-              (make-closures #t)
-              (list (get-x) (set-x 'foo) (get-x))
-",
+        (make-closures #t)
+        (list (get-x) (set-x 'foo) (get-x))
+        "#,
     )
     .unwrap();
 
@@ -302,17 +298,41 @@ fn test_vm_complex_closures() {
 }
 
 #[test]
+fn test_vm_smoke_test() {
+    let mut vm = VM::default();
+
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define (fib-tc n)
+        (fib-iter 1 0 n))
+
+        (define (fib-iter a b count)
+            (if (= count 0)
+                b
+              (fib-iter (+ a b) a (- count 1))))
+
+        (define (fib n) (if (<= n 2) 1 (+ (fib (- n 1)) (fib (- n 2)))))
+
+        (fib 10)
+        "#,
+    )
+    .unwrap();
+    assert_eq!(result, vm.values.real(55));
+}
+
+#[test]
 fn test_vm_bugs() {
     let mut vm = VM::default();
 
     // results in arity error
     let result = run_code(
         &mut vm,
-        "
-               (define ls (lambda x x))
-               (define test (lambda () #t))
-               (ls (test) #f (test))
-",
+        r#"
+        (define ls (lambda x x))
+        (define test (lambda () #t))
+        (ls (test) #f (test))
+        "#,
     )
     .unwrap();
 
