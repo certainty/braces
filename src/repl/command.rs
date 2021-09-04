@@ -81,7 +81,7 @@ impl Commands {
     }
 
     fn handle_disass(&self, ident: &str, vm: &mut VM) -> anyhow::Result<()> {
-        match vm.toplevel.get(&vm.values.sym(ident)) {
+        match vm.top_level.get(&vm.values.sym(ident)) {
             Some(Value::Closure(closure)) => match vm.disassemble(closure.procedure()) {
                 Err(e) => Err(anyhow!("{}", e)),
                 _ => Ok(()),

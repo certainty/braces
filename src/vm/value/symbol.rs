@@ -6,7 +6,7 @@ use crate::compiler::utils::string_table;
 pub struct Symbol(pub string_table::Interned);
 
 impl Symbol {
-    pub fn as_str<'a>(&'a self) -> &'a str {
+    pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
 }

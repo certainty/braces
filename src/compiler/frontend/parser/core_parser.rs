@@ -6,7 +6,10 @@ use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::environment::{Denotation, Special};
 use crate::compiler::source::HasSourceLocation;
 
+/// The `CoreParser` parses a fully expanded `SexpAST` into a `CoreAST`.
+/// It is used by the `Parser`, which interleaves the expansion and parsing phases.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct CoreParser {
     pub environment: syntax::environment::SyntaxEnvironment,
 }

@@ -111,10 +111,7 @@ impl<'a> CodeGenerator<'a> {
             &Formals::empty(),
         )?;
 
-        Ok(CompilationUnit::new(
-            self.values.clone(),
-            Closure::new(proc, vec![]),
-        ))
+        Ok(CompilationUnit::new(Closure::new(proc, vec![])))
     }
 
     pub fn generate_procedure(

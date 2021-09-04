@@ -277,11 +277,6 @@ impl Factory {
         }
     }
 
-    pub fn absorb(&mut self, other: Self) {
-        self.strings.absorb(other.strings);
-        self.symbols.absorb(other.symbols);
-    }
-
     pub fn interned_symbols(&self) -> Vec<Symbol> {
         self.symbols
             .interned_vec()

@@ -11,7 +11,7 @@ impl Interned {
         (&*self.0 as *const _) == (&*other.0 as *const _)
     }
 
-    pub fn as_str<'a>(&'a self) -> &'a str {
+    pub fn as_str(&self) -> &str {
         &(*self.0)
     }
 

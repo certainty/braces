@@ -1,10 +1,8 @@
-use std::io::Read;
-
+use crate::compiler::error::reporting::ErrorReporter;
 pub use compilation_unit::CompilationUnit;
 use core_compiler::CoreCompiler;
 use source::{HasOrigin, Source};
-
-use crate::compiler::error::reporting::ErrorReporter;
+use std::io::Read;
 
 pub mod backend;
 pub mod compilation_unit;

@@ -23,7 +23,7 @@ impl Closure {
         }
     }
 
-    pub fn code<'a>(&'a self) -> &'a Chunk {
+    pub fn code(&self) -> &Chunk {
         self.procedure().code()
     }
 
@@ -31,11 +31,11 @@ impl Closure {
         self.proc.clone()
     }
 
-    pub fn procedure<'a>(&'a self) -> &'a procedure::native::Procedure {
+    pub fn procedure(&self) -> &procedure::native::Procedure {
         &self.proc
     }
 
-    pub fn name<'a>(&'a self) -> &'a Option<String> {
+    pub fn name(&self) -> &Option<String> {
         &self.procedure().name()
     }
 }

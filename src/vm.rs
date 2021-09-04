@@ -33,7 +33,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct VM {
     stack_size: usize,
     pub values: value::Factory,
-    pub toplevel: TopLevel,
+    pub top_level: TopLevel,
     writer: Writer,
     pub settings: Settings,
 }
@@ -43,14 +43,14 @@ impl VM {
         VM {
             stack_size,
             values: value::Factory::default(),
-            toplevel: TopLevel::new(),
+            top_level: TopLevel::new(),
             writer: Writer::new(),
             settings: Settings::default(),
         }
     }
 
     pub fn binding_names(&self) -> Vec<String> {
-        self.toplevel.binding_names()
+        self.top_level.binding_names()
     }
 
     pub fn write(&self, value: &Value) -> String {
@@ -60,7 +60,7 @@ impl VM {
     pub fn register_foreign(&mut self, proc: foreign::Procedure) -> Result<()> {
         let name = self.values.sym(proc.name.clone());
         let proc_value = self.values.foreign_procedure(proc);
-        self.toplevel.set(name, proc_value);
+        self.top_level.set(name, proc_value);
         Ok(())
     }
 
@@ -73,12 +73,11 @@ impl VM {
 
     pub fn interpret(&mut self, unit: CompilationUnit) -> Result<Value> {
         let debug_mode = self.settings.is_enabled(&Setting::Debug);
-        self.values.absorb(unit.values);
 
         Instance::interprete(
             unit.closure,
             self.stack_size,
-            &mut self.toplevel,
+            &mut self.top_level,
             &mut self.values,
             debug_mode,
         )

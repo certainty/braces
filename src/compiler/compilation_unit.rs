@@ -2,12 +2,12 @@ use crate::vm::value;
 
 #[derive(Clone, Debug)]
 pub struct CompilationUnit {
-    pub values: value::Factory,
+    // The closure to execute this compilation unit
     pub closure: value::closure::Closure,
 }
 
 impl CompilationUnit {
-    pub fn new(values: value::Factory, closure: value::closure::Closure) -> Self {
-        CompilationUnit { values, closure }
+    pub fn new(closure: value::closure::Closure) -> Self {
+        CompilationUnit { closure }
     }
 }

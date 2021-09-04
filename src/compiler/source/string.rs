@@ -1,6 +1,12 @@
 use super::{HasOrigin, Origin};
 use std::io::Cursor;
 
+/// Create a source from a string
+///
+/// ```
+/// use braces::compiler::source::string::StringSource;
+/// let src = StringSource::new("(define (foo x) x)");
+/// ```
 #[repr(transparent)]
 #[derive(Debug, Clone)]
 pub struct StringSource(Cursor<String>);
@@ -29,7 +35,7 @@ mod tests {
     use std::io::Read;
 
     #[test]
-    fn buffer_source_works() {
+    fn string_source_works() {
         let mut s = StringSource::new("test content");
         let mut out = String::new();
 

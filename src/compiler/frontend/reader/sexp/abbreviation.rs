@@ -39,20 +39,14 @@ mod tests {
         assert_parse_as(
             "'foo",
             Datum::list(
-                vec![
-                    make_datum(SExpression::symbol("quote"), 0..1),
-                    make_datum(SExpression::symbol("foo"), 1..4),
-                ],
+                vec![Datum::symbol("quote", 0..1), Datum::symbol("foo", 1..4)],
                 0..4,
             ),
         );
         assert_parse_as(
             ",foo",
             Datum::list(
-                vec![
-                    make_datum(SExpression::symbol("unquote"), 0..1),
-                    make_datum(SExpression::symbol("foo"), 1..4),
-                ],
+                vec![Datum::symbol("unquote", 0..1), Datum::symbol("foo", 1..4)],
                 0..4,
             ),
         );
@@ -61,8 +55,8 @@ mod tests {
             "`foo",
             Datum::list(
                 vec![
-                    make_datum(SExpression::symbol("quasi-quote"), 0..1),
-                    make_datum(SExpression::symbol("foo"), 1..4),
+                    Datum::symbol("quasi-quote", 0..1),
+                    Datum::symbol("foo", 1..4),
                 ],
                 0..4,
             ),
@@ -72,8 +66,8 @@ mod tests {
             ",@foo",
             Datum::list(
                 vec![
-                    make_datum(SExpression::symbol("unquote-splicing"), 0..2),
-                    make_datum(SExpression::symbol("foo"), 2..5),
+                    Datum::symbol("unquote-splicing", 0..2),
+                    Datum::symbol("foo", 2..5),
                 ],
                 0..5,
             ),

@@ -26,8 +26,8 @@ impl Reader {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
-    use crate::compiler::source::{BufferSource, Location, Registry, SourceId, Span};
+    use crate::compiler::frontend::reader::datum::Datum;
+    use crate::compiler::source::{BufferSource, Registry};
 
     use super::Reader;
 
@@ -74,17 +74,5 @@ pub mod tests {
         let parsed = reader.parse(&source);
 
         assert!(parsed.is_err(), "expected  parse error")
-    }
-
-    pub fn location<S: Into<Span>>(span: S) -> Location {
-        Location::new(source_id(), span)
-    }
-
-    pub fn make_datum<S: Into<Span>>(sexp: SExpression, span: S) -> Datum {
-        Datum::new(sexp, location(span))
-    }
-
-    pub fn source_id() -> SourceId {
-        SourceId::from(0)
     }
 }

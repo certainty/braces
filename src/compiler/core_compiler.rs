@@ -3,6 +3,12 @@ use crate::compiler::representation::CoreAST;
 use crate::compiler::source::Registry;
 use crate::compiler::{backend, frontend, CompilationUnit};
 
+/// The `CoreCompiler` is used to compile the `CoreAST`
+/// down to the byte code representation.
+///
+/// It is used in the `Compiler` but also in the `Expander`.
+/// The latter uses it to compile procedural macro definitions.
+///
 #[derive(Debug)]
 pub struct CoreCompiler {
     parser: frontend::parser::CoreParser,
