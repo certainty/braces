@@ -80,9 +80,9 @@ impl Context {
 }
 
 impl<'a> CodeGenerator<'a> {
-    // constructor is private since we don't want external callers
-    // to hold an instance of `CodeGenerator`. It has internal state
-    // that shouldn't be shared across multiple generation steps.
+    /// constructor is private since we don't want external callers
+    /// to hold an instance of `CodeGenerator`. It has internal state
+    /// that shouldn't be shared across multiple generation invocations.
     fn new(
         target: Target,
         parent_variables: Option<VariablesRef>,
@@ -219,8 +219,8 @@ impl<'a> CodeGenerator<'a> {
         Ok(())
     }
 
-    // This is the main entry-point that turns Expressions into instructions, which
-    // are then written to the current chunk.
+    /// This is the main entry-point that turns Expressions into instructions, which
+    /// are then written to the current chunk.
     fn emit_instructions(&mut self, ast: &Expression, context: &Context) -> Result<()> {
         match ast {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
