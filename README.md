@@ -1,6 +1,6 @@
 # Braces
 
-![Build Status](https://https://github.com/certainty/braces/blob/switch-to-actions/.github/workflows/rust.yml/badge.svg?branch=main)
+
 
 > Brace for impact
 > 
