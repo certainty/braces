@@ -1,38 +1,33 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// # Stack based virtual machine for our scheme implementation
-//
-// This is the implementation of the virtual machine for our scheme implementation. It's a standard stack based
-// VM that borrows concepts from LUA's VM implementation to make it non-naive. However there is probably still alot
-// of room for improvement in terms of performance.
-//
-// ## Usage
-//
-// Most of the time you shouldn't have to use `Instance` directly but use the `VM` interface instead.
-// That will give you access to high-level functions that compile and run code on the VM. However in case you
-// build your own code this low level interface might come in handy.
-//
-// Examples:
-// ```
-// // first compile some source
-// let source_code = String::from("(let ((x #t)) (lambda () x))");
-// let mut source = StringSource::new(source_code, "test");
-// let mut compiler  = Compiler::new();
-// let unit = compiler.compile_program(&mut source)?;
-//
-// // instantiate the vm with the top-level bindings and the known values and get the result
-//
-// let result = Instance::interprete(unit.closure, 256, TopLevel::new(), unit.values)?;
-// println!("{:#?}", result);
-// ```
-//
-// ## Internals
-//
-// What follows is a more in depth documentation of how the VM works and some of the design choices that have been made.
-//
-//
-// ### Design choices
-//
+///
+/// # Stack based virtual machine for our scheme implementation
+///
+/// This is the implementation of the virtual machine for our scheme implementation. It's a standard stack based
+/// VM that borrows concepts from LUA's VM implementation to make it non-naive. However there is probably still alot
+/// of room for improvement in terms of performance.
+///
+/// ## Usage
+///
+/// Most of the time you shouldn't have to use `Instance` directly but use the `VM` interface instead.
+/// That will give you access to high-level functions that compile and run code on the VM. However in case you
+/// build your own code this low level interface might come in handy.
+///
+/// Examples:
+/// ```
+/// use braces::vm::instance::Instance;
+/// use braces::vm::{value, global::TopLevel};
+/// use braces::compiler::{source::StringSource, Compiler};
+/// let mut source = StringSource::new("(define (id x) x) (id #t)");
+/// let mut compiler  = Compiler::new();
+/// let unit = compiler.compile(&mut source).unwrap();
+/// // Now interpret the unit
+/// let mut top_level = TopLevel::new();
+/// let mut values = value::Factory::default();
+/// let result = Instance::interpret(unit.closure, 256, &mut top_level, &mut values, false).unwrap();
+/// println!("{:#?}", result);
+/// ```
+///
+///
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 pub mod call_frame;
 use crate::vm::byte_code::chunk::AddressType;
