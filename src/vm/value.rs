@@ -157,7 +157,6 @@ impl SchemeEqual<Value> for Value {
 #[derive(Debug, Clone)]
 pub struct Factory {
     strings: StringTable,
-    symbols: StringTable,
     true_value: Value,
     false_value: Value,
     nil_value: Value,
@@ -168,7 +167,6 @@ impl Default for Factory {
     fn default() -> Factory {
         Factory {
             strings: StringTable::default(),
-            symbols: StringTable::default(),
             true_value: Value::Bool(true),
             false_value: Value::Bool(false),
             nil_value: Value::ProperList(list::List::Nil),
@@ -203,7 +201,7 @@ impl Factory {
     }
 
     pub fn sym<T: Into<std::string::String>>(&mut self, v: T) -> Symbol {
-        let k = self.symbols.get_or_intern(v.into());
+        let k = self.strings.get_or_intern(v.into());
         Symbol(k)
     }
 
@@ -275,15 +273,6 @@ impl Factory {
             SExpression::Vector(v) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
             SExpression::ByteVector(v) => Value::ByteVector(v.clone()),
         }
-    }
-
-    pub fn interned_symbols(&self) -> Vec<Symbol> {
-        self.symbols
-            .interned_vec()
-            .iter()
-            .cloned()
-            .map(Symbol)
-            .collect()
     }
 
     pub fn interned_strings(&self) -> Vec<InternedString> {
