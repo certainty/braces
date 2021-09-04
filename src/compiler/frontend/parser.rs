@@ -22,15 +22,24 @@ pub mod quotation;
 pub mod result;
 pub mod sequence;
 
+/// The `Expression` type encodes scheme core forms.
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
+    /// A scheme identifier, which is a special symbol
     Identifier(identifier::Identifier),
+    /// Any scheme literal value
     Literal(literal::LiteralExpression),
+    /// A definition
     Define(define::DefinitionExpression),
+    /// A lambda expression
     Lambda(lambda::LambdaExpression),
+    /// A set! expression
     Assign(assignment::SetExpression),
+    /// An if expression
     If(conditional::IfExpression),
+    /// An expression for function application
     Apply(apply::ApplicationExpression),
+    /// A begin expression to sequence other expressions
     Begin(sequence::BeginExpression),
 }
 
@@ -63,6 +72,19 @@ impl Parser {
         }
     }
 
+    /// Expand and parse `ast` into the `CoreAST` representation.
+    /// This process interleaves macro expansion and parsing of forms.
+    ///
+    /// ```
+    /// use braces::compiler::frontend::parser::Parser;
+    /// use braces::compiler::representation::SexpAST;
+    /// use braces::compiler::frontend::reader::datum::Datum;
+    /// let mut parser = Parser::new();
+    /// // just a very simple s-expression which will be parsed to a literal
+    /// let sexps = SexpAST::new(vec![Datum::boolean(true, 0..2)]);
+    ///
+    /// parser.parse(&sexps).unwrap();
+    /// ```
     pub fn parse(&mut self, ast: &SexpAST) -> Result<CoreAST> {
         let expressions: Result<Vec<Expression>> =
             ast.to_vec().iter().map(|d| self.do_parse(d)).collect();
