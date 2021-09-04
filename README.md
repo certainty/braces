@@ -20,13 +20,13 @@ how fare I can bring it.
 
 ### Language Support 
 
-- [ ] literals
+- [x] literals
   - [x] bool
   - [x] symbol
   - [x] char
   - [x] number
   - [x] vector
-  - [ ] byte-vector
+  - [x] byte-vector
   - [x] proper list
   - [x] improper list
   - [x] string
