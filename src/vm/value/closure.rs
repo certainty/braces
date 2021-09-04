@@ -12,15 +12,12 @@ pub struct Closure {
 }
 
 impl Closure {
-    pub fn new(proc: procedure::native::Procedure, up_values: Vec<RefValue>) -> Self {
-        Self::from_rc(Rc::new(proc), up_values)
+    pub fn new(proc: procedure::native::Procedure) -> Self {
+        Self::from_rc(Rc::new(proc), vec![])
     }
 
     pub fn from_rc(proc: Rc<procedure::native::Procedure>, up_values: Vec<RefValue>) -> Self {
-        Self {
-            proc: proc,
-            up_values,
-        }
+        Self { proc, up_values }
     }
 
     pub fn code(&self) -> &Chunk {

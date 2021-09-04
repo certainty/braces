@@ -250,7 +250,7 @@ impl Factory {
     }
 
     pub fn closure(&mut self, v: procedure::native::Procedure) -> Value {
-        Value::Closure(closure::Closure::new(v, vec![]))
+        Value::Closure(closure::Closure::new(v))
     }
 
     pub fn from_datum(&mut self, d: &Datum) -> Value {

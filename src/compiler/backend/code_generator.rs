@@ -80,7 +80,10 @@ impl Context {
 }
 
 impl<'a> CodeGenerator<'a> {
-    pub fn new(
+    // constructor is private since we don't want external callers
+    // to hold an instance of `CodeGenerator`. It has internal state
+    // that shouldn't be shared across multiple generation steps.
+    fn new(
         target: Target,
         parent_variables: Option<VariablesRef>,
         source_registry: &'a Registry,
@@ -96,16 +99,17 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    pub fn generate(&mut self, ast: &CoreAST) -> Result<CompilationUnit> {
+    /// Main entry point to generate the VM byte code
+    pub fn generate(registry: &Registry, ast: &CoreAST) -> Result<CompilationUnit> {
         let proc = Self::generate_procedure(
-            self.source_registry,
+            registry,
             None,
             Target::TopLevel,
             &Expression::body(ast.expressions.clone()),
             &Formals::empty(),
         )?;
 
-        Ok(CompilationUnit::new(Closure::new(proc, vec![])))
+        Ok(CompilationUnit::new(Closure::new(proc)))
     }
 
     pub fn generate_procedure(
