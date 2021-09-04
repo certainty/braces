@@ -31,18 +31,17 @@ impl<'a> ErrorReporter<'a> {
         e: &RuntimeError,
         line: usize,
         stack_trace: StackTrace,
-        label: Option<String>,
+        _label: Option<String>,
     ) {
         eprintln!(
-            "{} on line {} [in {}]\n{}",
-            e,
+            "{} on line {}\n{}",
+            self.runtime_error_message(e),
             line,
-            label.unwrap_or_default(),
             stack_trace.as_string()
         )
     }
 
-    pub fn runtime_error_message(&self, e: RuntimeError) -> String {
+    pub fn runtime_error_message(&self, e: &RuntimeError) -> String {
         match e {
             RuntimeError::ArgumentError(value, message) => {
                 format!("ArgumentError: {:?} {}", value, message)
@@ -50,7 +49,9 @@ impl<'a> ErrorReporter<'a> {
             RuntimeError::ArithmeticError(message) => format!("ArithmeticError: {}", message),
             RuntimeError::ArityError(arity, argc) => format!("ArityError: {:?} {}", arity, argc),
             RuntimeError::NoncallableError(v) => format!("NonCallable: {:?}", v),
-            RuntimeError::UndefinedVariable(s) => format!("UndefineVariabel: {:?}", s),
+            RuntimeError::UndefinedVariable(s) => {
+                format!("UndefinedVariable: Variable `{}` is undefined", s.as_str())
+            }
         }
     }
 }

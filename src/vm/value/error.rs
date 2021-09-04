@@ -4,13 +4,13 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("UndefinedVariableError: Variable `{0:?}` is undefined")]
+    #[error("Undefined Variable")]
     UndefinedVariable(Symbol),
     #[error("ArityError: Function expected `{0:?}` arguments but received {1}")]
     ArityError(Arity, usize),
     #[error("ArgumentError: {1}")]
     ArgumentError(Value, String),
-    #[error("AppplicationError: `{0:?}` is not callable")]
+    #[error("ApplicationError: `{0:?}` is not callable")]
     NoncallableError(Value),
     #[error("ArithmeticError: `{0}`")]
     ArithmeticError(String),
