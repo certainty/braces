@@ -1,9 +1,15 @@
-# Braces
+# Braces (the tiny scheme compiler and VM)
 
 
 
 > Brace for impact
-> 
+
+
+## State 
+This is beyond the state where it's just dabbling around. However at this point I don't have any intentions
+to turn it into something for real world usage (I'm not sure I could even if I tried). 
+It will likely remain a play ground where I just try out ideas. I'll just see where it takes me.
+
 
 ## Usage
 
@@ -12,11 +18,6 @@ Start the REPL and play around with it
 ```
 make repl 
 ```
-
-## State 
-This is beyond the toy state but the code is messy and experimental at times.
-However, the compiler and the VM is coming together and I will go on with this to see 
-how fare I can bring it. 
 
 ### Language Support 
 
@@ -33,9 +34,10 @@ how fare I can bring it.
   - [x] quoted constants
 - [x] variables
 - [x] conditionals
-- [x] lambda expression
-- [x] procedure call
-- [x] assignment
+- [x] lambda expressions
+- [x] procedure calls
+- [x] assignments
+- [x] quasi-quoted expression
 
 ### Compiler 
 - [x] sexp parser
@@ -67,6 +69,10 @@ how fare I can bring it.
 
 ### Debugger 
 - [ ] generate DWARF debug information 
+
+### GC
+Well there is none :D
+I probably should build one or maybe not.
 
 
 ### Repl
