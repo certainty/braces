@@ -62,5 +62,6 @@ directories = "3.0"
 [dev-dependencies]
 matches = "0.1"
 criterion = "0.3.4"
+cargo-criterion = "1.1.0"
 quickcheck = "1"
 quickcheck_macros = "1.0"
