@@ -1,5 +1,5 @@
 use crate::compiler::frontend::error;
-use crate::compiler::frontend::reader::sexp::Input;
+use crate::compiler::frontend::reader::datum::Input;
 use crate::compiler::source::Location;
 use nom::error::{Error, ErrorKind};
 use nom::Err;

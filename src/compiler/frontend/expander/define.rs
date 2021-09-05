@@ -1,5 +1,5 @@
 use super::{Error, Expander, Result};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::source::HasSourceLocation;
 
 impl Expander {
@@ -11,21 +11,18 @@ impl Expander {
     ) -> Result<Datum> {
         match operands {
             //(define (...) <body>)
-            [definition, exprs @ ..] if definition.s_expression().is_proper_list() => {
+            [definition, exprs @ ..] if definition.is_proper_list() => {
                 match definition.list_slice() {
                     //(define (<ID> <def-formals> <body>)
                     Some([identifier, def_formals @ ..]) => {
                         let lambda = self.build_lambda(
-                            &Datum::new(
-                                SExpression::List(def_formals.to_vec()),
-                                datum.source_location().clone(),
-                            ),
+                            &Datum::list(def_formals.to_vec(), datum.source_location().clone()),
                             exprs,
                             datum.source_location().clone(),
                         );
 
-                        Ok(Datum::new(
-                            SExpression::List(vec![operator.clone(), identifier.clone(), lambda]),
+                        Ok(Datum::list(
+                            vec![operator.clone(), identifier.clone(), lambda],
                             datum.source_location().clone(),
                         ))
                     }
@@ -38,8 +35,8 @@ impl Expander {
                 }
             }
             //(define <id> <expr>)
-            [identifier, expr] => Ok(Datum::new(
-                SExpression::List(vec![operator.clone(), identifier.clone(), expr.clone()]),
+            [identifier, expr] => Ok(Datum::list(
+                vec![operator.clone(), identifier.clone(), expr.clone()],
                 datum.source_location().clone(),
             )),
             _ => Err(Error::expansion_error(

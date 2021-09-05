@@ -2,12 +2,11 @@ use nom::error::context;
 use nom::multi::many1;
 
 use crate::compiler::frontend;
-use crate::compiler::representation::SexpAST;
+use crate::compiler::representation::DatumAST;
 use crate::compiler::source::Source;
 
 pub mod datum;
 pub mod error;
-pub mod sexp;
 
 #[derive(Clone, Debug)]
 pub struct Reader;
@@ -17,10 +16,10 @@ impl Reader {
         Self
     }
 
-    pub fn parse(&self, source: &Source) -> frontend::Result<SexpAST> {
-        let input = sexp::Input::new_extra(&source.code, source.id.clone());
-        let (_rest, datum) = context("program", many1(sexp::parse_datum))(input)?;
-        Ok(SexpAST::new(datum))
+    pub fn parse(&self, source: &Source) -> frontend::Result<DatumAST> {
+        let input = datum::Input::new_extra(&source.code, source.id.clone());
+        let (_rest, datum) = context("program", many1(datum::parse_datum))(input)?;
+        Ok(DatumAST::new(datum))
     }
 }
 
@@ -42,7 +41,7 @@ pub mod tests {
         datum.to_vec()[0].clone()
     }
 
-    // test helpers to use in the sexp parser
+    // test helpers to use in the datum parser
     pub fn assert_parse_as(inp: &str, expected: Datum) {
         let mut registry = Registry::new();
         let source = registry

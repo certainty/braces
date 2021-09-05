@@ -5,7 +5,7 @@ use super::representation::CoreAST;
 
 use super::CompilationUnit;
 use crate::compiler::source::Registry;
-use code_generator::{CodeGenerator, Target};
+use code_generator::CodeGenerator;
 
 #[derive(Debug)]
 pub struct Backend {}
@@ -21,7 +21,7 @@ impl Backend {
         ast: &CoreAST,
         registry: &Registry,
     ) -> std::result::Result<CompilationUnit, error::Error> {
-        let mut code_gen = CodeGenerator::new(Target::TopLevel, None, registry);
-        Ok(code_gen.generate(ast)?)
+        let unit = CodeGenerator::generate(registry, ast)?;
+        Ok(unit)
     }
 }

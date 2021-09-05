@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::{Expression, ParseResult};
@@ -43,14 +43,17 @@ impl CoreParser {
     }
 
     pub fn do_parse_literal(&mut self, datum: &Datum) -> ParseResult<LiteralExpression> {
-        match datum.s_expression() {
-            SExpression::Bool(_) => ParseResult::accept(LiteralExpression::from(datum)),
-            SExpression::Char(_) => ParseResult::accept(LiteralExpression::from(datum)),
-            SExpression::String(_) => ParseResult::accept(LiteralExpression::from(datum)),
-            SExpression::Number(_) => ParseResult::accept(LiteralExpression::from(datum)),
-            SExpression::Vector(_) => ParseResult::accept(LiteralExpression::from(datum)),
-            SExpression::ByteVector(_) => ParseResult::accept(LiteralExpression::from(datum)),
-            _ => ParseResult::ignore("Expected literal expression", datum.source_location()),
+        match datum {
+            Datum::Bool(_, _) => ParseResult::accept(LiteralExpression::from(datum)),
+            Datum::Char(_, _) => ParseResult::accept(LiteralExpression::from(datum)),
+            Datum::String(_, _) => ParseResult::accept(LiteralExpression::from(datum)),
+            Datum::Number(_, _) => ParseResult::accept(LiteralExpression::from(datum)),
+            Datum::Vector(_, _) => ParseResult::accept(LiteralExpression::from(datum)),
+            Datum::ByteVector(_, _) => ParseResult::accept(LiteralExpression::from(datum)),
+            _ => ParseResult::ignore(
+                "Expected literal expression",
+                datum.source_location().clone(),
+            ),
         }
     }
 }

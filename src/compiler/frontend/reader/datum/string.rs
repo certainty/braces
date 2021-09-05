@@ -11,8 +11,8 @@ use super::{
     whitespace::{consume_line_ending, parse_intra_line_ws},
 };
 
-use super::{map_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use super::{with_location, Input, ParseResult};
+use crate::compiler::frontend::reader::datum::Datum;
 
 //////////////////////////////
 // String parser
@@ -41,7 +41,7 @@ pub fn parse(input: Input) -> ParseResult<Datum> {
 
     let string_literal = delimited(char('"'), string_elements, char('"'));
 
-    map_datum(string_literal, SExpression::String)(input)
+    with_location(string_literal, Datum::string)(input)
 }
 
 fn parse_string_element(input: Input) -> ParseResult<StringElement> {

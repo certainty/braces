@@ -1,5 +1,5 @@
-use super::{map_datum, parse_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use super::{parse_datum, with_location, Input, ParseResult};
+use crate::compiler::frontend::reader::datum::Datum;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
@@ -14,19 +14,21 @@ use nom::sequence::pair;
 pub fn parse(input: Input) -> ParseResult<Datum> {
     let abbrev = pair(parse_abbrev_prefix, parse_datum);
 
-    map_datum(abbrev, |(abbr, datum)| SExpression::list(vec![abbr, datum]))(input)
+    with_location(abbrev, |(abbr, datum), loc| {
+        Datum::list(vec![abbr, datum], loc)
+    })(input)
 }
 
 #[inline]
 fn parse_abbrev_prefix(input: Input) -> ParseResult<Datum> {
     let abbrev = alt((
-        value(SExpression::symbol("quote"), char('\'')),
-        value(SExpression::symbol("quasi-quote"), char('`')),
-        value(SExpression::symbol("unquote-splicing"), tag(",@")),
-        value(SExpression::symbol("unquote"), char(',')),
+        value("quote", char('\'')),
+        value("quasi-quote", char('`')),
+        value("unquote-splicing", tag(",@")),
+        value("unquote", char(',')),
     ));
 
-    map_datum(abbrev, |v| v)(input)
+    with_location(abbrev, |v, loc| Datum::symbol(v, loc))(input)
 }
 
 #[cfg(test)]

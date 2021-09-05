@@ -30,6 +30,17 @@ impl IfExpression {
     }
 }
 
+impl Expression {
+    pub fn conditional<L: Into<Location>>(
+        test: Expression,
+        consequent: Expression,
+        alternate: Option<Expression>,
+        loc: L,
+    ) -> Expression {
+        Expression::If(IfExpression::new(test, consequent, alternate, loc.into()))
+    }
+}
+
 impl HasSourceLocation for IfExpression {
     fn source_location(&self) -> &Location {
         &self.location
@@ -107,21 +118,19 @@ impl CoreParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
-
     use super::*;
+    use crate::compiler::frontend::parser::tests::*;
 
     #[test]
     fn one_armed_if() {
         assert_parse_as(
             "(if #t #f)",
-            Expression::If(IfExpression::new(
-                Expression::literal(make_datum(SExpression::Bool(true), 4, 6)),
-                Expression::literal(make_datum(SExpression::Bool(false), 7, 9)),
+            Expression::conditional(
+                Expression::literal(Datum::boolean(true, 4..6)),
+                Expression::literal(Datum::boolean(false, 7..9)),
                 None,
-                location(0..10),
-            )),
+                0..10,
+            ),
         )
     }
 
@@ -129,16 +138,12 @@ mod tests {
     fn two_armed_if() {
         assert_parse_as(
             "(if #t #f #\\a)",
-            Expression::If(IfExpression::new(
-                Expression::literal(make_datum(SExpression::Bool(true), 4, 6)),
-                Expression::literal(make_datum(SExpression::Bool(false), 7, 9)),
-                Some(Expression::literal(make_datum(
-                    SExpression::Char('a'),
-                    10,
-                    13,
-                ))),
-                location(0..14),
-            )),
+            Expression::conditional(
+                Expression::literal(Datum::boolean(true, 4..6)),
+                Expression::literal(Datum::boolean(false, 7..9)),
+                Some(Expression::literal(Datum::character('a', 10..13))),
+                0..14,
+            ),
         )
     }
 }

@@ -3,8 +3,8 @@ use nom::multi::{many0, many1};
 use nom::sequence::{delimited, tuple};
 
 use super::whitespace::parse_inter_token_space;
-use super::{map_datum, parse_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use super::{parse_datum, with_location, Input, ParseResult};
+use crate::compiler::frontend::reader::datum::Datum;
 
 /// Parse proper list
 /// Ref: r7rs 7.1.2
@@ -13,7 +13,7 @@ use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
 /// ```
 
 #[inline]
-pub fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse_proper_list(input: Input) -> ParseResult<Datum> {
     let list_elements = delimited(
         parse_inter_token_space,
         parse_datum,
@@ -21,7 +21,7 @@ pub fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     );
     let list = delimited(char('('), many0(list_elements), char(')'));
 
-    map_datum(list, SExpression::list)(input)
+    with_location(list, Datum::list)(input)
 }
 
 /// Parse improper list
@@ -32,7 +32,7 @@ pub fn parse_proper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
 /// ```
 
 #[inline]
-pub fn parse_improper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse_improper_list(input: Input) -> ParseResult<Datum> {
     let improper_head = many1(delimited(
         parse_inter_token_space,
         parse_datum,
@@ -47,8 +47,8 @@ pub fn parse_improper_list<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     let improper_elements = tuple((improper_head, char('.'), improper_tail));
     let improper_list = delimited(char('('), improper_elements, char(')'));
 
-    map_datum(improper_list, |(improper_head, _, improper_tail)| {
-        SExpression::improper_list(improper_head, improper_tail)
+    with_location(improper_list, |(head, _, tail), loc| {
+        Datum::improper_list(head, tail, loc)
     })(input)
 }
 

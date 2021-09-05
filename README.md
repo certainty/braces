@@ -40,11 +40,11 @@ make repl
 - [x] quasi-quoted expression
 
 ### Compiler 
-- [x] sexp parser
+- [x] datum (s-expression) parser
 - [x] expression parser 
 - [x] basic code generator 
-- [ ] collect all errors in sexp parser 
-- [ ] collect all errors in expr parser 
+- [ ] collect all errors in reader  
+- [ ] collect all errors in parser 
 - [ ] bytecode serialization
 - [ ] libraries  
 - [ ] optimization pass 
@@ -57,7 +57,7 @@ make repl
 
 #### Errors
 - [ ] fix backtraces 
-- [ ] improve error reporting for sexp parser
+- [ ] improve error reporting for reader
 - [ ] improve error reporting for expressions
 
 ### VM

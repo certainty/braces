@@ -44,5 +44,6 @@ impl<S: Into<Span>> From<S> for Location {
 ///
 ///  Examples of this are `Datum` and various `Expression`s.
 pub trait HasSourceLocation {
+    /// return `Location` information for this value
     fn source_location(&self) -> &Location;
 }

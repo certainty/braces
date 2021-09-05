@@ -6,8 +6,8 @@ use nom::combinator::{map_opt, map_res, value};
 use nom::error::context;
 use nom::sequence::{delimited, preceded};
 
-use super::{map_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use super::{with_location, Input, ParseResult};
+use crate::compiler::frontend::reader::datum::Datum;
 
 /// Character parser
 pub fn parse(input: Input) -> ParseResult<Datum> {
@@ -16,7 +16,7 @@ pub fn parse(input: Input) -> ParseResult<Datum> {
         alt((parse_hex_char_literal, parse_named_char_literal, anychar)),
     );
 
-    map_datum(char_literal, SExpression::from)(input)
+    with_location(char_literal, Datum::character)(input)
 }
 
 #[inline]

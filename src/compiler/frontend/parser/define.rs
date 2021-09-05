@@ -28,8 +28,8 @@ impl HasSourceLocation for DefinitionExpression {
 }
 
 impl Expression {
-    pub fn define(id: Identifier, expr: Expression, loc: Location) -> Expression {
-        Expression::Define(DefinitionExpression::new(id, expr, loc))
+    pub fn define<L: Into<Location>>(id: Identifier, expr: Expression, loc: L) -> Expression {
+        Expression::Define(DefinitionExpression::new(id, expr, loc.into()))
     }
 }
 
@@ -89,10 +89,8 @@ impl CoreParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
-
     use super::*;
+    use crate::compiler::frontend::parser::tests::*;
 
     #[test]
     fn test_parse_define() {
@@ -100,8 +98,8 @@ mod tests {
             "(define x #t)",
             Expression::define(
                 Identifier::synthetic("x"),
-                Expression::literal(make_datum(SExpression::Bool(true), 10, 12)),
-                location(0..13),
+                Expression::literal(Datum::boolean(true, 10..12)),
+                0..13,
             ),
         )
     }

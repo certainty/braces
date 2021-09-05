@@ -7,7 +7,7 @@ use super::syntax::environment::{Denotation, Special, SyntaxEnvironment};
 use super::Result;
 use crate::compiler::core_compiler::CoreCompiler;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
@@ -87,7 +87,7 @@ impl Expander {
         let mut new_ls = vec![self.expand(operator)?];
         new_ls.extend(self.expand_all(operands)?);
 
-        Ok(Datum::new(SExpression::list(new_ls.into_iter()), loc))
+        Ok(Datum::list(new_ls.into_iter(), loc))
     }
 
     fn expand_macro(
@@ -114,33 +114,27 @@ impl Expander {
 
     fn quote_datum(&mut self, datum: Datum) -> Datum {
         let loc = datum.source_location().clone();
-        Datum::new(
-            SExpression::List(vec![
-                Datum::new(
-                    SExpression::Symbol(Symbol::unforgeable("quote")),
-                    loc.clone(),
-                ),
+        Datum::list(
+            vec![
+                Datum::Symbol(Symbol::unforgeable("quote"), loc.clone()),
                 datum,
-            ]),
-            loc,
+            ],
+            loc.clone(),
         )
     }
 
     fn build_lambda(&self, def_formals: &Datum, body: &[Datum], loc: Location) -> Datum {
         let mut lambda = vec![
-            Datum::new(
-                SExpression::Symbol(Symbol::unforgeable("lambda")),
-                loc.clone(),
-            ),
+            Datum::Symbol(Symbol::unforgeable("lambda"), loc.clone()),
             def_formals.clone(),
         ];
 
         lambda.extend_from_slice(body);
-        Datum::new(SExpression::List(lambda), loc.clone())
+        Datum::list(lambda, loc.clone())
     }
 
     pub fn denotation_of(&mut self, datum: &Datum) -> Result<Denotation> {
-        if let SExpression::Symbol(sym) = datum.s_expression() {
+        if let Datum::Symbol(sym, _) = datum {
             Ok(self.expansion_env.get(&sym.clone().into()))
         } else {
             Err(Error::bug("unexpected symbol to determine denotation"))
@@ -150,7 +144,6 @@ impl Expander {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::compiler::frontend::reader::sexp::SExpression;
     use crate::compiler::frontend::reader::tests::*;
     use std::fmt::Debug;
 
@@ -172,11 +165,11 @@ pub mod tests {
 
     pub fn assert_expands_equal(lhs: &str, rhs: &str, pedantic: bool) -> Result<()> {
         let mut exp = Expander::new();
-        let actual_sexp = parse_datum(lhs);
-        let expected_sexp = parse_datum(rhs);
-        let expanded = exp.expand(&actual_sexp)?;
+        let actual_datum = parse_datum(lhs);
+        let expected_datum = parse_datum(rhs);
+        let expanded = exp.expand(&actual_datum)?;
 
-        assert_struct_eq(&expanded, &expected_sexp, pedantic);
+        assert_struct_eq(&expanded, &expected_datum, pedantic);
         Ok(())
     }
 
@@ -186,32 +179,55 @@ pub mod tests {
     }
 
     pub fn assert_struct_eq(lhs: &Datum, rhs: &Datum, pedantic: bool) {
-        match (lhs.s_expression(), rhs.s_expression()) {
-            (SExpression::List(inner_lhs), SExpression::List(inner_rhs)) => {
+        if pedantic {
+            assert_eq!(
+                lhs.source_location(),
+                rhs.source_location(),
+                "locations differ"
+            );
+        }
+
+        match (lhs, rhs) {
+            (Datum::List(inner_lhs, _), Datum::List(inner_rhs, _)) => {
                 assert_vec_eq(&inner_lhs, &inner_rhs, |l, r| {
                     assert_struct_eq(l, r, pedantic)
                 })
             }
             (
-                SExpression::ImproperList(head_lhs, tail_lhs),
-                SExpression::ImproperList(head_rhs, tail_rhs),
+                Datum::ImproperList(head_lhs, tail_lhs, _),
+                Datum::ImproperList(head_rhs, tail_rhs, _),
             ) => {
                 assert_vec_eq(&head_lhs, &head_rhs, |l, r| {
                     assert_struct_eq(l, r, pedantic)
                 });
                 assert_struct_eq(&tail_lhs, &tail_rhs, pedantic);
             }
-            (SExpression::Vector(inner_lhs), SExpression::Vector(inner_rhs)) => {
+            (Datum::Vector(inner_lhs, _), Datum::Vector(inner_rhs, _)) => {
                 assert_vec_eq(&inner_lhs, &inner_rhs, |l, r| {
                     assert_struct_eq(l, r, pedantic)
                 })
             }
-            (SExpression::Symbol(inner_lhs), SExpression::Symbol(inner_rhs)) if !pedantic => {
+            (Datum::Symbol(inner_lhs, _), Datum::Symbol(inner_rhs, _)) if !pedantic => {
                 assert_eq!(inner_lhs.as_str(), inner_rhs.as_str())
             }
-            (sexp_lhs, sexp_rhs) => {
-                assert_eq!(sexp_lhs, sexp_rhs)
+            (datum_lhs, datum_rhs) if !pedantic => {
+                assert_eq_ignore_location(datum_lhs, datum_rhs);
             }
+            (datum_lhs, datum_rhs) => {
+                assert_eq!(datum_lhs, datum_rhs)
+            }
+        }
+    }
+
+    fn assert_eq_ignore_location(lhs: &Datum, rhs: &Datum) {
+        match (lhs, rhs) {
+            (Datum::Bool(l, _), Datum::Bool(r, _)) => assert_eq!(l, r),
+            (Datum::Symbol(l, _), Datum::Symbol(r, _)) => assert_eq!(l, r),
+            (Datum::String(l, _), Datum::String(r, _)) => assert_eq!(l, r),
+            (Datum::Char(l, _), Datum::Char(r, _)) => assert_eq!(l, r),
+            (Datum::Number(l, _), Datum::Number(r, _)) => assert_eq!(l, r),
+            (Datum::ByteVector(l, _), Datum::ByteVector(r, _)) => assert_eq!(l, r),
+            (l, r) => assert_struct_eq(l, r, false),
         }
     }
 

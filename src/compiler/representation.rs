@@ -24,24 +24,24 @@ impl CoreAST {
     }
 }
 
-/// The `SexpAST` is parsed s-expressions, that are produced by the `reader`.
+/// The `DatumAST` is parsed s-expressions, that are produced by the `reader`.
 #[derive(Clone, Debug)]
-pub struct SexpAST {
-    sexps: Vec<Datum>,
+pub struct DatumAST {
+    data: Vec<Datum>,
 }
 
-impl SexpAST {
-    pub fn new(sexps: Vec<Datum>) -> Self {
-        Self { sexps }
+impl DatumAST {
+    pub fn new(data: Vec<Datum>) -> Self {
+        Self { data }
     }
 
     pub fn to_vec(&self) -> &Vec<Datum> {
-        &self.sexps
+        &self.data
     }
 
     /// Get only the very first datum of this ast.
     pub fn first(&self) -> &Datum {
-        debug_assert!(!self.sexps.is_empty());
-        &self.sexps[0]
+        debug_assert!(!self.data.is_empty());
+        &self.data[0]
     }
 }

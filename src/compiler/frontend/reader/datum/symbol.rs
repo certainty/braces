@@ -7,10 +7,10 @@ use nom::sequence::{delimited, pair, tuple};
 
 use super::{
     character::{parse_inline_hex_escape, parse_mnemonic_escape},
-    map_datum, Input, ParseResult,
+    with_location, Input, ParseResult,
 };
 
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 
 //////////////////////////////////////////
 // Identifier / Symbol
@@ -29,7 +29,7 @@ pub fn parse(input: Input) -> ParseResult<Datum> {
         parse_peculiar_identifier,
     ));
 
-    map_datum(symbol_literal, SExpression::symbol)(input)
+    with_location(symbol_literal, Datum::symbol)(input)
 }
 
 #[inline]

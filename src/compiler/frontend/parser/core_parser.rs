@@ -1,12 +1,12 @@
 use crate::compiler::frontend;
 use crate::compiler::frontend::error::{Detail, Error};
 use crate::compiler::frontend::parser::Expression;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::environment::{Denotation, Special};
 use crate::compiler::source::HasSourceLocation;
 
-/// The `CoreParser` parses a fully expanded `SexpAST` into a `CoreAST`.
+/// The `CoreParser` parses a fully expanded `DatumAST` into a `CoreAST`.
 /// It is used by the `Parser`, which interleaves the expansion and parsing phases.
 #[derive(Debug)]
 #[repr(transparent)]
@@ -42,8 +42,8 @@ impl CoreParser {
     pub fn parse(&mut self, datum: &Datum) -> frontend::Result<Expression> {
         log::trace!("parsing to core: {}", datum.to_string());
 
-        match datum.s_expression() {
-            SExpression::List(ls) => match &ls[..] {
+        match datum {
+            Datum::List(ls, _loc) => match &ls[..] {
                 [operator, _operands @ ..] if operator.is_symbol() => {
                     let denotation = self.denotation_of(operator)?;
                     match denotation {
@@ -64,7 +64,7 @@ impl CoreParser {
                     vec![],
                 )),
             },
-            sexp if sexp.is_symbol() => self.parse_identifier(&datum).res(),
+            datum if datum.is_symbol() => self.parse_identifier(&datum).res(),
             _lit => self.parse_literal(&datum).res(),
         }
     }
@@ -91,7 +91,7 @@ impl CoreParser {
     }
 
     pub fn denotation_of(&mut self, datum: &Datum) -> frontend::Result<Denotation> {
-        if let SExpression::Symbol(sym) = datum.s_expression() {
+        if let Datum::Symbol(sym, _) = datum {
             Ok(self.environment.get(&sym.clone().into()))
         } else {
             Err(Error::bug("unexpected symbol to determine denotation"))
@@ -100,8 +100,8 @@ impl CoreParser {
 
     pub fn parse_list<'a>(&mut self, datum: &'a Datum) -> frontend::Result<&'a [Datum]> {
         log::trace!("trying to parse list: {:?}", datum);
-        match datum.s_expression() {
-            SExpression::List(ls) => Ok(&ls[..]),
+        match datum {
+            Datum::List(ls, _) => Ok(&ls[..]),
             _ => Err(Error::parse_error(
                 "Expected list",
                 Detail::new("expected list", datum.source_location().clone()),

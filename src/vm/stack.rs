@@ -32,7 +32,7 @@ impl<V> Stack<V> {
         }
     }
 
-    pub fn at<'a>(&'a self, idx: usize) -> &'a V {
+    pub fn at(&self, idx: usize) -> &V {
         &self.repr[idx]
     }
 
@@ -70,7 +70,7 @@ impl<V> Stack<V> {
         self.peek(0)
     }
 
-    pub fn top_mut_ptr<'a>(&'a mut self) -> *mut V {
+    pub fn top_mut_ptr(&mut self) -> *mut V {
         unsafe {
             self.repr
                 .as_mut_ptr()
@@ -91,7 +91,7 @@ impl<V> Stack<V> {
     }
 
     // returns a vector of the stack elements in the order they appear on the stack from left to right
-    pub fn as_vec<'a>(&'a self) -> &Vec<V> {
+    pub fn as_vec(&self) -> &Vec<V> {
         &self.repr
     }
 }

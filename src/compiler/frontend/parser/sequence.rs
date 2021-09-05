@@ -30,8 +30,12 @@ impl HasSourceLocation for BeginExpression {
 }
 
 impl Expression {
-    pub fn begin(first: Expression, rest: Vec<Expression>, loc: Location) -> Expression {
-        Expression::Begin(BeginExpression::new(first, rest, loc))
+    pub fn begin<L: Into<Location>>(
+        first: Expression,
+        rest: Vec<Expression>,
+        loc: L,
+    ) -> Expression {
+        Expression::Begin(BeginExpression::new(first, rest, loc.into()))
     }
 }
 
@@ -65,19 +69,17 @@ impl CoreParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
-
     use super::*;
+    use crate::compiler::frontend::parser::tests::*;
 
     #[test]
     fn test_parse_begin() {
         assert_parse_as(
             "(begin #t)",
             Expression::begin(
-                Expression::literal(make_datum(SExpression::Bool(true), 7, 9)),
+                Expression::literal(Datum::boolean(true, 7..9)),
                 vec![],
-                location(0..10),
+                0..10,
             ),
         )
     }

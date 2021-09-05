@@ -33,8 +33,12 @@ impl HasSourceLocation for SetExpression {
 }
 
 impl Expression {
-    pub fn assign(id: identifier::Identifier, expr: Expression, loc: Location) -> Expression {
-        Expression::Assign(SetExpression::new(id, expr, loc))
+    pub fn assign<L: Into<Location>>(
+        id: identifier::Identifier,
+        expr: Expression,
+        loc: L,
+    ) -> Expression {
+        Expression::Assign(SetExpression::new(id, expr, loc.into()))
     }
 }
 
@@ -70,7 +74,6 @@ impl CoreParser {
 #[cfg(test)]
 mod tests {
     use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
 
     use super::*;
 
@@ -80,8 +83,8 @@ mod tests {
             "(set! foo #t)",
             Expression::assign(
                 identifier::Identifier::synthetic("foo"),
-                Expression::literal(make_datum(SExpression::Bool(true), 10, 12)),
-                location(0..13),
+                Expression::literal(Datum::boolean(true, 10..12)),
+                0..13,
             ),
         );
 

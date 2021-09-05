@@ -1,4 +1,4 @@
-use super::representation::{CoreAST, SexpAST};
+use super::representation::{CoreAST, DatumAST};
 use super::source::Source;
 
 pub mod error;
@@ -13,7 +13,7 @@ pub mod syntax;
 // On very basic level the flow of data through the frontend looks something like the following
 //
 //                         ┌─────────────────┐                    ┌───────────────────┐               ┌───────────────────┐
-//                         │                 │      SexpAST       │                   │     SexpAST   │                   │
+//                         │                 │      DatumAST      │                   │     DatumAST  │                   │
 //  SourceText ───────────►│      Reader     ├───────────────────►│      Expander     ├──────────────►│      Parser       ├───────────────► CoreAST
 //                         │                 │                    │                   │               │                   │
 //                         └─────────────────┘                    └───────────────────┘               └───────────────────┘
@@ -40,7 +40,7 @@ impl Frontend {
     }
 
     /// Read the source code from `source` and turn it into an AST of s-expressions
-    pub fn read<'a>(&self, source: &Source) -> Result<SexpAST> {
+    pub fn read<'a>(&self, source: &Source) -> Result<DatumAST> {
         let ast = self.reader.parse(source)?;
         Ok(ast)
     }
@@ -48,8 +48,8 @@ impl Frontend {
     /// Take a single s-expression and parse it into an AST of core scheme expressions.
     /// Note that every core scheme form is an s-expression but not every s-expression
     /// is a valid core scheme expression.
-    pub fn parse(&mut self, sexps: &SexpAST) -> Result<CoreAST> {
-        let ast = self.parser.parse(sexps)?;
+    pub fn parse(&mut self, data: &DatumAST) -> Result<CoreAST> {
+        let ast = self.parser.parse(data)?;
         Ok(ast)
     }
 }

@@ -3,7 +3,7 @@ pub use result::ParseResult;
 
 use crate::compiler::frontend;
 use crate::compiler::frontend::expander::Expander;
-use crate::compiler::representation::{CoreAST, SexpAST};
+use crate::compiler::representation::{CoreAST, DatumAST};
 use crate::compiler::source::{HasSourceLocation, Location};
 
 pub use super::Result;
@@ -22,15 +22,24 @@ pub mod quotation;
 pub mod result;
 pub mod sequence;
 
+/// The `Expression` type encodes scheme core forms.
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
+    /// A scheme identifier, which is a special symbol
     Identifier(identifier::Identifier),
+    /// Any scheme literal value
     Literal(literal::LiteralExpression),
+    /// A definition
     Define(define::DefinitionExpression),
+    /// A lambda expression
     Lambda(lambda::LambdaExpression),
+    /// A set! expression
     Assign(assignment::SetExpression),
+    /// An if expression
     If(conditional::IfExpression),
+    /// An expression for function application
     Apply(apply::ApplicationExpression),
+    /// A begin expression to sequence other expressions
     Begin(sequence::BeginExpression),
 }
 
@@ -63,7 +72,22 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self, ast: &SexpAST) -> Result<CoreAST> {
+    /// Expand and parse `ast` into the `CoreAST` representation.
+    /// This process interleaves macro expansion and parsing of forms.
+    ///
+    /// ### Example
+    /// ```
+    /// use braces::compiler::frontend::parser::Parser;
+    /// use braces::compiler::representation::DatumAST;
+    /// use braces::compiler::frontend::reader::datum::Datum;
+    ///
+    /// // just a very simple s-expression which will be parsed to a literal
+    /// let data = DatumAST::new(vec![Datum::boolean(true, 0..2)]);
+    /// let mut parser = Parser::new();
+    ///
+    /// parser.parse(&data).unwrap();
+    /// ```
+    pub fn parse(&mut self, ast: &DatumAST) -> Result<CoreAST> {
         let expressions: Result<Vec<Expression>> =
             ast.to_vec().iter().map(|d| self.do_parse(d)).collect();
 
@@ -80,13 +104,9 @@ impl Parser {
 
 #[cfg(test)]
 pub mod tests {
-    use std::ops::Range;
-
-    use crate::compiler::frontend::reader::Reader;
-    use crate::compiler::source::{BufferSource, Registry, SourceId};
-
     use super::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
+    use crate::compiler::frontend::reader::Reader;
+    use crate::compiler::source::{BufferSource, Registry};
 
     pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut registry = Registry::new();
@@ -94,9 +114,9 @@ pub mod tests {
             .add(&mut BufferSource::new(inp, "datum-parser-test"))
             .unwrap();
         let reader = Reader::new();
-        let sexp_ast = reader.parse(&source).unwrap();
+        let datum_ast = reader.parse(&source).unwrap();
         let mut parser = Parser::new();
-        let core_ast = parser.parse(&sexp_ast).unwrap();
+        let core_ast = parser.parse(&datum_ast).unwrap();
 
         assert_eq!(core_ast.expressions[0], exp);
     }
@@ -107,21 +127,13 @@ pub mod tests {
             .add(&mut BufferSource::new(inp, "datum-parser-test"))
             .unwrap();
         let reader = Reader::new();
-        let sexp_ast = reader.parse(&source).unwrap();
+        let datum_ast = reader.parse(&source).unwrap();
         let mut parser = Parser::new();
-        let parse_result = parser.parse(&sexp_ast);
+        let parse_result = parser.parse(&datum_ast);
 
         assert!(
             parse_result.is_err(),
             "expected parser error but got something different"
         )
-    }
-
-    pub fn location(span: Range<usize>) -> Location {
-        Location::new(SourceId::from(0), span)
-    }
-
-    pub fn make_datum(sexp: SExpression, line: usize, col: usize) -> Datum {
-        Datum::new(sexp, location(line..col))
     }
 }
