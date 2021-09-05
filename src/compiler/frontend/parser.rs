@@ -75,13 +75,15 @@ impl Parser {
     /// Expand and parse `ast` into the `CoreAST` representation.
     /// This process interleaves macro expansion and parsing of forms.
     ///
+    /// ### Example
     /// ```
     /// use braces::compiler::frontend::parser::Parser;
     /// use braces::compiler::representation::SexpAST;
     /// use braces::compiler::frontend::reader::datum::Datum;
-    /// let mut parser = Parser::new();
+    ///
     /// // just a very simple s-expression which will be parsed to a literal
     /// let sexps = SexpAST::new(vec![Datum::boolean(true, 0..2)]);
+    /// let mut parser = Parser::new();
     ///
     /// parser.parse(&sexps).unwrap();
     /// ```
