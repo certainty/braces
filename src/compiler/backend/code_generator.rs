@@ -22,7 +22,7 @@ use crate::compiler::frontend::parser::{
     sequence::BeginExpression,
     Expression,
 };
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::representation::CoreAST;
 use crate::compiler::source::{HasSourceLocation, Location, Registry};
 use crate::compiler::CompilationUnit;
@@ -446,19 +446,15 @@ impl<'a> CodeGenerator<'a> {
     }
 
     fn emit_lit(&mut self, datum: &Datum) -> Result<()> {
-        match datum.s_expression() {
-            SExpression::Bool(true) => {
-                self.emit_instruction(Instruction::True, &datum.source_location())?
+        match datum {
+            Datum::Bool(true, loc) => self.emit_instruction(Instruction::True, loc)?,
+            Datum::Bool(false, loc) => self.emit_instruction(Instruction::False, loc)?,
+            Datum::List(ls, loc) if ls.is_empty() => {
+                self.emit_instruction(Instruction::Nil, loc)?
             }
-            SExpression::Bool(false) => {
-                self.emit_instruction(Instruction::False, &datum.source_location())?
-            }
-            SExpression::List(ls) if ls.is_empty() => {
-                self.emit_instruction(Instruction::Nil, &datum.source_location())?
-            }
-            SExpression::String(s) => {
+            Datum::String(s, loc) => {
                 let interned = self.intern(s);
-                self.emit_constant(interned, &datum.source_location())?;
+                self.emit_constant(interned, loc)?;
             }
             _ => {
                 let value = self.values.from_datum(datum);

@@ -1,5 +1,5 @@
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location, SourceId};
 
@@ -19,10 +19,10 @@ impl PartialEq for Identifier {
 }
 
 impl Identifier {
-    pub fn new<T: Into<Symbol>>(s: T, location: Location) -> Self {
+    pub fn new<T: Into<Symbol>, L: Into<Location>>(s: T, location: L) -> Self {
         Self {
             name: s.into(),
-            location,
+            location: location.into(),
         }
     }
 
@@ -55,8 +55,8 @@ impl HasSourceLocation for Identifier {
 }
 
 impl Expression {
-    pub fn identifier(str: String, loc: Location) -> Expression {
-        Expression::Identifier(Identifier::new(str, loc))
+    pub fn identifier<L: Into<Location>>(str: String, loc: L) -> Expression {
+        Expression::Identifier(Identifier::new(str, loc.into()))
     }
 }
 
@@ -66,11 +66,9 @@ impl CoreParser {
     }
 
     pub fn do_parse_identifier(&mut self, datum: &Datum) -> ParseResult<Identifier> {
-        match datum.s_expression() {
-            SExpression::Symbol(s) => {
-                ParseResult::accept(Identifier::new(s.clone(), datum.source_location().clone()))
-            }
-            _ => ParseResult::ignore("Expected identifier", datum.source_location()),
+        match datum {
+            Datum::Symbol(s, loc) => ParseResult::accept(Identifier::new(s.clone(), loc.clone())),
+            _ => ParseResult::ignore("Expected identifier", datum.source_location().clone()),
         }
     }
 }
@@ -83,17 +81,14 @@ mod tests {
 
     #[test]
     fn test_identifier_equals() {
-        let x = Identifier::new(String::from("foo"), location(0..1));
-        let y = Identifier::new(String::from("foo"), location(10..1));
+        let x = Identifier::new(String::from("foo"), 0..1);
+        let y = Identifier::new(String::from("foo"), 10..1);
 
         assert_eq!(x, y)
     }
 
     #[test]
     fn test_parse_identifier() {
-        assert_parse_as(
-            "foo",
-            Expression::identifier("foo".to_string(), location(0..0)),
-        )
+        assert_parse_as("foo", Expression::identifier("foo".to_string(), 0..0))
     }
 }

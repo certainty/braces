@@ -2,8 +2,8 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::value;
 
-use super::{parser::map_datum, parser::Input, parser::ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use super::{parser::with_location, parser::Input, parser::ParseResult};
+use crate::compiler::frontend::reader::datum::Datum;
 
 /// Boolean parser
 ///
@@ -20,7 +20,7 @@ pub fn parse(input: Input) -> ParseResult<Datum> {
         value(false, tag("#f")),
     ));
 
-    map_datum(bool_literal, SExpression::from)(input)
+    with_location(bool_literal, Datum::boolean)(input)
 }
 
 #[cfg(test)]

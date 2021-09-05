@@ -1,7 +1,7 @@
 use super::number;
 use super::whitespace::parse_inter_token_space;
-use super::{map_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use super::{with_location, Input, ParseResult};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::vm::value::number::{Number, SchemeNumber};
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
@@ -21,15 +21,15 @@ pub fn parse(input: Input) -> ParseResult<Datum> {
     let byte = delimited(parse_inter_token_space, parse_byte, parse_inter_token_space);
     let vector = delimited(tag("#u8("), many0(byte), char(')'));
 
-    map_datum(vector, SExpression::byte_vector)(input)
+    with_location(vector, Datum::byte_vector)(input)
 }
 
 fn parse_byte(input: Input) -> ParseResult<u8> {
     let (s, num) = number::parse(input)?;
 
-    match num.s_expression() {
-        SExpression::Number(n)
-            if n.is_exact() && n >= &Number::fixnum(0) && n <= &Number::fixnum(255) =>
+    match num {
+        Datum::Number(n, _)
+            if n.is_exact() && n >= Number::fixnum(0) && n <= Number::fixnum(255) =>
         {
             ParseResult::Ok((s, n.to_u8().unwrap()))
         }

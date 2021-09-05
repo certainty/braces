@@ -1,6 +1,6 @@
 use crate::compiler::frontend::error::Detail;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::frontend::error::Error;
@@ -37,8 +37,12 @@ impl HasSourceLocation for ApplicationExpression {
 }
 
 impl Expression {
-    pub fn apply(operator: Expression, operands: Vec<Expression>, loc: Location) -> Expression {
-        Expression::Apply(ApplicationExpression::new(operator, operands, loc))
+    pub fn apply<L: Into<Location>>(
+        operator: Expression,
+        operands: Vec<Expression>,
+        loc: L,
+    ) -> Expression {
+        Expression::Apply(ApplicationExpression::new(operator, operands, loc.into()))
     }
 }
 
@@ -48,8 +52,8 @@ impl CoreParser {
     }
 
     pub fn do_parse_apply(&mut self, datum: &Datum) -> Result<ApplicationExpression> {
-        match datum.s_expression() {
-            SExpression::List(ls) => {
+        match datum {
+            Datum::List(ls, loc) => {
                 if let [operator, operands @ ..] = &ls[..] {
                     let operator_expr = self.parse(&operator)?;
                     let operands_expr: Result<Vec<Expression>> =
@@ -58,12 +62,12 @@ impl CoreParser {
                     Ok(ApplicationExpression::new(
                         operator_expr,
                         operands_expr?,
-                        datum.source_location().clone(),
+                        loc.clone(),
                     ))
                 } else {
                     Err(Error::parse_error(
                         "expected (<operator> <operand>*)",
-                        Detail::new("", datum.source_location().clone()),
+                        Detail::new("", loc.clone()),
                         vec![],
                     ))
                 }
@@ -80,23 +84,17 @@ impl CoreParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::frontend::parser::tests::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
-
     use super::*;
+    use crate::compiler::frontend::parser::tests::*;
 
     #[test]
     pub fn test_apply() {
         assert_parse_as(
             "(foo #t)",
             Expression::apply(
-                Expression::identifier("foo".to_string(), location(1..4)),
-                vec![Expression::literal(make_datum(
-                    SExpression::Bool(true),
-                    5,
-                    7,
-                ))],
-                location(0..8),
+                Expression::identifier("foo".to_string(), 1..4),
+                vec![Expression::literal(Datum::boolean(true, 5..7))],
+                0..8,
             ),
         )
     }

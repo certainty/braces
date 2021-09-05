@@ -12,7 +12,7 @@ pub mod symbol;
 pub mod vector;
 
 use self::{string::InternedString, symbol::Symbol};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::utils::string_table::StringTable;
 use crate::vm::value::number::real::RealNumber;
 use std::cell::Ref;
@@ -252,26 +252,26 @@ impl Factory {
     }
 
     pub fn from_datum(&mut self, d: &Datum) -> Value {
-        match d.s_expression() {
-            SExpression::Bool(true) => self.bool_true().clone(),
-            SExpression::Bool(false) => self.bool_false().clone(),
-            SExpression::Symbol(s) => self.symbol(s),
-            SExpression::String(s) => self.string(s),
-            SExpression::List(ls) => {
+        match d {
+            Datum::Bool(true, _) => self.bool_true().clone(),
+            Datum::Bool(false, _) => self.bool_false().clone(),
+            Datum::Symbol(s, _) => self.symbol(s),
+            Datum::String(s, _) => self.string(s),
+            Datum::List(ls, _) => {
                 let elements = ls.iter().map(|e| self.from_datum(e)).collect();
                 self.proper_list(elements)
             }
-            SExpression::ImproperList(head, tail) => {
+            Datum::ImproperList(head, tail, _) => {
                 let head_values = head.iter().map(|e| self.from_datum(e)).collect::<Vec<_>>();
                 Value::ImproperList(
                     list::List::from(head_values),
                     Box::new(self.from_datum(tail)),
                 )
             }
-            SExpression::Char(c) => self.character(*c),
-            SExpression::Number(num) => Value::Number(num.clone()),
-            SExpression::Vector(v) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
-            SExpression::ByteVector(v) => Value::ByteVector(v.clone()),
+            Datum::Char(c, _) => self.character(*c),
+            Datum::Number(num, _) => Value::Number(num.clone()),
+            Datum::Vector(v, _) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
+            Datum::ByteVector(v, _) => Value::ByteVector(v.clone()),
         }
     }
 

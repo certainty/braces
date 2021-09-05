@@ -5,8 +5,8 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
 
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
-use crate::compiler::source::SourceId;
+use crate::compiler::frontend::reader::datum::Datum;
+use crate::compiler::source::{Location, SourceId};
 
 use super::{
     abbreviation, boolean, byte_vector, character, list, number, string, symbol, vector, whitespace,
@@ -51,23 +51,22 @@ fn parse_compound_datum(input: Input) -> ParseResult<Datum> {
 }
 
 // Helper to create datum from a parser
-pub fn map_datum<'a, O1, F, G>(
-    mut first: F,
-    mut second: G,
+pub fn with_location<'a, O1, F, G>(
+    mut parser: F,
+    mut datum_builder: G,
 ) -> impl FnMut(Input<'a>) -> ParseResult<'a, Datum>
 where
     F: FnMut(Input<'a>) -> ParseResult<'a, O1>,
-    G: FnMut(O1) -> SExpression,
+    G: FnMut(O1, Location) -> Datum,
 {
     move |input: Input<'a>| {
         let (s, p) = position(input)?;
-        let (s2, v) = first(s)?;
+        let (s2, v) = parser(s)?;
         let (s3, p2) = position(s2)?;
-        let value = second(v);
         let loc = input
             .extra
             .location(p.location_offset()..p2.location_offset());
-        let datum = Datum::new(value, loc);
+        let datum = datum_builder(v, loc);
         Ok((s3, datum))
     }
 }

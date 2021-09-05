@@ -20,7 +20,7 @@ pub struct Writer {
 impl Writer {
     pub fn new() -> Self {
         let special_initial: HashSet<char> =
-            String::from(reader::sexp::symbol::SYMBOL_SPECIAL_INITIAL)
+            String::from(reader::datum::symbol::SYMBOL_SPECIAL_INITIAL)
                 .chars()
                 .collect();
         Writer {

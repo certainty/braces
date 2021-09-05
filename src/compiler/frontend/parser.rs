@@ -104,13 +104,9 @@ impl Parser {
 
 #[cfg(test)]
 pub mod tests {
-    use std::ops::Range;
-
-    use crate::compiler::frontend::reader::Reader;
-    use crate::compiler::source::{BufferSource, Registry, SourceId};
-
     use super::*;
-    use crate::compiler::frontend::reader::sexp::SExpression;
+    use crate::compiler::frontend::reader::Reader;
+    use crate::compiler::source::{BufferSource, Registry};
 
     pub fn assert_parse_as(inp: &str, exp: Expression) {
         let mut registry = Registry::new();
@@ -139,13 +135,5 @@ pub mod tests {
             parse_result.is_err(),
             "expected parser error but got something different"
         )
-    }
-
-    pub fn location(span: Range<usize>) -> Location {
-        Location::new(SourceId::from(0), span)
-    }
-
-    pub fn make_datum(sexp: SExpression, line: usize, col: usize) -> Datum {
-        Datum::new(sexp, location(line..col))
     }
 }

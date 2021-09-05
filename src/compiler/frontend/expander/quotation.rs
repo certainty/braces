@@ -1,5 +1,5 @@
 use super::{Error, Expander, Result};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax::environment::{Denotation, Special};
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
@@ -23,22 +23,18 @@ impl Expander {
             ));
         }
 
-        let quasi_quoted_sexp = operands[0].clone();
-        match quasi_quoted_sexp.s_expression() {
+        let quasi_quoted_datum = operands[0].clone();
+        match &quasi_quoted_datum {
             // (quasi-quote (..))
-            SExpression::List(elements) => {
-                self.expand_quasi_quoted_list(elements, datum.source_location().clone())
-            }
+            Datum::List(elements, loc) => self.expand_quasi_quoted_list(elements, loc.clone()),
             // (quasi-quote (_ . _))
-            SExpression::ImproperList(head, tail) => {
-                self.expand_quasi_quoted_improper_list(head, tail, datum.source_location().clone())
+            Datum::ImproperList(head, tail, loc) => {
+                self.expand_quasi_quoted_improper_list(head, tail, loc.clone())
             }
             // (quasi-quote #(..))
-            SExpression::Vector(elements) => {
-                self.expand_quasi_quoted_vector(elements, datum.source_location().clone())
-            }
+            Datum::Vector(elements, loc) => self.expand_quasi_quoted_vector(elements, loc.clone()),
             // (quasi-quote datum)
-            _ => Ok(self.quote_datum(quasi_quoted_sexp)),
+            _ => Ok(self.quote_datum(quasi_quoted_datum)),
         }
     }
 

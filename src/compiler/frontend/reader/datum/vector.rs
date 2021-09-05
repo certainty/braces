@@ -1,6 +1,6 @@
 use super::whitespace::parse_inter_token_space;
-use super::{map_datum, parse_datum, Input, ParseResult};
-use crate::compiler::frontend::reader::{datum::Datum, sexp::SExpression};
+use super::{parse_datum, with_location, Input, ParseResult};
+use crate::compiler::frontend::reader::datum::Datum;
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
 use nom::multi::many0;
@@ -13,7 +13,7 @@ use nom::sequence::delimited;
 /// ```
 
 #[inline]
-pub fn parse_vector<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
+pub fn parse_vector(input: Input) -> ParseResult<Datum> {
     let list_elements = delimited(
         parse_inter_token_space,
         parse_datum,
@@ -21,7 +21,7 @@ pub fn parse_vector<'a>(input: Input<'a>) -> ParseResult<'a, Datum> {
     );
     let vector = delimited(tag("#("), many0(list_elements), char(')'));
 
-    map_datum(vector, SExpression::vector)(input)
+    with_location(vector, Datum::vector)(input)
 }
 
 #[cfg(test)]

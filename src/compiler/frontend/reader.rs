@@ -7,7 +7,6 @@ use crate::compiler::source::Source;
 
 pub mod datum;
 pub mod error;
-pub mod sexp;
 
 #[derive(Clone, Debug)]
 pub struct Reader;
@@ -18,8 +17,8 @@ impl Reader {
     }
 
     pub fn parse(&self, source: &Source) -> frontend::Result<SexpAST> {
-        let input = sexp::Input::new_extra(&source.code, source.id.clone());
-        let (_rest, datum) = context("program", many1(sexp::parse_datum))(input)?;
+        let input = datum::Input::new_extra(&source.code, source.id.clone());
+        let (_rest, datum) = context("program", many1(datum::parse_datum))(input)?;
         Ok(SexpAST::new(datum))
     }
 }

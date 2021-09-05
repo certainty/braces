@@ -1,65 +1,76 @@
-use crate::compiler::frontend::reader::sexp::SExpression;
+pub mod abbreviation;
+pub mod boolean;
+pub mod byte_vector;
+pub mod character;
+pub mod list;
+pub mod number;
+pub mod parser;
+pub mod string;
+pub mod symbol;
+pub mod vector;
+pub mod whitespace;
+
+use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::value::number::Number;
 use crate::vm::value::Value;
 use std::fmt::Formatter;
 
-/// `Datum` is what the reader creates from the textual input.
+pub use parser::*;
+
+/// `Datum` is what the reader creates from the textual input which are s-expressions
 ///
-/// It's essentially an s-expression (`Sexp`) with a location,
-/// which is tracked through the whole compilation pipeline.
+/// **Important**:
+/// Values of this type are not used as runtime representations of values in the VM.
+/// They're optimised to be ergonomic for the different phases of the compiler.
 #[derive(Debug, PartialEq, Clone)]
-pub struct Datum {
-    location: Location,
-    s_expression: SExpression,
+pub enum Datum {
+    Bool(bool, Location),
+    Symbol(Symbol, Location),
+    String(String, Location),
+    Char(char, Location),
+    Number(Number, Location),
+    List(Vec<Datum>, Location),
+    ImproperList(Vec<Datum>, Box<Datum>, Location),
+    Vector(Vec<Datum>, Location),
+    ByteVector(Vec<u8>, Location),
 }
 
 impl Datum {
-    pub fn new(s_expression: SExpression, location: Location) -> Self {
-        Self {
-            s_expression,
-            location,
-        }
-    }
-
-    pub fn s_expression(&self) -> &SExpression {
-        &self.s_expression
-    }
-
     /// Create a symbol from a token in code
     ///
     /// This is the method that is most likely used by the reader itself.
     /// The `crate::compiler::frontend::expander::Expander` might inject symbols
     /// which are then tracked via `forged_symbol` rather
     pub fn symbol<S: Into<String>, L: Into<Location>>(val: S, location: L) -> Self {
-        Self::new(SExpression::symbol(val), location.into())
+        Self::Symbol(Symbol::from_code(val), location.into())
     }
     /// Create a symbol that didn't exist in the source code
     ///
     /// The `crate::compiler::frontend::expander::Expander` might inject symbols as a result
     /// of a transformation phase.
     pub fn forged_symbol<S: Into<String>, L: Into<Location>>(val: S, location: L) -> Self {
-        Self::new(SExpression::forged_symbol(val), location.into())
+        Self::Symbol(Symbol::forged(val), location.into())
     }
 
     #[inline]
     pub fn boolean<L: Into<Location>>(v: bool, location: L) -> Self {
-        Self::new(v.into(), location.into())
+        Self::Bool(v.into(), location.into())
     }
 
     #[inline]
     pub fn character<L: Into<Location>>(v: char, location: L) -> Self {
-        Self::new(v.into(), location.into())
+        Self::Char(v.into(), location.into())
     }
 
     #[inline]
     pub fn string<S: Into<String>, L: Into<Location>>(v: S, location: L) -> Self {
-        Self::new(SExpression::from(v.into()), location.into())
+        Self::String(v.into(), location.into())
     }
 
     #[inline]
     pub fn number<N: Into<Number>, L: Into<Location>>(v: N, location: L) -> Self {
-        Self::new(SExpression::from(v.into()), location.into())
+        Self::Number(v.into(), location.into())
     }
 
     #[inline]
@@ -68,7 +79,10 @@ impl Datum {
         I: IntoIterator,
         I::Item: Into<Datum>,
     {
-        Self::new(SExpression::list(elements), location.into())
+        Self::List(
+            elements.into_iter().map(Into::into).collect(),
+            location.into(),
+        )
     }
 
     pub fn improper_list<I, L: Into<Location>>(elements: I, element: Datum, location: L) -> Self
@@ -76,10 +90,8 @@ impl Datum {
         I: IntoIterator,
         I::Item: Into<Datum>,
     {
-        Self::new(
-            SExpression::improper_list(elements, element),
-            location.into(),
-        )
+        let head = elements.into_iter().map(Into::into).collect();
+        Self::ImproperList(head, Box::new(element), location.into())
     }
 
     pub fn vector<I, L: Into<Location>>(elements: I, location: L) -> Self
@@ -87,7 +99,10 @@ impl Datum {
         I: IntoIterator,
         I::Item: Into<Datum>,
     {
-        Self::new(SExpression::vector(elements), location.into())
+        Self::Vector(
+            elements.into_iter().map(Into::into).collect(),
+            location.into(),
+        )
     }
 
     pub fn byte_vector<I, L: Into<Location>>(bytes: I, location: L) -> Self
@@ -95,7 +110,7 @@ impl Datum {
         I: IntoIterator,
         I::Item: Into<u8>,
     {
-        Self::new(SExpression::byte_vector(bytes), location.into())
+        Self::ByteVector(bytes.into_iter().map(Into::into).collect(), location.into())
     }
 
     /// Create an s-expression from a value, if that's possible.
@@ -122,18 +137,25 @@ impl Datum {
     }
 
     pub fn is_atom(&self) -> bool {
-        match self.s_expression() {
-            SExpression::Vector(_) => false,
-            SExpression::List(_) => false,
-            SExpression::ImproperList(_, _) => false,
-            SExpression::ByteVector(_) => false,
+        match self {
+            Self::Vector(_, _) => false,
+            Self::List(_, _) => false,
+            Self::ImproperList(_, _, _) => false,
+            Self::ByteVector(_, _) => false,
             _ => true,
         }
     }
 
     pub fn is_symbol(&self) -> bool {
-        match self.s_expression() {
-            SExpression::Symbol(_) => true,
+        match self {
+            Self::Symbol(_, _) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_proper_list(&self) -> bool {
+        match self {
+            Self::List(_, _) => true,
             _ => false,
         }
     }
@@ -142,8 +164,8 @@ impl Datum {
     ///
     /// This function is mostly used in the parser, which uses slice patterns extensively.
     pub fn list_slice(&self) -> Option<&[Datum]> {
-        match self.s_expression() {
-            SExpression::List(ls) => Some(&ls[..]),
+        match self {
+            Self::List(ls, _) => Some(&ls[..]),
             _ => None,
         }
     }
@@ -154,17 +176,57 @@ impl Datum {
 /// full faithful, valid, external representation of s-expressions use the `Writer` instead.
 impl std::fmt::Display for Datum {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "[{}..{}]@{}",
-            self.s_expression().to_string(),
+        let location = format!(
+            "[{}..{}]",
             self.source_location().span.start(),
             self.source_location().span.end()
-        ))
+        );
+
+        match self {
+            Self::Bool(v, _) => f.write_fmt(format_args!("{}@{}", location, v)),
+            Self::Symbol(v, _) => {
+                f.write_fmt(format_args!("{}@{}", location, v.as_str().to_string()))
+            }
+            Self::String(v, _) => f.write_fmt(format_args!("{}@\"{}\"", location, v)),
+            Self::Char(v, _) => f.write_fmt(format_args!("{}@{}", location, v.to_string())),
+            Self::Number(n, _) => f.write_fmt(format_args!("{}@{}", location, n.to_string())),
+            Self::List(inner, _) => {
+                let elements: Vec<_> = inner.iter().map(|e| e.to_string()).collect();
+                f.write_fmt(format_args!("{} @ ( {} )", location, elements.join(" ")))
+            }
+            Self::ImproperList(head, tail, _) => {
+                let head_elements: Vec<_> = head.iter().map(|e| e.to_string()).collect();
+                f.write_fmt(format_args!(
+                    "{} @ ({} . {})",
+                    location,
+                    head_elements.join(" "),
+                    tail.to_string()
+                ))
+            }
+            Self::Vector(inner, _) => {
+                let elements: Vec<_> = inner.iter().map(|e| e.to_string()).collect();
+                f.write_fmt(format_args!("{} @ #({})", location, elements.join(" ")))
+            }
+            Self::ByteVector(inner, _) => {
+                let elements: Vec<_> = inner.iter().map(|e| format!("{:x?}", e)).collect();
+                f.write_fmt(format_args!("{} @ #u8({})", location, elements.join(" ")))
+            }
+        }
     }
 }
 
 impl HasSourceLocation for Datum {
     fn source_location(&self) -> &Location {
-        &self.location
+        match self {
+            Datum::Bool(_, loc) => loc,
+            Datum::Symbol(_, loc) => loc,
+            Datum::String(_, loc) => loc,
+            Datum::Char(_, loc) => loc,
+            Datum::Number(_, loc) => loc,
+            Datum::List(_, loc) => loc,
+            Datum::ImproperList(_, _, loc) => loc,
+            Datum::Vector(_, loc) => loc,
+            Datum::ByteVector(_, loc) => loc,
+        }
     }
 }

@@ -1,16 +1,3 @@
-pub use parser::*;
-pub mod abbreviation;
-pub mod boolean;
-pub mod byte_vector;
-pub mod character;
-pub mod list;
-pub mod number;
-pub mod parser;
-pub mod string;
-pub mod symbol;
-pub mod vector;
-pub mod whitespace;
-
 use super::datum::Datum;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::vm::value::number::real::RealNumber;
