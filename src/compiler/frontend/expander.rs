@@ -165,11 +165,11 @@ pub mod tests {
 
     pub fn assert_expands_equal(lhs: &str, rhs: &str, pedantic: bool) -> Result<()> {
         let mut exp = Expander::new();
-        let actual_sexp = parse_datum(lhs);
-        let expected_sexp = parse_datum(rhs);
-        let expanded = exp.expand(&actual_sexp)?;
+        let actual_datum = parse_datum(lhs);
+        let expected_datum = parse_datum(rhs);
+        let expanded = exp.expand(&actual_datum)?;
 
-        assert_struct_eq(&expanded, &expected_sexp, pedantic);
+        assert_struct_eq(&expanded, &expected_datum, pedantic);
         Ok(())
     }
 

@@ -3,7 +3,7 @@ pub use result::ParseResult;
 
 use crate::compiler::frontend;
 use crate::compiler::frontend::expander::Expander;
-use crate::compiler::representation::{CoreAST, SexpAST};
+use crate::compiler::representation::{CoreAST, DatumAST};
 use crate::compiler::source::{HasSourceLocation, Location};
 
 pub use super::Result;
@@ -78,16 +78,16 @@ impl Parser {
     /// ### Example
     /// ```
     /// use braces::compiler::frontend::parser::Parser;
-    /// use braces::compiler::representation::SexpAST;
+    /// use braces::compiler::representation::DatumAST;
     /// use braces::compiler::frontend::reader::datum::Datum;
     ///
     /// // just a very simple s-expression which will be parsed to a literal
-    /// let sexps = SexpAST::new(vec![Datum::boolean(true, 0..2)]);
+    /// let data = DatumAST::new(vec![Datum::boolean(true, 0..2)]);
     /// let mut parser = Parser::new();
     ///
-    /// parser.parse(&sexps).unwrap();
+    /// parser.parse(&data).unwrap();
     /// ```
-    pub fn parse(&mut self, ast: &SexpAST) -> Result<CoreAST> {
+    pub fn parse(&mut self, ast: &DatumAST) -> Result<CoreAST> {
         let expressions: Result<Vec<Expression>> =
             ast.to_vec().iter().map(|d| self.do_parse(d)).collect();
 
@@ -114,9 +114,9 @@ pub mod tests {
             .add(&mut BufferSource::new(inp, "datum-parser-test"))
             .unwrap();
         let reader = Reader::new();
-        let sexp_ast = reader.parse(&source).unwrap();
+        let datum_ast = reader.parse(&source).unwrap();
         let mut parser = Parser::new();
-        let core_ast = parser.parse(&sexp_ast).unwrap();
+        let core_ast = parser.parse(&datum_ast).unwrap();
 
         assert_eq!(core_ast.expressions[0], exp);
     }
@@ -127,9 +127,9 @@ pub mod tests {
             .add(&mut BufferSource::new(inp, "datum-parser-test"))
             .unwrap();
         let reader = Reader::new();
-        let sexp_ast = reader.parse(&source).unwrap();
+        let datum_ast = reader.parse(&source).unwrap();
         let mut parser = Parser::new();
-        let parse_result = parser.parse(&sexp_ast);
+        let parse_result = parser.parse(&datum_ast);
 
         assert!(
             parse_result.is_err(),

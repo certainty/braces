@@ -6,7 +6,7 @@ use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::environment::{Denotation, Special};
 use crate::compiler::source::HasSourceLocation;
 
-/// The `CoreParser` parses a fully expanded `SexpAST` into a `CoreAST`.
+/// The `CoreParser` parses a fully expanded `DatumAST` into a `CoreAST`.
 /// It is used by the `Parser`, which interleaves the expansion and parsing phases.
 #[derive(Debug)]
 #[repr(transparent)]
@@ -64,7 +64,7 @@ impl CoreParser {
                     vec![],
                 )),
             },
-            sexp if sexp.is_symbol() => self.parse_identifier(&datum).res(),
+            datum if datum.is_symbol() => self.parse_identifier(&datum).res(),
             _lit => self.parse_literal(&datum).res(),
         }
     }
