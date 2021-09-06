@@ -24,6 +24,7 @@ pub struct Repl {
     vm: VM,
     commands: Commands,
     editor: Editor<ReplHelper>,
+    command_counter: usize,
 }
 
 pub struct ReplHelper {
@@ -107,6 +108,7 @@ impl Repl {
             vm,
             editor,
             commands,
+            command_counter: 0,
         })
     }
 
@@ -172,6 +174,7 @@ impl Repl {
     fn eval(&mut self, input: &String) -> anyhow::Result<()> {
         let mut source = BufferSource::new(input.clone(), "repl");
         let mut compiler = Compiler::new();
+        self.command_counter += 1;
 
         match compiler.compile(&mut source) {
             Ok(unit) => match self.vm.interpret(unit) {
@@ -187,7 +190,7 @@ impl Repl {
 
     #[inline]
     fn prompt(&self) -> String {
-        String::from(">> ")
+        format!("#;{} λ> ", self.command_counter)
     }
 
     fn default_config() -> rustyline::config::Config {
