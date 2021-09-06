@@ -12,8 +12,7 @@ use nom::sequence::delimited;
 /// <vector> -> #(<datum>*)  
 /// ```
 
-#[inline]
-pub fn parse_vector(input: Input) -> ParseResult<Datum> {
+pub fn parse(input: Input) -> ParseResult<Datum> {
     let list_elements = delimited(
         parse_inter_token_space,
         parse_datum,

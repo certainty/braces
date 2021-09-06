@@ -19,7 +19,6 @@ pub fn parse_intra_line_ws(input: Input) -> ParseResult<()> {
     unit(alt((char(' '), char('\t'))))(input)
 }
 
-#[inline]
 pub fn parse_inter_token_space(input: Input) -> ParseResult<()> {
     let atmosphere = alt((parse_white_space, parse_comment, parse_directive));
     unit(many0(atmosphere))(input)
@@ -42,7 +41,6 @@ pub fn parse_comment(input: Input) -> ParseResult<()> {
     )(input)
 }
 
-#[inline]
 fn parse_nested_comment(input: Input) -> ParseResult<()> {
     let comment_text = many0(anychar);
     let nested_comment = delimited(tag("#|"), comment_text, tag("|#"));

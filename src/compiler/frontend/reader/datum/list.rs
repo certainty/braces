@@ -12,7 +12,6 @@ use crate::compiler::frontend::reader::datum::Datum;
 /// <list> -> (<datum>*)  | (<datum>+ . <datum>)
 /// ```
 
-#[inline]
 pub fn parse_proper_list(input: Input) -> ParseResult<Datum> {
     let list_elements = delimited(
         parse_inter_token_space,
@@ -31,7 +30,6 @@ pub fn parse_proper_list(input: Input) -> ParseResult<Datum> {
 /// <list> -> (<datum>*)  | (<datum>+ . <datum>)
 /// ```
 
-#[inline]
 pub fn parse_improper_list(input: Input) -> ParseResult<Datum> {
     let improper_head = many1(delimited(
         parse_inter_token_space,

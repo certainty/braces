@@ -54,7 +54,7 @@ fn parse_string_element(input: Input) -> ParseResult<StringElement> {
     ))(input)
 }
 
-fn parse_string_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+fn parse_string_escape(input: Input) -> ParseResult<char> {
     context(
         "escaped character",
         preceded(
@@ -64,8 +64,7 @@ fn parse_string_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
     )(input)
 }
 
-#[inline]
-fn parse_string_continuation<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
+fn parse_string_continuation(input: Input) -> ParseResult<()> {
     let line_continuation = terminated(
         terminated(many0(parse_intra_line_ws), consume_line_ending),
         parse_intra_line_ws,
@@ -75,7 +74,6 @@ fn parse_string_continuation<'a>(input: Input<'a>) -> ParseResult<'a, ()> {
     Ok((s, ()))
 }
 
-#[inline]
 fn parse_string_literal(input: Input) -> ParseResult<&str> {
     let (s, v) = is_not("\\\"")(input)?;
 

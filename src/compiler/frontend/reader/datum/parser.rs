@@ -42,7 +42,7 @@ fn parse_compound_datum(input: Input) -> ParseResult<Datum> {
     context(
         "compound datum",
         alt((
-            context("vector", vector::parse_vector),
+            context("vector", vector::parse),
             context("improper list", list::parse_improper_list),
             context("list", list::parse_proper_list),
             context("abbreviation", abbreviation::parse),

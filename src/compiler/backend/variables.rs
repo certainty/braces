@@ -239,7 +239,6 @@ impl VariablesRef {
         }
     }
 
-    #[inline]
     pub fn add_local(&mut self, name: Identifier) -> Result<usize> {
         let scope_depth = self.inner.borrow().scope_depth;
         self.inner.borrow_mut().locals.add(name, scope_depth)?;

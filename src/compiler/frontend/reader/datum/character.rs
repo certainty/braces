@@ -24,7 +24,6 @@ fn parse_hex_char_literal(input: Input) -> ParseResult<char> {
     preceded(char('x'), parse_hex_literal)(input)
 }
 
-#[inline]
 fn parse_named_char_literal(input: Input) -> ParseResult<char> {
     alt((
         value(' ', tag("space")),
@@ -40,7 +39,6 @@ fn parse_named_char_literal(input: Input) -> ParseResult<char> {
 }
 
 // parse a sequence of 3 bytes hex encoded
-#[inline]
 fn parse_hex_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
     let parse_hex = take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit());
     let parse_u32 = map_res(parse_hex, move |hex: Input<'a>| {
@@ -51,15 +49,14 @@ fn parse_hex_literal<'a>(input: Input<'a>) -> ParseResult<'a, char> {
 }
 
 // shared for strings and symbols
-#[inline]
-pub fn parse_inline_hex_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+pub fn parse_inline_hex_escape(input: Input) -> ParseResult<char> {
     context(
         "inline hex escape",
         delimited(tag("\\x"), parse_hex_literal, char(';')),
     )(input)
 }
 
-pub fn parse_mnemonic_escape<'a>(input: Input<'a>) -> ParseResult<'a, char> {
+pub fn parse_mnemonic_escape(input: Input) -> ParseResult<char> {
     context(
         "mnemonic escape",
         preceded(

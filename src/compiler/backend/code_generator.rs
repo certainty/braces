@@ -204,7 +204,6 @@ impl<'a> CodeGenerator<'a> {
     }
 
     /// we want to track a new binding, so we need to make it known to the generator
-    #[inline]
     fn declare_binding(&mut self, id: &Identifier) -> Result<()> {
         // if we're at the top-level we don't need to track anything
         // as during runtime the VM will just resolve this identifier, using the `TopLevel`

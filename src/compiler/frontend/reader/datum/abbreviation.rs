@@ -10,7 +10,6 @@ use nom::sequence::pair;
 // abbreviation
 ////////////////////////////
 
-#[inline]
 pub fn parse(input: Input) -> ParseResult<Datum> {
     let abbrev = pair(parse_abbrev_prefix, parse_datum);
 
@@ -19,7 +18,6 @@ pub fn parse(input: Input) -> ParseResult<Datum> {
     })(input)
 }
 
-#[inline]
 fn parse_abbrev_prefix(input: Input) -> ParseResult<Datum> {
     let abbrev = alt((
         value("quote", char('\'')),

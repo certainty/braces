@@ -32,7 +32,6 @@ pub fn parse(input: Input) -> ParseResult<Datum> {
     with_location(symbol_literal, Datum::symbol)(input)
 }
 
-#[inline]
 fn parse_peculiar_identifier(input: Input) -> ParseResult<String> {
     let explicit_sign_str = map(parse_explicit_sign, String::from);
 
@@ -44,7 +43,6 @@ fn parse_peculiar_identifier(input: Input) -> ParseResult<String> {
     ))(input)
 }
 
-#[inline]
 fn parse_peculiar_with_sign(input: Input) -> ParseResult<String> {
     let (s, (sign, sign_sub, subseq)) = tuple((
         parse_explicit_sign,
@@ -59,7 +57,6 @@ fn parse_peculiar_with_sign(input: Input) -> ParseResult<String> {
     Ok((s, symbol))
 }
 
-#[inline]
 fn parse_peculiar_with_dot(input: Input) -> ParseResult<String> {
     let (s, (dot, dot_subseq, subseq)) =
         tuple((char('.'), parse_dot_subsequent, many0(parse_subsequent)))(input)?;
@@ -71,7 +68,6 @@ fn parse_peculiar_with_dot(input: Input) -> ParseResult<String> {
     Ok((s, symbol))
 }
 
-#[inline]
 fn parse_peculiar_with_sign_dot(input: Input) -> ParseResult<String> {
     let (s, (sign, sign_sub, dot_subseq)) =
         tuple((parse_explicit_sign, char('.'), parse_dot_subsequent))(input)?;
@@ -93,7 +89,6 @@ fn parse_sign_subsequent(input: Input) -> ParseResult<char> {
     alt((parse_initial, parse_explicit_sign, char('@')))(input)
 }
 
-#[inline]
 fn parse_delimited_identifier(input: Input) -> ParseResult<String> {
     let symbol_elements = fold_many0(
         parse_symbol_element,
@@ -110,7 +105,6 @@ fn parse_delimited_identifier(input: Input) -> ParseResult<String> {
     delimited(char('|'), symbol_elements, char('|'))(input)
 }
 
-#[inline]
 fn parse_symbol_element(input: Input) -> ParseResult<SymbolElement> {
     let parse_symbol_escape = value('|', tag("\\|"));
 
@@ -122,7 +116,6 @@ fn parse_symbol_element(input: Input) -> ParseResult<SymbolElement> {
     ))(input)
 }
 
-#[inline]
 fn parse_symbol_literal(input: Input) -> ParseResult<&str> {
     let (s, v) = is_not("|\\")(input)?;
 
@@ -141,7 +134,6 @@ fn parse_identifier(input: Input) -> ParseResult<String> {
 
 pub const SYMBOL_SPECIAL_INITIAL: &str = "!$%&*/:<=>?^_~";
 
-#[inline]
 fn parse_initial(input: Input) -> ParseResult<char> {
     let letter = verify(anychar, |c| c.is_alphabetic());
     let special_initial = one_of(SYMBOL_SPECIAL_INITIAL);
@@ -149,7 +141,6 @@ fn parse_initial(input: Input) -> ParseResult<char> {
     alt((letter, special_initial))(input)
 }
 
-#[inline]
 fn parse_subsequent(input: Input) -> ParseResult<char> {
     let digit = verify(anychar, |c| c.is_digit(10));
     let special_subsequent = alt((parse_explicit_sign, char('.'), char('@')));
