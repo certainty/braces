@@ -14,6 +14,12 @@ pub enum RuntimeError {
     NoncallableError(Value),
     #[error("ArithmeticError: `{0}`")]
     ArithmeticError(String),
+    #[error("SyntaxError")]
+    SyntaxError(String),
+}
+
+pub fn syntax_error<T: Into<String>>(msg: T) -> RuntimeError {
+    RuntimeError::SyntaxError(msg.into())
 }
 
 pub fn arithmetic_error<T: Into<String>>(msg: T) -> RuntimeError {

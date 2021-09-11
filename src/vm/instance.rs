@@ -46,6 +46,7 @@ use super::value::procedure::{self, Arity};
 use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::vm::byte_code::chunk::ConstAddressType;
 use crate::vm::value::RefValue;
 use call_frame::CallFrame;
@@ -85,24 +86,29 @@ impl<'a> Instance<'a> {
         values: &'a mut value::Factory,
         debug_mode: bool,
     ) -> Self {
-        let mut stack = ValueStack::new(call_stack_size * 255);
+        let mut vm = Self::vanilla(call_stack_size, top_level, values, debug_mode);
+        vm.push(Value::Closure(initial_closure.clone())).unwrap();
+        vm.push_frame(initial_closure, 0).unwrap();
+        vm
+    }
+
+    pub fn vanilla(
+        call_stack_size: usize,
+        top_level: &'a mut TopLevel,
+        values: &'a mut value::Factory,
+        debug_mode: bool,
+    ) -> Self {
+        let stack = ValueStack::new(call_stack_size * 255);
         let mut call_stack = CallStack::new(call_stack_size);
-
-        // the first value on the stack is the initial procedure
-        stack.push(Value::Closure(initial_closure.clone()));
-
-        // the first active stack frame is that of the current procedure
-        call_stack.push(CallFrame::new(initial_closure, 0));
-
-        let active_frame = call_stack.top_mut_ptr();
+        let open_up_values = FxHashMap::<AddressType, RefValue>::default();
 
         Self {
             values,
             stack,
             call_stack,
             top_level,
-            active_frame,
-            open_up_values: FxHashMap::default(),
+            active_frame: std::ptr::null_mut(),
+            open_up_values,
             debug_mode,
         }
     }
@@ -117,6 +123,24 @@ impl<'a> Instance<'a> {
     ) -> Result<Value> {
         let mut instance = Self::new(initial_closure, stack_size, top_level, values, debug_mode);
         instance.run()
+    }
+
+    pub fn interpret_expander(
+        expander: procedure::Procedure,
+        syntax: &Value,
+        rename: procedure::Procedure,
+        compare: procedure::Procedure,
+        top_level: &'a mut TopLevel,
+        values: &'a mut value::Factory,
+    ) -> Result<Value> {
+        let mut vm = Self::vanilla(255, top_level, values, false);
+
+        vm.push(Value::Procedure(expander))?;
+        vm.push(syntax.clone())?;
+        vm.push(Value::Procedure(rename))?;
+        vm.push(Value::Procedure(compare))?;
+        vm.apply(3)?;
+        Ok(vm.stack.pop())
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -602,7 +626,6 @@ impl<'a> Instance<'a> {
         proc: Rc<procedure::native::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
-        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
         self.check_arity(&proc.arity, arg_count)?;
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();

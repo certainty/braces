@@ -1,3 +1,4 @@
+use crate::compiler::frontend::reader::datum::Datum;
 use crate::vm::value::Value;
 use crate::vm::value::{error, procedure::Arity};
 use thiserror::Error;
@@ -24,14 +25,34 @@ impl ToScheme for bool {
 }
 
 // Helpers
-pub fn binary_procedure<'a>(args: &'a Vec<Value>) -> FunctionResult<(&'a Value, &'a Value)> {
+pub fn explicit_rename_transformer(args: &Vec<Value>) -> FunctionResult<(&Datum, &Value, &Value)> {
+    match &args[..] {
+        [first, second, third] => match first {
+            Value::Syntax(datum) => Ok((datum, second, third)),
+            _ => Err(error::argument_error(
+                first.clone(),
+                "expected syntax object",
+            )),
+        },
+        _ => Err(error::arity_mismatch(Arity::Exactly(3), args.len())),
+    }
+}
+
+pub fn ternary_procedure(args: &Vec<Value>) -> FunctionResult<(&Value, &Value, &Value)> {
+    match &args[..] {
+        [first, second, third] => Ok((first, second, third)),
+        _ => Err(error::arity_mismatch(Arity::Exactly(3), args.len())),
+    }
+}
+
+pub fn binary_procedure(args: &Vec<Value>) -> FunctionResult<(&Value, &Value)> {
     match &args[..] {
         [first, second] => Ok((first, second)),
         _ => Err(error::arity_mismatch(Arity::Exactly(2), args.len())),
     }
 }
 
-pub fn unary_procedure<'a>(args: &'a Vec<Value>) -> FunctionResult<&'a Value> {
+pub fn unary_procedure(args: &Vec<Value>) -> FunctionResult<&Value> {
     match &args[..] {
         [first] => Ok(first),
         _ => Err(error::arity_mismatch(Arity::Exactly(1), args.len())),

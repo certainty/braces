@@ -76,6 +76,7 @@ pub enum Value {
     ImproperList(list::List, Box<Value>),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
+    Syntax(Datum),
     Unspecified,
 }
 
@@ -84,6 +85,37 @@ impl Value {
         match self {
             Self::Bool(false) => true,
             _ => false,
+        }
+    }
+
+    pub fn syntax(v: Datum) -> Self {
+        Value::Syntax(v)
+    }
+
+    pub fn from_datum(v: &Datum, values: &mut Factory) -> Self {
+        match v {
+            Datum::Char(c, _) => Self::Char(c.clone()),
+            Datum::Symbol(s, _) => values.symbol(s.as_str()),
+            Datum::String(s, _) => values.interned_string(s),
+            Datum::Number(n, _) => Self::Number(n.clone()),
+            Datum::Bool(v, _) => Self::Bool(v.clone()),
+            Datum::List(v, _) => {
+                let elements: Vec<Value> = v.iter().map(|e| Self::from_datum(e, values)).collect();
+                values.proper_list(elements)
+            }
+            Datum::ImproperList(head, tail, _) => {
+                let head_elements: Vec<Value> =
+                    head.iter().map(|e| Self::from_datum(e, values)).collect();
+                let tail_element = Self::from_datum(tail, values);
+                values.improper_list(head_elements, tail_element)
+            }
+
+            Datum::Vector(v, _) => {
+                let elements: Vec<Value> = v.iter().map(|e| Self::from_datum(e, values)).collect();
+                values.vector(elements)
+            }
+
+            Datum::ByteVector(v, _) => values.byte_vector(v.clone()),
         }
     }
 }
