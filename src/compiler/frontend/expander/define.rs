@@ -20,9 +20,10 @@ impl Expander {
                             exprs,
                             datum.source_location().clone(),
                         );
+                        let expanded_lambda = self.expand_macros(&lambda)?;
 
                         Ok(Datum::list(
-                            vec![operator.clone(), identifier.clone(), lambda],
+                            vec![operator.clone(), identifier.clone(), expanded_lambda],
                             datum.source_location().clone(),
                         ))
                     }
@@ -45,7 +46,9 @@ impl Expander {
                                 exprs,
                                 datum.source_location().clone()
                             );
-                            Ok(Datum::list(vec![operator.clone(), identifier.clone(), lambda], datum.source_location().clone()))
+                            let expanded_lambda = self.expand_macros(&lambda)?;
+
+                            Ok(Datum::list(vec![operator.clone(), identifier.clone(), expanded_lambda], datum.source_location().clone()))
                         }
                         //(foo x y . rest)
                         [identifier , required_args @ ..]  => {
@@ -58,8 +61,9 @@ impl Expander {
                                 exprs,
                                 datum.source_location().clone(),
                             );
+                            let expanded_lambda = self.expand_macros(&lambda)?;
 
-                            Ok(Datum::list(vec![operator.clone(), identifier.clone(), lambda], datum.source_location().clone()))
+                            Ok(Datum::list(vec![operator.clone(), identifier.clone(), expanded_lambda], datum.source_location().clone()))
                         }
                         _ => Err(Error::expansion_error(
                             "Invalid procedure definition. Expected name and arguments in def-formals" ,
@@ -127,6 +131,17 @@ mod tests {
         assert_expands_equal(
             "(define (foo . args) x)",
             "(define foo (lambda args x))",
+            false,
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_define_with_expanded_lambda() -> Result<()> {
+        assert_expands_equal(
+            "(define (foo x) (let ((y x)) y))",
+            "(define foo (lambda (x) ((lambda (y) y) x)))",
             false,
         )?;
 

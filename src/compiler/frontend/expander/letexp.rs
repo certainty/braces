@@ -29,33 +29,9 @@ fn expand_let(args: Vec<Value>) -> FunctionResult<Value> {
         |(datum, _rename, _compare)| match datum.list_slice() {
             // Named let
             // (let f ((v e) ...) b ...)
-            Some([_let, f, bindings, body @ ..]) if bindings.is_proper_list() && f.is_symbol() => {
-                let (lambda, values) =
-                    self::make_lambda(bindings, body, datum.source_location().clone())?;
-
-                // (define f (lambda ...))
-                let definition = Datum::list(
-                    vec![
-                        Datum::forged_symbol("define", datum.source_location().clone()),
-                        f.clone(),
-                        lambda,
-                    ],
-                    datum.source_location().clone(),
-                );
-
-                let mut application = vec![f.clone()];
-                application.extend(values);
-
-                //(begin (define f (lambda ...)) (f initial_arg))
-                let begin = Datum::list(
-                    vec![
-                        Datum::forged_symbol("begin", datum.source_location().clone()),
-                        definition,
-                        Datum::list(application, datum.source_location().clone()),
-                    ],
-                    datum.source_location().clone(),
-                );
-                Ok(Value::syntax(begin))
+            Some([_let, f, bindings, _body @ ..]) if bindings.is_proper_list() && f.is_symbol() => {
+                // named let not yet supported. We first need a working implementation of letrec
+                todo!()
             }
             // let
             // (let ((v e) ...) b ...)
@@ -136,16 +112,6 @@ mod tests {
     #[test]
     fn test_expand_simple_let_empty_bindings() -> Result<()> {
         assert_expands_equal("(let () #t)", "((lambda () #t))", false)?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_named_let() -> Result<()> {
-        assert_expands_equal(
-            "(let lp ((x 0)) (lp (+ x 1)))",
-            "(begin (define lp (lambda (x) (lp (+ x 1)))) (lp 0))",
-            false,
-        )?;
         Ok(())
     }
 }
