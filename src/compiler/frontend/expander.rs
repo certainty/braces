@@ -68,7 +68,11 @@ impl Expander {
                         Special::Quote => Ok(datum.clone()),
                         _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                     },
-                    Denotation::Macro(transformer) => self.expand_macro(&datum, &transformer),
+                    Denotation::Macro(transformer) => {
+                        let expanded = self.expand_macro(&datum, &transformer)?;
+                        // recursively expand
+                        self.expand_macros(&expanded)
+                    }
                     _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                 }
             }
@@ -210,8 +214,8 @@ pub mod tests {
         let expected_datum = parse_datum(rhs);
         let expanded_datum = exp.expand(&actual_datum)?;
 
-        //println!("expected: {}", expected_datum);
-        //println!("expanded: {}", expanded_datum);
+        println!("expected: {}", expected_datum);
+        println!("expanded: {}", expanded_datum);
 
         assert_struct_eq(&expanded_datum, &expected_datum, pedantic);
         Ok(())

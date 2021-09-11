@@ -124,6 +124,16 @@ mod tests {
     }
 
     #[test]
+    fn test_expand_nested_let() -> Result<()> {
+        assert_expands_equal(
+            "(let ((x #t)) (let ((y x)) y))",
+            "((lambda (x) ((lambda (y) y) x)) #t)",
+            false,
+        )?;
+        Ok(())
+    }
+
+    #[test]
     fn test_expand_simple_let_empty_bindings() -> Result<()> {
         assert_expands_equal("(let () #t)", "((lambda () #t))", false)?;
         Ok(())
