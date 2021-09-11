@@ -96,6 +96,12 @@ mod tests {
     }
 
     #[test]
+    fn test_expand_define_procedure_nullary() -> Result<()> {
+        assert_expands_equal("(define (foo) x)", "(define foo (lambda () x))", false)?;
+        Ok(())
+    }
+
+    #[test]
     fn test_expand_define_procedure() -> Result<()> {
         assert_expands_equal(
             "(define (foo x y) x)",
@@ -113,6 +119,11 @@ mod tests {
             false,
         )?;
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_expand_define_procedure_single_rest_arg() -> Result<()> {
         assert_expands_equal(
             "(define (foo . args) x)",
             "(define foo (lambda args x))",
