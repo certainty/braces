@@ -12,6 +12,10 @@ pub struct StackTrace {
 }
 
 impl StackTrace {
+    pub fn empty() -> Self {
+        Self { frames: vec![] }
+    }
+
     pub fn new(call_stack: &CallStack) -> Self {
         let mut info = vec![];
 

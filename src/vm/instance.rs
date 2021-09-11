@@ -667,7 +667,7 @@ impl<'a> Instance<'a> {
                 Ok(())
             }
             Err(e) => {
-                println!("Error in foreign function: {}", proc.name.clone());
+                println!("Error in foreign function: {} {:?}", proc.name.clone(), e);
                 self.runtime_error(e, Some(proc.name.clone()))
             }
         }
@@ -942,15 +942,19 @@ impl<'a> Instance<'a> {
 
     // TODO: add a representation for stack trace and add it to the error
     fn runtime_error<T>(&self, e: error::RuntimeError, context: Option<String>) -> Result<T> {
-        let result = Err(Error::RuntimeError(
-            e,
-            self.active_frame()
-                .line_number_for_current_instruction()
-                .unwrap_or(0),
-            StackTrace::from(&self.call_stack),
-            context,
-        ));
-        result
+        if self.has_active_frame() {
+            let result = Err(Error::RuntimeError(
+                e,
+                self.active_frame()
+                    .line_number_for_current_instruction()
+                    .unwrap_or(0),
+                StackTrace::from(&self.call_stack),
+                context,
+            ));
+            result
+        } else {
+            Err(Error::RuntimeError(e, 0, StackTrace::empty(), context))
+        }
     }
 
     // Debug the VM
