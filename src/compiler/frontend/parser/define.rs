@@ -63,9 +63,16 @@ impl CoreParser {
                     self.environment
                         .extend(parsed_identifier.symbol().clone(), Denotation::Id);
 
+                    let parsed_expression = match self.parse(&expr)? {
+                        Expression::Lambda(lambda) => {
+                            Expression::Lambda(lambda.with_label(parsed_identifier.string()))
+                        }
+                        other => other,
+                    };
+
                     Ok(DefinitionExpression::DefineSimple(
                         parsed_identifier,
-                        Box::new(self.parse(&expr)?),
+                        Box::new(parsed_expression),
                         datum.source_location().clone(),
                     ))
                 }

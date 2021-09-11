@@ -145,7 +145,6 @@ impl Expander {
 #[cfg(test)]
 pub mod tests {
     use crate::compiler::frontend::reader::tests::*;
-    use std::fmt::Debug;
 
     use super::*;
 
@@ -167,9 +166,12 @@ pub mod tests {
         let mut exp = Expander::new();
         let actual_datum = parse_datum(lhs);
         let expected_datum = parse_datum(rhs);
-        let expanded = exp.expand(&actual_datum)?;
+        let expanded_datum = exp.expand(&actual_datum)?;
 
-        assert_struct_eq(&expanded, &expected_datum, pedantic);
+        //println!("expected: {}", expected_datum);
+        //println!("expanded: {}", expanded_datum);
+
+        assert_struct_eq(&expanded_datum, &expected_datum, pedantic);
         Ok(())
     }
 
@@ -190,7 +192,7 @@ pub mod tests {
         match (lhs, rhs) {
             (Datum::List(inner_lhs, _), Datum::List(inner_rhs, _)) => {
                 assert_vec_eq(&inner_lhs, &inner_rhs, |l, r| {
-                    assert_struct_eq(l, r, pedantic)
+                    assert_struct_eq(l, r, pedantic);
                 })
             }
             (
@@ -210,31 +212,19 @@ pub mod tests {
             (Datum::Symbol(inner_lhs, _), Datum::Symbol(inner_rhs, _)) if !pedantic => {
                 assert_eq!(inner_lhs.as_str(), inner_rhs.as_str())
             }
-            (datum_lhs, datum_rhs) if !pedantic => {
-                assert_eq_ignore_location(datum_lhs, datum_rhs);
-            }
-            (datum_lhs, datum_rhs) => {
-                assert_eq!(datum_lhs, datum_rhs)
-            }
-        }
-    }
-
-    fn assert_eq_ignore_location(lhs: &Datum, rhs: &Datum) {
-        match (lhs, rhs) {
             (Datum::Bool(l, _), Datum::Bool(r, _)) => assert_eq!(l, r),
             (Datum::Symbol(l, _), Datum::Symbol(r, _)) => assert_eq!(l, r),
             (Datum::String(l, _), Datum::String(r, _)) => assert_eq!(l, r),
             (Datum::Char(l, _), Datum::Char(r, _)) => assert_eq!(l, r),
             (Datum::Number(l, _), Datum::Number(r, _)) => assert_eq!(l, r),
             (Datum::ByteVector(l, _), Datum::ByteVector(r, _)) => assert_eq!(l, r),
-            (l, r) => assert_struct_eq(l, r, false),
+            _ => assert!(false, "Expected datum to be of the same kind"),
         }
     }
 
-    fn assert_vec_eq<T, F>(lhs: &Vec<T>, rhs: &Vec<T>, assertion: F)
+    fn assert_vec_eq<F>(lhs: &Vec<Datum>, rhs: &Vec<Datum>, assertion: F)
     where
-        F: Copy + FnOnce(&T, &T),
-        T: Debug,
+        F: Copy + FnOnce(&Datum, &Datum),
     {
         if lhs.len() == 0 {
             assert_eq!(0, rhs.len(), "expected length of both vectors to be 0")

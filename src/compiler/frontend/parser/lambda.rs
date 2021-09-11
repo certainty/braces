@@ -32,6 +32,13 @@ impl LambdaExpression {
             label,
         }
     }
+
+    pub fn with_label<S: Into<String>>(self, label: S) -> Self {
+        LambdaExpression {
+            label: Some(label.into()),
+            ..self
+        }
+    }
 }
 
 impl HasSourceLocation for LambdaExpression {
