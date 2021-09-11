@@ -35,7 +35,7 @@ fn expand_let(args: Vec<Value>) -> FunctionResult<Value> {
             }
             // let
             // (let ((v e) ...) b ...)
-            Some([_let, bindings, body @ ..]) => {
+            Some([_let, bindings, body @ ..]) if body.len() >= 1 => {
                 let (lambda, values) =
                     self::make_lambda(bindings, body, datum.source_location().clone())?;
 
@@ -47,10 +47,9 @@ fn expand_let(args: Vec<Value>) -> FunctionResult<Value> {
                     datum.source_location().clone(),
                 )))
             }
-
             _ => Err(error::argument_error(
                 Value::Syntax(datum.clone()),
-                "expected syntax object to be proper list",
+                "expansion of let failed. Incorrect form given",
             )),
         }
     })
