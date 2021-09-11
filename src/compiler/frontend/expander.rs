@@ -47,8 +47,6 @@ impl Expander {
             Some([operator, operands @ ..]) if operator.is_symbol() => {
                 let denotation = self.denotation_of(operator)?;
                 log::trace!("denotation of {:?} is {:?}", datum, denotation);
-
-                println!("Denotation: {:?} {}", denotation, operator);
                 match denotation {
                     Denotation::Special(special) => match special {
                         Special::Define => self.expand_define(&datum, &operator, &operands),

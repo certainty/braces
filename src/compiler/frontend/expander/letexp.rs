@@ -1,10 +1,10 @@
-use super::{Error, Expander, Result};
+use super::Expander;
 use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax::environment::Denotation;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::frontend::syntax::Transformer;
 use crate::compiler::source::HasSourceLocation;
-use crate::vm::scheme::ffi::{explicit_rename_transformer, ternary_procedure, FunctionResult};
+use crate::vm::scheme::ffi::{explicit_rename_transformer, FunctionResult};
 use crate::vm::value::error;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
 use crate::vm::value::Value;

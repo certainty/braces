@@ -314,11 +314,11 @@ fn test_vm_smoke_test() {
 
         (define (fib n) (if (<= n 2) 1 (+ (fib (- n 1)) (fib (- n 2)))))
 
-        (fib 10)
+        (fib 20)
         "#,
     )
     .unwrap();
-    assert_eq!(result, vm.values.real(55));
+    assert_eq!(result, vm.values.real(6765));
 }
 
 #[test]

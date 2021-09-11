@@ -46,7 +46,6 @@ use super::value::procedure::{self, Arity};
 use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
-use crate::compiler::frontend::reader::datum::Datum;
 use crate::vm::byte_code::chunk::ConstAddressType;
 use crate::vm::value::RefValue;
 use call_frame::CallFrame;
@@ -99,7 +98,7 @@ impl<'a> Instance<'a> {
         debug_mode: bool,
     ) -> Self {
         let stack = ValueStack::new(call_stack_size * 255);
-        let mut call_stack = CallStack::new(call_stack_size);
+        let call_stack = CallStack::new(call_stack_size);
         let open_up_values = FxHashMap::<AddressType, RefValue>::default();
 
         Self {
@@ -139,7 +138,7 @@ impl<'a> Instance<'a> {
         vm.push(syntax.clone())?;
         vm.push(Value::Procedure(rename))?;
         vm.push(Value::Procedure(compare))?;
-        vm.apply(3)?;
+        vm.tail_call(3)?;
         Ok(vm.stack.pop())
     }
 
@@ -358,6 +357,11 @@ impl<'a> Instance<'a> {
     #[inline]
     fn active_frame(&self) -> &CallFrame {
         unsafe { &(*self.active_frame) }
+    }
+
+    #[inline]
+    fn has_active_frame(&self) -> bool {
+        !self.active_frame.is_null()
     }
 
     // Retrieve a mutable reference to the currently active frame.
@@ -679,8 +683,11 @@ impl<'a> Instance<'a> {
         let arguments = self.stack.pop_n(args);
         // now save the last value
         let value = self.pop();
+
         // prepare stack frame for overwrite
-        self.stack.truncate(self.active_frame().stack_base);
+        if self.has_active_frame() {
+            self.stack.truncate(self.active_frame().stack_base);
+        }
         // restore the saved value
         self.push(value)?;
         // push the arguments again
