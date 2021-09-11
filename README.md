@@ -92,3 +92,7 @@ There are plenty :D
 * No proper macro expander yet. (There is an expansion phase which expands using rust code but that's very limited for now)
 * No support for internal defines (we might get away by adding an expansion to letrec*)
 * I'm not sure the location tracking works all the time
+
+
+### Questions
+* let/let*/letrec currently expand to the corresponding lambda expressions. Should it not do that and instead I handle those as special cases in the VM. Would that yield benefits other than being easier to trace and potentially better error reporting?
