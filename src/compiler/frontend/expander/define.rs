@@ -38,6 +38,16 @@ impl Expander {
             [definition, exprs @ ..] if definition.is_improper_list() => {
                 match definition.improper_list_slice() {
                     Some((head, tail)) => match &head[..] {
+                        //(foo . rest)
+                        [identifier] => {
+                            let lambda = self.build_lambda(
+                                tail,
+                                exprs,
+                                datum.source_location().clone()
+                            );
+                            Ok(Datum::list(vec![operator.clone(), identifier.clone(), lambda], datum.source_location().clone()))
+                        }
+                        //(foo x y . rest)
                         [identifier , required_args @ ..]  => {
                             let lambda = self.build_lambda(
                                 &Datum::improper_list(
@@ -102,6 +112,13 @@ mod tests {
             "(define foo (lambda (x y . args) x))",
             false,
         )?;
+
+        assert_expands_equal(
+            "(define (foo . args) x)",
+            "(define foo (lambda args x))",
+            false,
+        )?;
+
         Ok(())
     }
 }
