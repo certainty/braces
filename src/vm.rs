@@ -23,7 +23,11 @@ use std::io::stdout;
 use thiserror::Error;
 use value::Value;
 
+use crate::compiler::frontend::reader::datum::Datum;
+use crate::compiler::frontend::syntax::environment::SyntaxEnvironment;
+use crate::compiler::source::Location;
 use crate::vm::error::reporting::ErrorReporter;
+use crate::vm::value::procedure::Procedure;
 pub use error::Error;
 pub use settings::{Setting, Settings};
 
@@ -47,6 +51,10 @@ impl VM {
             writer: Writer::new(),
             settings: Settings::default(),
         }
+    }
+
+    pub fn for_expansion() -> VM {
+        Self::new(255)
     }
 
     pub fn binding_names(&self) -> Vec<String> {
@@ -81,6 +89,34 @@ impl VM {
             &mut self.values,
             debug_mode,
         )
+    }
+
+    pub fn interpret_expander(
+        &mut self,
+        procedure: Procedure,
+        datum: &Datum,
+        rename: Procedure,
+        compare: Procedure,
+        _env: SyntaxEnvironment,
+        location: Location,
+    ) -> Result<Datum> {
+        if let Some(datum) = Datum::from_value(
+            &Instance::interpret_expander(
+                procedure,
+                &Value::syntax(datum.clone()),
+                rename,
+                compare,
+                &mut self.top_level,
+                &mut self.values,
+            )?,
+            location,
+        ) {
+            Ok(datum)
+        } else {
+            Err(Error::CompilerBug(
+                "Expander returned invalid value for expansion".to_string(),
+            ))
+        }
     }
 
     pub fn print_error(&self, e: &Error, compiler: &Compiler) {

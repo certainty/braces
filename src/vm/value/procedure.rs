@@ -12,7 +12,7 @@ pub enum Arity {
 }
 
 pub trait HasArity {
-    fn arity<'a>(&'a self) -> &'a Arity;
+    fn arity(&self) -> &Arity;
 }
 
 #[derive(Debug, PartialEq, Clone)]

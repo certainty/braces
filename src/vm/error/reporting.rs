@@ -52,6 +52,9 @@ impl<'a> ErrorReporter<'a> {
             RuntimeError::UndefinedVariable(s) => {
                 format!("UndefinedVariable: Variable `{}` is undefined", s.as_str())
             }
+            RuntimeError::SyntaxError(msg) => {
+                format!("Error during macro expansion: {}", msg)
+            }
         }
     }
 }

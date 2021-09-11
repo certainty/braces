@@ -119,6 +119,7 @@ impl Datum {
     /// for runtime values as it uses for s-expressions. This converts between the two worlds.
     pub fn from_value(v: &Value, location: Location) -> Option<Self> {
         match v {
+            Value::Syntax(datum) => Some(datum.clone()),
             Value::Char(c) => Some(Self::character(c.clone(), location)),
             Value::Symbol(sym) => Some(Self::forged_symbol(sym.as_str(), location)),
             Value::InternedString(s) => Some(Self::string(s.as_str(), location)),

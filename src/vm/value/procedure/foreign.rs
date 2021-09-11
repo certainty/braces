@@ -30,13 +30,13 @@ impl Procedure {
 }
 
 impl HasArity for Procedure {
-    fn arity<'a>(&'a self) -> &'a Arity {
+    fn arity(&self) -> &Arity {
         &self.arity
     }
 }
 
 impl HasArity for std::rc::Rc<Procedure> {
-    fn arity<'a>(&'a self) -> &'a Arity {
+    fn arity(&self) -> &Arity {
         &self.arity
     }
 }

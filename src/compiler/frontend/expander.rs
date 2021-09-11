@@ -1,5 +1,6 @@
 pub mod define;
 pub mod lambda;
+pub mod letexp;
 pub mod quotation;
 
 use super::error::Error;
@@ -11,9 +12,14 @@ use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
+use crate::vm::scheme::ffi::{binary_procedure, unary_procedure};
+use crate::vm::value::procedure::{foreign, Arity, Procedure};
+use crate::vm::value::Value;
+use crate::vm::VM;
 
 #[derive(Debug)]
 pub struct Expander {
+    vm: VM,
     compiler: CoreCompiler,
     parser: CoreParser,
     expansion_env: SyntaxEnvironment,
@@ -21,11 +27,15 @@ pub struct Expander {
 
 impl Expander {
     pub fn new() -> Self {
-        Self {
+        let mut expander = Self {
+            vm: VM::for_expansion(),
             compiler: CoreCompiler::new(),
             parser: CoreParser::new(),
             expansion_env: SyntaxEnvironment::basic(),
-        }
+        };
+
+        letexp::register_macros(&mut expander);
+        expander
     }
 
     pub fn expand(&mut self, datum: &Datum) -> Result<Datum> {
@@ -37,7 +47,6 @@ impl Expander {
             Some([operator, operands @ ..]) if operator.is_symbol() => {
                 let denotation = self.denotation_of(operator)?;
                 log::trace!("denotation of {:?} is {:?}", datum, denotation);
-
                 match denotation {
                     Denotation::Special(special) => match special {
                         Special::Define => self.expand_define(&datum, &operator, &operands),
@@ -59,7 +68,11 @@ impl Expander {
                         Special::Quote => Ok(datum.clone()),
                         _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                     },
-                    Denotation::Macro(transformer) => self.expand_macro(&datum, &transformer),
+                    Denotation::Macro(transformer) => {
+                        let expanded = self.expand_macro(&datum, &transformer)?;
+                        // recursively expand
+                        self.expand_macros(&expanded)
+                    }
                     _ => self.expand_apply(operator, operands, datum.source_location().clone()),
                 }
             }
@@ -90,12 +103,45 @@ impl Expander {
         Ok(Datum::list(new_ls.into_iter(), loc))
     }
 
-    fn expand_macro(
-        &mut self,
-        _datum: &Datum,
-        _transformer: &syntax::Transformer,
-    ) -> Result<Datum> {
-        todo!()
+    fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
+        match transformer {
+            syntax::Transformer::ExplicitRenaming(expander) => {
+                let renamer = self.create_renamer();
+                let cmp = self.create_comparator();
+                match self.vm.interpret_expander(
+                    expander.clone(),
+                    datum,
+                    renamer,
+                    cmp,
+                    self.expansion_env.clone(),
+                    datum.source_location().clone(),
+                ) {
+                    Ok(expanded) => Ok(expanded),
+                    Err(e) => Err(Error::expansion_error(
+                        format!("Invocation of macro expander failed: {:?}", e),
+                        &datum,
+                    )),
+                }
+            }
+        }
+    }
+
+    // TODO: make this behave correctly
+    fn create_renamer(&mut self) -> Procedure {
+        Procedure::foreign(foreign::Procedure::new(
+            "rename",
+            |values| unary_procedure(&values).map(|v| v.clone()),
+            Arity::Exactly(1),
+        ))
+    }
+
+    // TODO: make this behave correctly
+    fn create_comparator(&mut self) -> Procedure {
+        Procedure::foreign(foreign::Procedure::new(
+            "compare",
+            |values| binary_procedure(&values).map(|(l, r)| Value::Bool(l == r)),
+            Arity::Exactly(2),
+        ))
     }
 
     fn build_apply(&mut self, op: Symbol, args: Vec<Datum>, loc: Location) -> Datum {
