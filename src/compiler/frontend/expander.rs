@@ -122,6 +122,7 @@ impl Expander {
         }
     }
 
+    // TODO: make this behave correctly
     fn create_renamer(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "rename",
@@ -130,9 +131,10 @@ impl Expander {
         ))
     }
 
+    // TODO: make this behave correctly
     fn create_comparator(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
-            "rename",
+            "compare",
             |values| binary_procedure(&values).map(|(l, r)| Value::Bool(l == r)),
             Arity::Exactly(2),
         ))
