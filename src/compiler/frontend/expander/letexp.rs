@@ -66,11 +66,6 @@ fn expand_let(args: Vec<Value>) -> FunctionResult<Value> {
                 let mut application = vec![lambda];
                 application.extend(values);
 
-                println!(
-                    "Expanding to: {}",
-                    Datum::list(application.clone(), datum.source_location().clone())
-                );
-
                 Ok(Value::syntax(Datum::list(
                     application,
                     datum.source_location().clone(),
