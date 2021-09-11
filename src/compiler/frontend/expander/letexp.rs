@@ -129,6 +129,12 @@ mod tests {
     }
 
     #[test]
+    fn test_expand_simple_let_empty_bindings() -> Result<()> {
+        assert_expands_equal("(let () #t)", "((lambda () #t))", false)?;
+        Ok(())
+    }
+
+    #[test]
     fn test_named_let() -> Result<()> {
         assert_expands_equal(
             "(let lp ((x 0)) (lp (+ x 1)))",
