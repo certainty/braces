@@ -163,13 +163,13 @@ impl Writer {
     fn write_procedure(&self, proc: &procedure::Procedure) -> String {
         match proc {
             procedure::Procedure::Native(proc) => format!(
-                "#<procedure {} ({})>",
+                "#<procedure ({} {})>",
                 proc.name().clone().unwrap_or(String::from("")),
                 self.write_formals(&proc.arity)
             ),
             procedure::Procedure::Foreign(proc) => {
                 format!(
-                    "#<procedure {} ({})>",
+                    "#<procedure ({} {})>",
                     proc.name,
                     self.write_formals(&proc.arity)
                 )
@@ -187,7 +187,7 @@ impl Writer {
                 let fixed_args: Vec<String> = (0..*count).map(|i| format!("x{}", i)).collect();
                 format!("{} . rest", fixed_args.join(" "))
             }
-            procedure::Arity::Many => " . args".to_string(),
+            procedure::Arity::Many => ". args".to_string(),
         }
     }
 

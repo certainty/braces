@@ -406,11 +406,11 @@ impl<'a> CodeGenerator<'a> {
             DefinitionExpression::DefineSimple(id, expr, _loc) => {
                 self.emit_instructions(expr, &Context::NonTail)?;
                 let id_sym = self.sym(&id.string());
-                let const_addr = self.current_chunk().add_constant(id_sym);
+                let const_address = self.current_chunk().add_constant(id_sym);
 
                 if let Target::TopLevel = self.target {
                     self.emit_instruction(
-                        Instruction::Define(const_addr),
+                        Instruction::Define(const_address),
                         &definition.source_location(),
                     )
                 } else {

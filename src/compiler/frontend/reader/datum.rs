@@ -160,6 +160,20 @@ impl Datum {
         }
     }
 
+    pub fn is_improper_list(&self) -> bool {
+        match self {
+            Self::ImproperList(_, _, _) => true,
+            _ => false,
+        }
+    }
+
+    pub fn improper_list_slice(&self) -> Option<(&[Datum], &Datum)> {
+        match self {
+            Self::ImproperList(head, tail, _) => Some((&head[..], &tail)),
+            _ => None,
+        }
+    }
+
     /// If the current datum is a proper list, return the slice of that list's elements
     ///
     /// This function is mostly used in the parser, which uses slice patterns extensively.

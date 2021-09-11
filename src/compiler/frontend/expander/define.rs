@@ -34,6 +34,43 @@ impl Expander {
                     )),
                 }
             }
+
+            [definition, exprs @ ..] if definition.is_improper_list() => {
+                match definition.improper_list_slice() {
+                    Some((head, tail)) => match &head[..] {
+                        //(foo . rest)
+                        [identifier] => {
+                            let lambda = self.build_lambda(
+                                tail,
+                                exprs,
+                                datum.source_location().clone()
+                            );
+                            Ok(Datum::list(vec![operator.clone(), identifier.clone(), lambda], datum.source_location().clone()))
+                        }
+                        //(foo x y . rest)
+                        [identifier , required_args @ ..]  => {
+                            let lambda = self.build_lambda(
+                                &Datum::improper_list(
+                                    required_args.to_vec(),
+                                    tail.clone(),
+                                    datum.source_location().clone(),
+                                ),
+                                exprs,
+                                datum.source_location().clone(),
+                            );
+
+                            Ok(Datum::list(vec![operator.clone(), identifier.clone(), lambda], datum.source_location().clone()))
+                        }
+                        _ => Err(Error::expansion_error(
+                            "Invalid procedure definition. Expected name and arguments in def-formals" ,
+                            &datum
+                        ))
+                    }
+                    _ => Err(Error::bug(
+                        "Expected improper list in expansion of <define>",
+                    )),
+                }
+            }
             //(define <id> <expr>)
             [identifier, expr] => Ok(Datum::list(
                 vec![operator.clone(), identifier.clone(), expr.clone()],
@@ -59,12 +96,40 @@ mod tests {
     }
 
     #[test]
+    fn test_expand_define_procedure_nullary() -> Result<()> {
+        assert_expands_equal("(define (foo) x)", "(define foo (lambda () x))", false)?;
+        Ok(())
+    }
+
+    #[test]
     fn test_expand_define_procedure() -> Result<()> {
         assert_expands_equal(
             "(define (foo x y) x)",
             "(define foo (lambda (x y) x))",
             false,
         )?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_expand_define_procedure_varargs() -> Result<()> {
+        assert_expands_equal(
+            "(define (foo x y . args) x)",
+            "(define foo (lambda (x y . args) x))",
+            false,
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_expand_define_procedure_single_rest_arg() -> Result<()> {
+        assert_expands_equal(
+            "(define (foo . args) x)",
+            "(define foo (lambda args x))",
+            false,
+        )?;
+
         Ok(())
     }
 }
