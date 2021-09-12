@@ -322,6 +322,44 @@ fn test_vm_smoke_test() {
 }
 
 #[test]
+fn test_storage_model() {
+    let mut vm = VM::default();
+    let expected = vm
+        .values
+        .proper_list(vec![vm.values.bool_true(), vm.values.bool_false()]);
+
+    assert_result_eq(
+        &mut vm,
+        r#"
+        ; support procedures
+        (define (list . x) x)
+        
+        ; it doesn't alter the ref outside the lambda
+        (define (foo x) (set! x #t) x)
+        (define y #f)
+        (list (foo y) y)
+        "#,
+        expected,
+    );
+
+    let expected = vm.values.proper_list(vec![
+        vm.values.bool_false(),
+        vm.values.bool_false(),
+        vm.values.bool_false(),
+    ]);
+
+    assert_result_eq(
+        &mut vm,
+        r#"
+        (define ls '(#t #f #f))
+        (set! (car ls) #f)
+        ls 
+        "#,
+        expected,
+    )
+}
+
+#[test]
 fn test_vm_bugs() {
     let mut vm = VM::default();
 
