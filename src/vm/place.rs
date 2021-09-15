@@ -1,20 +1,19 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// A location is a set-able place
+/// A place is a set-able place
 /// There are a number of things that are set-able places in scheme
 /// 1. cons cell in proper and improper list
 /// 2. vector elements
-/// 3. string elements
 /// 4. byte-vector elements
 /// 5. variables
 #[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct Location<T> {
+pub struct Place<T> {
     inner: Rc<RefCell<T>>,
 }
 
-impl<T> Location<T> {
+impl<T> Place<T> {
     pub fn new(v: T) -> Self {
         Self {
             inner: Rc::new(RefCell::new(v)),
@@ -37,8 +36,8 @@ impl<T> Location<T> {
     }
 }
 
-impl<T> PartialEq for Location<T> {
-    fn eq(&self, other: &Location<T>) -> bool {
+impl<T> PartialEq for Place<T> {
+    fn eq(&self, other: &Place<T>) -> bool {
         self.inner.as_ptr() == other.inner.as_ptr()
     }
 }
@@ -50,8 +49,8 @@ mod tests {
 
     #[test]
     pub fn test_ref_value() {
-        let v1 = Location::new(Value::Bool(true));
-        let v2 = Location::new(Value::Bool(true));
+        let v1 = Place::new(Value::Bool(true));
+        let v2 = Place::new(Value::Bool(true));
         let v3 = v1.clone();
 
         assert_ne!(v1, v2);
