@@ -164,6 +164,7 @@ impl<'a> Instance<'a> {
                 &Instruction::SetUpValue(addr) => self.set_up_value(addr)?,
                 &Instruction::GetLocal(addr) => self.get_local(addr)?,
                 &Instruction::SetLocal(addr) => self.set_local(addr)?,
+                &Instruction::Set => self.set()?,
 
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
 
@@ -919,6 +920,24 @@ impl<'a> Instance<'a> {
         self.frame_set_slot(addr, self.peek(0).clone());
         self.push(self.values.unspecified())?;
         Ok(())
+    }
+
+    // the stack before the call to stack looks like this:
+    //       ┌──────────────┐
+    //    3  │ value        │
+    //       ├──────────────┤
+    //    2  │ location     │
+    //       └──────────────┘
+    //
+    // set replaces the value in location with the value on the top of the stack
+    fn set(&mut self) -> Result<()> {
+        let value = self.pop();
+        let location = self.pop();
+
+        // set the reference
+        // TODO: add the implementation once we have locations
+
+        self.push(self.values.unspecified())
     }
 
     ///////////////////////////////////////////////////////

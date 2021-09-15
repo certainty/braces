@@ -1,5 +1,6 @@
 use braces::compiler::source::StringSource;
 use braces::compiler::Compiler;
+use braces::vm::value::equality::SchemeEqual;
 use braces::vm::value::{error, procedure::Arity, Value};
 use braces::vm::Error;
 use braces::vm::Result;
@@ -324,39 +325,70 @@ fn test_vm_smoke_test() {
 #[test]
 fn test_storage_model() {
     let mut vm = VM::default();
-    let expected = vm
-        .values
-        .proper_list(vec![vm.values.bool_true(), vm.values.bool_false()]);
 
-    assert_result_eq(
+    let result = run_code(
         &mut vm,
         r#"
-        ; support procedures
         (define (list . x) x)
         
-        ; it doesn't alter the ref outside the lambda
         (define (foo x) (set! x #t) x)
         (define y #f)
         (list (foo y) y)
         "#,
-        expected,
+    )
+    .unwrap();
+    assert_scheme_equal(
+        result,
+        vm.values
+            .proper_list(vec![vm.values.bool_true(), vm.values.bool_false()]),
     );
 
-    let expected = vm.values.proper_list(vec![
-        vm.values.bool_false(),
-        vm.values.bool_false(),
-        vm.values.bool_false(),
-    ]);
-
-    assert_result_eq(
+    let result = run_code(
         &mut vm,
         r#"
         (define ls '(#t #f #f))
         (set! (car ls) #f)
         ls 
         "#,
-        expected,
     )
+    .unwrap();
+    assert_scheme_equal(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_false(),
+            vm.values.bool_false(),
+            vm.values.bool_false(),
+        ]),
+    );
+
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define (ls . args) args)
+        (define x '(1 2 3 4))
+        (define y '(5 6 7))
+        (set! (car x) (car y))
+        (set! (car y) 0)
+        (ls x y)
+        "#,
+    )
+    .unwrap();
+    assert_scheme_equal(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.proper_list(vec![
+                vm.values.real(5),
+                vm.values.real(2),
+                vm.values.real(3),
+                vm.values.real(4),
+            ]),
+            vm.values.proper_list(vec![
+                vm.values.real(0),
+                vm.values.real(6),
+                vm.values.real(7),
+            ]),
+        ]),
+    );
 }
 
 #[test]
@@ -382,4 +414,8 @@ fn test_vm_bugs() {
             vm.values.bool_true()
         ])
     );
+}
+
+fn assert_scheme_equal(a: Value, b: Value) {
+    assert!(a.is_equal(&b), "values are not scheme-equal")
 }

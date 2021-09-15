@@ -12,6 +12,7 @@ pub enum Instruction {
     SetUpValue(AddressType),
     GetUpValue(AddressType),
     SetLocal(AddressType),
+    Set,
     GetLocal(AddressType),
     UpValue(AddressType, bool),
     CloseUpValue(AddressType),

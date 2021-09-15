@@ -87,6 +87,7 @@ impl<T: Write> Disassembler<T> {
             &Instruction::SetLocal(addr) => {
                 self.disassemble_variable_access("OP_SET_LOCAL", address, addr, true)
             }
+            &Instruction::Set => self.disassemble_simple("OP_SET", address),
 
             &Instruction::Define(const_address) => {
                 self.disassemble_constant(chunk, "OP_DEFINE", address, const_address)

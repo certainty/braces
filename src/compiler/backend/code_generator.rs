@@ -11,6 +11,7 @@
 /// computation of addresses.
 use thiserror::Error;
 
+use super::variables::{Variables, VariablesRef};
 use crate::compiler::frontend::parser::{
     apply::ApplicationExpression,
     assignment::SetExpression,
@@ -35,8 +36,6 @@ use crate::vm::value;
 use crate::vm::value::closure::Closure;
 use crate::vm::value::procedure::Arity;
 use crate::vm::value::Value;
-
-use super::variables::{Variables, VariablesRef};
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
@@ -365,18 +364,31 @@ impl<'a> CodeGenerator<'a> {
 
     fn emit_set_variable(&mut self, expr: &SetExpression, context: &Context) -> Result<()> {
         // push the value of the expression
-        self.emit_instructions(&expr.value, context)?;
 
-        // is it local?
-        if let Some(addr) = self.resolve_local(&expr.name) {
-            self.emit_instruction(Instruction::SetLocal(addr), expr.source_location())
-        } else if let Some(addr) = self.resolve_up_value(&expr.name)? {
-            self.emit_instruction(Instruction::SetUpValue(addr), expr.source_location())
-        } else {
-            // top level variable
-            let id_sym = self.sym(&expr.name.string());
-            let const_addr = self.current_chunk().add_constant(id_sym);
-            self.emit_instruction(Instruction::SetGlobal(const_addr), expr.source_location())
+        match &*expr.location {
+            Expression::Identifier(id) => {
+                self.emit_instructions(&expr.value, context)?;
+
+                // is it local?
+                if let Some(addr) = self.resolve_local(&id) {
+                    self.emit_instruction(Instruction::SetLocal(addr), expr.source_location())
+                } else if let Some(addr) = self.resolve_up_value(&id)? {
+                    self.emit_instruction(Instruction::SetUpValue(addr), expr.source_location())
+                } else {
+                    // top level variable
+                    let id_sym = self.sym(id.string());
+                    let const_addr = self.current_chunk().add_constant(id_sym);
+                    self.emit_instruction(
+                        Instruction::SetGlobal(const_addr),
+                        expr.source_location(),
+                    )
+                }
+            }
+            _ => {
+                self.emit_instructions(&expr.location, context)?;
+                self.emit_instructions(&expr.value, context)?;
+                self.emit_instruction(Instruction::Set, expr.source_location())
+            }
         }
     }
 

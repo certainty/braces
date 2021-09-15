@@ -4,6 +4,7 @@ pub mod disassembler;
 pub mod error;
 pub mod global;
 pub mod instance;
+pub mod location;
 pub mod scheme;
 pub mod settings;
 pub mod stack;
