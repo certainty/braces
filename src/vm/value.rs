@@ -18,6 +18,7 @@ use crate::vm::value::number::real::RealNumber;
 use std::convert::Into;
 use thiserror::Error;
 
+use crate::vm::place::Reference;
 use equality::SchemeEqual;
 
 #[derive(Error, Debug)]
@@ -29,6 +30,7 @@ pub enum Error {
 /// Runtime representation of values
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    Syntax(Datum),
     Bool(bool),
     Symbol(Symbol),
     Char(char),
@@ -41,11 +43,29 @@ pub enum Value {
     ImproperList(list::List, Box<Value>),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
-    Syntax(Datum),
     Unspecified,
+    Ref(Reference<Value>),
 }
 
 impl Value {
+    pub fn to_reference(self) -> Value {
+        Value::Ref(Reference::new(self))
+    }
+
+    pub fn to_value(self) -> Value {
+        match self {
+            Self::Ref(inner) => inner.get_inner(),
+            _ => self,
+        }
+    }
+
+    pub fn is_set_able(&self) -> bool {
+        match self {
+            Self::Ref(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_false(&self) -> bool {
         match self {
             Self::Bool(false) => true,
@@ -279,5 +299,20 @@ impl Factory {
             .cloned()
             .map(InternedString)
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::vm::value::Factory;
+
+    #[test]
+    fn test_is_settable() {
+        let values = Factory::default();
+
+        assert!(!values.false_value.is_set_able());
+        assert!(!values.character('a').is_set_able());
+
+        assert!(values.false_value.to_reference().is_set_able())
     }
 }

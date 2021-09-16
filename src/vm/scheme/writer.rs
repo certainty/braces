@@ -34,6 +34,7 @@ impl Writer {
 
     fn write_impl(&self, v: &Value, values: &Factory, quote: bool) -> String {
         match v {
+            Value::Ref(inner) => inner.with_ref(|e| self.write_impl(&e, &values, quote)),
             Value::Syntax(datum) => self.write_string(format!("#<syntax {}>", datum).as_str()),
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),

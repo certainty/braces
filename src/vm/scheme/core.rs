@@ -29,6 +29,7 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
     register_core!(vm, "inspect", inspect, Arity::Exactly(1));
 
+    register_core!(vm, "car", list_car, Arity::Exactly(1));
     register_core!(vm, "cons", list_cons, Arity::Exactly(2));
     register_core!(vm, "append", list_append, Arity::Exactly(2));
 
@@ -113,6 +114,32 @@ pub fn bool_not(args: Vec<Value>) -> FunctionResult<Value> {
 pub fn inspect(args: Vec<Value>) -> FunctionResult<Value> {
     println!("Debug: {:?}", args.first().unwrap());
     Ok(Value::Unspecified)
+}
+
+pub fn list_car(args: Vec<Value>) -> FunctionResult<Value> {
+    unary_procedure(&args).and_then(|v| match v {
+        Value::ProperList(ls) => {
+            if let Some(v) = ls.first() {
+                Ok(v.clone())
+            } else {
+                Err(error::argument_error(
+                    v.clone(),
+                    "can't take care of empty list",
+                ))
+            }
+        }
+        Value::ImproperList(ls, _) => {
+            if let Some(v) = ls.first() {
+                Ok(v.clone())
+            } else {
+                Err(error::argument_error(
+                    v.clone(),
+                    "can't take care of empty list",
+                ))
+            }
+        }
+        _ => Err(error::argument_error(v.clone(), "Expected list")),
+    })
 }
 
 pub fn list_cons(args: Vec<Value>) -> FunctionResult<Value> {
