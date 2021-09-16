@@ -399,6 +399,38 @@ fn test_storage_model_set_references_to_cons_cells() {
 }
 
 #[test]
+fn test_storage_model_improper_list() {
+    let mut vm = VM::default();
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define ls '(1 2 3 . 4))
+        (set! (car ls) 3)
+        (car ls)
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(result, vm.values.real(3));
+}
+
+#[test]
+fn test_storage_model_vector() {
+    let mut vm = VM::default();
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define v #(1 2 3))
+        (set! (vector-ref v 0) 5)
+        (vector-ref v 0)
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(result, vm.values.real(5));
+}
+
+#[test]
 fn test_vm_bugs() {
     let mut vm = VM::default();
 

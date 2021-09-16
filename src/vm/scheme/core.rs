@@ -33,6 +33,7 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "cons", list_cons, Arity::Exactly(2));
     register_core!(vm, "append", list_append, Arity::Exactly(2));
 
+    register_core!(vm, "vector-ref", vector_ref, Arity::Exactly(2));
     register_core!(vm, "vector-cons", vector_cons, Arity::Exactly(2));
     register_core!(vm, "vector-append", vector_append, Arity::Exactly(2));
 
@@ -166,6 +167,35 @@ pub fn list_append(args: Vec<Value>) -> FunctionResult<Value> {
         (lhs, _) => Err(error::argument_error(lhs.clone(), "Expected list")),
     }
 }
+
+pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Value> {
+    match binary_procedure(&args)? {
+        (Value::Vector(vector), Value::Number(index)) => {
+            if let Some(idx) = index.to_usize() {
+                if let Some(v) = vector.get(idx) {
+                    Ok(v.clone())
+                } else {
+                    Err(error::out_of_bound_error(idx, 0..vector.len()))
+                }
+            } else {
+                Err(error::argument_error(
+                    Value::Number(index.clone()),
+                    "not a valid index",
+                ))
+            }
+        }
+        (other, Value::Number(_)) => Err(error::argument_error(other.clone(), "Expected vector")),
+        (Value::Vector(_), other) => Err(error::argument_error(
+            other.clone(),
+            "Expected numeric index",
+        )),
+        (other, _) => Err(error::argument_error(
+            other.clone(),
+            "Expected the two aruments to be of type vector and number",
+        )),
+    }
+}
+
 pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Value> {
     match binary_procedure(&args)? {
         (v, Value::Vector(elts)) => {

@@ -254,11 +254,11 @@ impl Factory {
     }
 
     pub fn improper_list(&self, head: Vec<Value>, tail: Value) -> Value {
-        Value::ImproperList(head.into(), Box::new(tail))
+        Value::ImproperList(head.into(), Box::new(tail.to_reference()))
     }
 
     pub fn vector(&self, vals: Vec<Value>) -> Value {
-        Value::Vector(vals)
+        Value::Vector(vals.iter().map(|e| e.clone().to_reference()).collect())
     }
 
     pub fn byte_vector(&self, vals: Vec<u8>) -> Value {
@@ -296,7 +296,11 @@ impl Factory {
             }
             Datum::Char(c, _) => self.character(*c),
             Datum::Number(num, _) => Value::Number(num.clone()),
-            Datum::Vector(v, _) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
+            Datum::Vector(v, _) => Value::Vector(
+                v.iter()
+                    .map(|e| self.from_datum(e).to_reference())
+                    .collect(),
+            ),
             Datum::ByteVector(v, _) => Value::ByteVector(v.clone()),
         }
     }

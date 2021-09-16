@@ -84,6 +84,15 @@ impl Number {
                 .and_then(|fx| fx.as_inner().to_u8()),
         }
     }
+
+    pub fn to_usize(&self) -> Option<usize> {
+        match self {
+            Self::Real(r) => r
+                .clone()
+                .checked_as::<fixnum::Fixnum>()
+                .and_then(|fx| fx.as_inner().to_usize()),
+        }
+    }
 }
 
 impl ToString for Number {

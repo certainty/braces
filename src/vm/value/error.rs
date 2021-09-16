@@ -12,6 +12,8 @@ pub enum RuntimeError {
     ArgumentError(Value, String),
     #[error("ApplicationError: `{0:?}` is not callable")]
     NoncallableError(Value),
+    #[error("OutOfBoundError")]
+    OutOfBoundError(usize, std::ops::Range<usize>),
     #[error("ArithmeticError: `{0}`")]
     ArithmeticError(String),
     #[error("SyntaxError")]
@@ -20,6 +22,13 @@ pub enum RuntimeError {
 
 pub fn syntax_error<T: Into<String>>(msg: T) -> RuntimeError {
     RuntimeError::SyntaxError(msg.into())
+}
+
+pub fn out_of_bound_error<R: Into<std::ops::Range<usize>>>(
+    idx: usize,
+    accepted: R,
+) -> RuntimeError {
+    RuntimeError::OutOfBoundError(idx, accepted.into())
 }
 
 pub fn arithmetic_error<T: Into<String>>(msg: T) -> RuntimeError {
