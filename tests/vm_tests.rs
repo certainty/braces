@@ -277,7 +277,7 @@ fn test_vm_complex_closures() {
         (define get-x #t)
         (define make-closures (lambda (value)
            ((lambda (x)
-             (set! get-x (lambda () x))
+              (set! get-x (lambda () x))
               (set! set-x (lambda (new) (set! x new)))) value)))
 
         (make-closures #t)
@@ -335,6 +335,7 @@ fn test_storage_model_locals_modfied_locally() {
         "#,
     )
     .unwrap();
+    println!("result: {}", result);
     assert_eq!(
         result,
         vm.values
@@ -353,6 +354,7 @@ fn test_storage_model_set_cons_cell() {
         "#,
     )
     .unwrap();
+    println!("result: {}", result);
     assert_eq!(
         result,
         vm.values.proper_list(vec![

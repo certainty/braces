@@ -82,14 +82,17 @@ impl Commands {
 
     fn handle_disass(&self, ident: &str, vm: &mut VM) -> anyhow::Result<()> {
         match vm.top_level.get(&vm.values.sym(ident)) {
-            Some(Value::Closure(closure)) => match vm.disassemble(closure.procedure()) {
-                Err(e) => Err(anyhow!("{}", e)),
-                _ => Ok(()),
-            },
-            Some(Value::Procedure(Procedure::Native(proc))) => match vm.disassemble(&(*proc)) {
-                Err(e) => Err(anyhow!("{}", e)),
-                _ => Ok(()),
-            },
+            Some(v) => v.with_ref(|value| match value {
+                Value::Closure(closure) => match vm.disassemble(closure.procedure()) {
+                    Err(e) => Err(anyhow!("{}", e)),
+                    _ => Ok(()),
+                },
+                Value::Procedure(Procedure::Native(proc)) => match vm.disassemble(&(*proc)) {
+                    Err(e) => Err(anyhow!("{}", e)),
+                    _ => Ok(()),
+                },
+                _ => Err(anyhow!("Can't disassemble non-procedure")),
+            }),
             _ => Err(anyhow!("Can't disassemble non-procedure")),
         }
     }

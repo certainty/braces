@@ -378,12 +378,15 @@ impl<'a> CodeGenerator<'a> {
                     self.emit_instruction(Instruction::SetUpValue(addr), expr.source_location())
                 } else {
                     // top level variable
-                    let id_sym = self.sym(id.string());
-                    let const_addr = self.current_chunk().add_constant(id_sym);
-                    self.emit_instruction(
-                        Instruction::SetGlobal(const_addr),
-                        expr.source_location(),
-                    )
+                    //let id_sym = self.sym(id.string());
+                    //let const_addr = self.current_chunk().add_constant(id_sym);
+                    //self.emit_instruction(
+                    //    Instruction::SetGlobal(const_addr),
+                    //    expr.source_location(),
+                    // )
+                    self.emit_instructions(&expr.location, context)?;
+                    self.emit_instructions(&expr.value, context)?;
+                    self.emit_instruction(Instruction::Set, expr.source_location())
                 }
             }
             _ => {

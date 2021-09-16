@@ -1,10 +1,11 @@
 use super::value::symbol::Symbol;
 use super::value::Value;
+use crate::vm::place::Reference;
 use rustc_hash::FxHashMap;
 
 #[derive(Debug)]
 pub struct TopLevel {
-    bindings: FxHashMap<Symbol, Value>,
+    bindings: FxHashMap<Symbol, Reference<Value>>,
 }
 
 impl TopLevel {
@@ -21,15 +22,19 @@ impl TopLevel {
             .collect()
     }
 
-    pub fn set(&mut self, k: Symbol, v: Value) {
-        self.bindings.insert(k, v);
+    pub fn define(&mut self, k: Symbol, v: Value) {
+        self.bindings.insert(k, v.into());
     }
 
-    pub fn get(&self, k: &Symbol) -> Option<&Value> {
+    pub fn set(&mut self, k: Symbol, v: Value) {
+        self.bindings.get_mut(&k).map(|r| r.set(v));
+    }
+
+    pub fn get(&self, k: &Symbol) -> Option<&Reference<Value>> {
         self.bindings.get(k)
     }
 
     pub fn get_owned(&self, k: &Symbol) -> Option<Value> {
-        self.bindings.get(k).map(|e| e.clone())
+        self.bindings.get(k).map(|e| e.get_inner())
     }
 }

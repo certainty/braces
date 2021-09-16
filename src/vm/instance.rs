@@ -139,7 +139,7 @@ impl<'a> Instance<'a> {
         vm.push(Value::Procedure(rename))?;
         vm.push(Value::Procedure(compare))?;
         vm.tail_call(3)?;
-        Ok(vm.stack.pop())
+        Ok(vm.stack.pop().to_value())
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -157,7 +157,6 @@ impl<'a> Instance<'a> {
                 &Instruction::Define(addr) => self.define_value(addr)?,
 
                 &Instruction::GetGlobal(addr) => self.get_global(addr)?,
-                &Instruction::SetGlobal(addr) => self.set_global(addr)?,
                 &Instruction::UpValue(addr, is_local) => self.create_up_value(addr, is_local)?,
                 &Instruction::CloseUpValue(addr) => self.close_up_value(addr)?,
                 &Instruction::GetUpValue(addr) => self.get_up_value(addr)?,
@@ -584,8 +583,7 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
-        let callable = self.peek(args).clone();
-
+        let callable = self.peek(args).clone().to_value();
         match callable {
             value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
             value::Value::Procedure(procedure::Procedure::Native(p)) => {
@@ -659,7 +657,11 @@ impl<'a> Instance<'a> {
         arg_count: usize,
     ) -> Result<()> {
         self.check_arity(&proc.arity, arg_count)?;
-        let arguments = self.pop_n(arg_count).iter().cloned().collect();
+        let arguments = self
+            .pop_n(arg_count)
+            .iter()
+            .map(|a| a.clone().to_value())
+            .collect();
         // also pop the procedure itself
         self.pop();
         match proc.call(arguments) {
@@ -701,7 +703,7 @@ impl<'a> Instance<'a> {
     #[inline]
     fn tail_call(&mut self, args: usize) -> Result<()> {
         self.setup_tail_call(args)?;
-        let callable = self.peek(args).clone();
+        let callable = self.peek(args).clone().to_value();
 
         match callable {
             value::Value::Closure(cl) => self.tail_call_closure(cl.clone(), args)?,
@@ -844,6 +846,11 @@ impl<'a> Instance<'a> {
         }
     }
 
+    #[inline]
+    fn make_variable(&mut self, v: Value) -> Value {
+        v.to_reference()
+    }
+
     ///////////////////////////////////////////////////////
     //
     // Managing variables in different scopes
@@ -853,7 +860,7 @@ impl<'a> Instance<'a> {
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
-        self.top_level.set(id.clone(), v.clone());
+        self.top_level.define(id.clone(), v);
         self.push(self.values.unspecified())?;
         Ok(())
     }
@@ -865,24 +872,12 @@ impl<'a> Instance<'a> {
     #[inline]
     fn get_global(&mut self, addr: ConstAddressType) -> Result<()> {
         let id = self.read_identifier(addr)?;
+        let value = self.top_level.get(&id).cloned();
 
-        if let Some(value) = self.top_level.get_owned(&id) {
-            self.push(value)?;
+        if let Some(reference) = value {
+            self.push(Value::Ref(reference))?;
         } else {
             self.runtime_error(error::undefined_variable(id), None)?;
-        }
-        Ok(())
-    }
-
-    fn set_global(&mut self, addr: ConstAddressType) -> Result<()> {
-        let v = self.pop();
-        let id = self.read_identifier(addr)?;
-
-        if !self.top_level.get(&id).is_some() {
-            return self.runtime_error(error::undefined_variable(id.clone()), None);
-        } else {
-            self.top_level.set(id.clone(), v.clone());
-            self.push(self.values.unspecified())?;
         }
         Ok(())
     }

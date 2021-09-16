@@ -69,7 +69,7 @@ impl VM {
     pub fn register_foreign(&mut self, proc: foreign::Procedure) -> Result<()> {
         let name = self.values.sym(proc.name.clone());
         let proc_value = self.values.foreign_procedure(proc);
-        self.top_level.set(name, proc_value);
+        self.top_level.define(name, proc_value);
         Ok(())
     }
 
@@ -90,6 +90,7 @@ impl VM {
             &mut self.values,
             debug_mode,
         )
+        .map(|v| v.to_value())
     }
 
     pub fn interpret_expander(
