@@ -113,4 +113,14 @@ mod tests {
         assert_expands_equal("(let () #t)", "((lambda () #t))", false)?;
         Ok(())
     }
+
+    #[test]
+    fn test_let_after_define() -> Result<()> {
+        assert_expands_equal(
+            "(define x (let ((f #t)) f))",
+            "(define x ((lambda (f) f) #t))",
+            false,
+        )?;
+        Ok(())
+    }
 }

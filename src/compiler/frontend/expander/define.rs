@@ -76,10 +76,18 @@ impl Expander {
                 }
             }
             //(define <id> <expr>)
-            [identifier, expr] => Ok(Datum::list(
-                vec![operator.clone(), identifier.clone(), expr.clone()],
-                datum.source_location().clone(),
-            )),
+            [identifier, expr] => {
+                let expanded_place = self.expand_macros(identifier)?;
+                let expanded_expr = self.expand_macros(expr)?;
+                Ok(Datum::list(
+                    vec![
+                        operator.clone(),
+                        expanded_place.clone(),
+                        expanded_expr.clone(),
+                    ],
+                    datum.source_location().clone(),
+                ))
+            }
             _ => Err(Error::expansion_error(
                 "Expected definition or procedure definition",
                 &datum,

@@ -59,7 +59,8 @@ impl Value {
 
     pub fn to_value(self) -> Value {
         match self {
-            Self::Ref(inner) => inner.get_inner(),
+            // we're unpacking until the value is full unwrapped
+            Self::Ref(inner) => inner.get_inner().to_value(),
             _ => self,
         }
     }

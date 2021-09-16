@@ -362,39 +362,10 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    // TODO: think about unifying setting of variables (identifiers) and other places
-    //       this will simplify the computational model, but it might be more expensive to execute
     fn emit_set(&mut self, expr: &SetExpression, context: &Context) -> Result<()> {
-        // push the value of the expression
-
-        match &*expr.location {
-            Expression::Identifier(id) => {
-                self.emit_instructions(&expr.value, context)?;
-
-                // is it local?
-                if let Some(addr) = self.resolve_local(&id) {
-                    self.emit_instruction(Instruction::SetLocal(addr), expr.source_location())
-                } else if let Some(addr) = self.resolve_up_value(&id)? {
-                    self.emit_instruction(Instruction::SetUpValue(addr), expr.source_location())
-                } else {
-                    // top level variable
-                    //let id_sym = self.sym(id.string());
-                    //let const_addr = self.current_chunk().add_constant(id_sym);
-                    //self.emit_instruction(
-                    //    Instruction::SetGlobal(const_addr),
-                    //    expr.source_location(),
-                    // )
-                    self.emit_instructions(&expr.location, context)?;
-                    self.emit_instructions(&expr.value, context)?;
-                    self.emit_instruction(Instruction::Set, expr.source_location())
-                }
-            }
-            _ => {
-                self.emit_instructions(&expr.location, context)?;
-                self.emit_instructions(&expr.value, context)?;
-                self.emit_instruction(Instruction::Set, expr.source_location())
-            }
-        }
+        self.emit_instructions(&expr.location, context)?;
+        self.emit_instructions(&expr.value, context)?;
+        self.emit_instruction(Instruction::Set, expr.source_location())
     }
 
     fn emit_body(&mut self, body: &BodyExpression) -> Result<()> {

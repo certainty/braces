@@ -160,16 +160,11 @@ impl<'a> Instance<'a> {
                 &Instruction::UpValue(addr, is_local) => self.create_up_value(addr, is_local)?,
                 &Instruction::CloseUpValue(addr) => self.close_up_value(addr)?,
                 &Instruction::GetUpValue(addr) => self.get_up_value(addr)?,
-                &Instruction::SetUpValue(addr) => self.set_up_value(addr)?,
                 &Instruction::GetLocal(addr) => self.get_local(addr)?,
-                &Instruction::SetLocal(addr) => self.set_local(addr)?,
                 &Instruction::Set => self.set()?,
-
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
-
                 &Instruction::Call(args) => self.apply(args)?,
                 &Instruction::TailCall(args) => self.tail_call(args)?,
-
                 &Instruction::JumpIfFalse(to) => self.jump_if_false(to)?,
                 &Instruction::Jump(to) => self.jump(to)?,
                 &Instruction::Return => {
@@ -411,12 +406,6 @@ impl<'a> Instance<'a> {
         self.stack.at(index)
     }
 
-    #[inline]
-    fn frame_set_slot(&mut self, slot_address: AddressType, value: Value) {
-        let index = self.frame_slot_address_to_stack_index(slot_address);
-        self.stack.set(index, value);
-    }
-
     ///////////////////////////////////////////////////////
     //
     // Jumps and conditional jumps
@@ -484,17 +473,18 @@ impl<'a> Instance<'a> {
 
     fn _return(&mut self) -> Result<Option<Value>> {
         // save the return value
-        let value = self.pop();
+        let value = self.pop().to_value(); // unwrap any references
         let (remaining, frame) = self.pop_frame();
 
         // unwind the stack
         self.stack.truncate(frame.stack_base);
-        self.push(value.clone())?;
 
         if remaining <= 0 {
+            self.push(value.clone())?;
             self.debug_stack();
             Ok(Some(value))
         } else {
+            self.push(value)?;
             Ok(None)
         }
     }
@@ -558,7 +548,8 @@ impl<'a> Instance<'a> {
             return Ok(());
         } else {
             let value = self.stack.at(stack_idx as usize).clone();
-            self.open_up_values.insert(stack_idx, value.into());
+            self.open_up_values
+                .insert(stack_idx, Reference::from(value));
             Ok(())
         }
     }
@@ -819,19 +810,41 @@ impl<'a> Instance<'a> {
 
     fn bind_arguments(&mut self, arity: &Arity, arg_count: usize) -> Result<usize> {
         match arity {
-            Arity::Exactly(_) => Ok(arg_count), // nothing to do as the variables are layed out as expected already on the stack
+            Arity::Exactly(n) => {
+                // we place the values on the stack into references, which are then available during the function call
+                let args: Vec<Value> = self.pop_n(*n);
+                for arg in args {
+                    // place the pure value into the reference represented by the variable (argument)
+                    self.push(arg.to_value().to_reference())?;
+                }
+                Ok(arg_count)
+            }
             Arity::AtLeast(n) => {
-                // stuff the last values into a new local
-                let rest_count = arg_count - n;
-                let rest_values = self.pop_n(rest_count);
-                let rest_list = self.values.proper_list(rest_values);
-                self.push(rest_list)?;
+                let args: Vec<Value> = self.pop_n(arg_count);
+                let (named_args, rest_args) = args.split_at(*n);
+                let rest_list = self.values.proper_list(
+                    rest_args
+                        .iter()
+                        .map(|e| e.clone().to_value())
+                        .collect::<Vec<_>>()
+                        .into(),
+                );
+
+                for arg in named_args {
+                    // now place the pure value into the reference represented by the variable (argument)
+                    self.push(arg.clone().to_value().to_reference())?;
+                }
+                self.push(rest_list.to_reference())?;
                 Ok(n + 1)
             }
             Arity::Many => {
-                let rest_values = self.pop_n(arg_count);
+                let rest_values: Vec<Value> = self
+                    .pop_n(arg_count)
+                    .iter()
+                    .map(|e| e.clone().to_value())
+                    .collect();
                 let rest_list = self.values.proper_list(rest_values);
-                self.push(rest_list)?;
+                self.push(rest_list.to_reference())?;
                 Ok(1)
             }
         }
@@ -844,11 +857,6 @@ impl<'a> Instance<'a> {
             Arity::Many => Ok(()),
             other => self.runtime_error(error::arity_mismatch(other.clone(), arg_count), None),
         }
-    }
-
-    #[inline]
-    fn make_variable(&mut self, v: Value) -> Value {
-        v.to_reference()
     }
 
     ///////////////////////////////////////////////////////
@@ -889,15 +897,7 @@ impl<'a> Instance<'a> {
     #[inline]
     fn get_up_value(&mut self, addr: AddressType) -> Result<()> {
         let value = self.active_frame().closure.get_up_value(addr);
-        self.push(value.get_inner())?;
-        Ok(())
-    }
-
-    #[inline]
-    fn set_up_value(&mut self, addr: AddressType) -> Result<()> {
-        let value = self.peek(0).clone();
-        self.active_mut_frame().closure.set_up_value(addr, value);
-        self.push(self.values.unspecified())?;
+        self.push(Value::Ref(value))?;
         Ok(())
     }
 
@@ -908,13 +908,6 @@ impl<'a> Instance<'a> {
     #[inline]
     fn get_local(&mut self, addr: AddressType) -> Result<()> {
         self.push(self.frame_get_slot(addr).clone())
-    }
-
-    #[inline]
-    fn set_local(&mut self, addr: AddressType) -> Result<()> {
-        self.frame_set_slot(addr, self.peek(0).clone());
-        self.push(self.values.unspecified())?;
-        Ok(())
     }
 
     // the stack before the call to stack looks like this:
@@ -929,8 +922,6 @@ impl<'a> Instance<'a> {
         let value = self.pop();
         let location = self.pop();
 
-        // set the reference
-        // TODO: add the implementation once we have locations
         match location {
             Value::Ref(mut reference) => reference.set(value.to_value()),
             _ => {

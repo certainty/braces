@@ -222,11 +222,12 @@ fn test_vm_simple_closures() {
     let result = run_code(
         &mut vm,
         r#"
-        (define test
-          ((lambda (x y) (lambda () (set! x (not x)) x)) #t 'ignored)
-        )
-       (define ls (lambda x x))
-       (ls (test) (test) (test))
+        (define (list . rest) rest)
+        (define test 
+           (let ((x #t)
+                 (y 'ignored))
+             (lambda () (set! x (not x)) x)))
+        (list (test) (test) (test))
         "#,
     )
     .unwrap();
