@@ -19,7 +19,9 @@ use std::convert::Into;
 use thiserror::Error;
 
 use crate::vm::place::Reference;
+use crate::vm::scheme::writer::Writer;
 use equality::SchemeEqual;
+use std::fmt::Formatter;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -49,7 +51,10 @@ pub enum Value {
 
 impl Value {
     pub fn to_reference(self) -> Value {
-        Value::Ref(Reference::new(self))
+        match self {
+            Self::Ref(_) => self,
+            _ => Value::Ref(Reference::from(self)),
+        }
     }
 
     pub fn to_value(self) -> Value {
@@ -108,6 +113,7 @@ impl Value {
 impl SchemeEqual<Value> for Value {
     fn is_eq(&self, other: &Value) -> bool {
         match (self, other) {
+            (Value::Ref(lhs), Value::Ref(rhs)) => lhs.is_eq(rhs),
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
             (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
@@ -128,6 +134,7 @@ impl SchemeEqual<Value> for Value {
 
     fn is_eqv(&self, other: &Value) -> bool {
         match (self, other) {
+            (Value::Ref(lhs), Value::Ref(rhs)) => lhs.is_eqv(rhs),
             (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eqv(rhs),
@@ -149,6 +156,7 @@ impl SchemeEqual<Value> for Value {
 
     fn is_equal(&self, other: &Value) -> bool {
         match (self, other) {
+            (Value::Ref(lhs), Value::Ref(rhs)) => lhs.is_equal(rhs),
             (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_equal(rhs),
@@ -239,7 +247,7 @@ impl Factory {
         if vals.is_empty() {
             Value::ProperList(list::List::Nil)
         } else {
-            let ls: list::List = vals.into();
+            let ls: list::List = list::List::from(vals);
             Value::ProperList(ls)
         }
     }
@@ -302,6 +310,28 @@ impl Factory {
     }
 }
 
+// Implementation of display that's useful for logging and printf debugging
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let writer = Writer::new();
+        match self {
+            Value::Ref(inner) => {
+                let printed = inner.with_ref(|r| writer.write(&r));
+                f.write_fmt(format_args!("&{}", printed))
+            }
+            Value::ProperList(elements) => {
+                let printend_elements = elements
+                    .iter()
+                    .map(|e| format!("{}", e))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                f.write_fmt(format_args!("({})", printend_elements))
+            }
+            _ => f.write_str(writer.write(&self).as_str()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::vm::value::Factory;
@@ -314,5 +344,14 @@ mod tests {
         assert!(!values.character('a').is_set_able());
 
         assert!(values.false_value.to_reference().is_set_able())
+    }
+
+    #[test]
+    fn test_display_lists() {
+        let values = Factory::default();
+
+        let v = values.proper_list(vec![values.bool_true(), values.bool_false()]);
+
+        assert_eq!(format!("{}", v), "(&#t &#f)")
     }
 }

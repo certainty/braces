@@ -222,7 +222,7 @@ impl<'a> CodeGenerator<'a> {
     fn emit_instructions(&mut self, ast: &Expression, context: &Context) -> Result<()> {
         match ast {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
-            Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
+            Expression::Assign(expr) => self.emit_set(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr, context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
@@ -362,7 +362,9 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    fn emit_set_variable(&mut self, expr: &SetExpression, context: &Context) -> Result<()> {
+    // TODO: think about unifying setting of variables (identifiers) and other places
+    //       this will simplify the computational model, but it might be more expensive to execute
+    fn emit_set(&mut self, expr: &SetExpression, context: &Context) -> Result<()> {
         // push the value of the expression
 
         match &*expr.location {

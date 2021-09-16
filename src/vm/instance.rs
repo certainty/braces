@@ -937,7 +937,7 @@ impl<'a> Instance<'a> {
         // set the reference
         // TODO: add the implementation once we have locations
         match location {
-            Value::Ref(mut reference) => reference.set(value),
+            Value::Ref(mut reference) => reference.set(value.to_value()),
             _ => {
                 return self.runtime_error(
                     error::argument_error(location, "Can't set! immutable value"),

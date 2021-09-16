@@ -21,10 +21,12 @@ impl List {
 
     pub fn cons(&self, v: Value) -> List {
         match self {
-            List::Nil => List::Cons(Vector::from(vec![v])),
+            List::Nil => List::Cons(Vector::from(vec![v.to_reference()])),
             List::Cons(elts) => {
                 let mut new_elts = elts.clone();
-                new_elts.push_front(v);
+                // if it's a reference itself we first copy it value out and then wrap it
+                // into a references again
+                new_elts.push_front(v.to_reference());
                 List::Cons(new_elts)
             }
         }
@@ -59,38 +61,33 @@ impl List {
 
     #[inline]
     pub fn head(&self) -> Option<&Value> {
-        match self {
-            List::Nil => None,
-            List::Cons(e) => e.head(),
-        }
+        self.first()
     }
 
     #[inline]
     pub fn first(&self) -> Option<&Value> {
-        self.head()
+        self.at(0)
     }
 
     #[inline]
     pub fn second(&self) -> Option<&Value> {
-        match self {
-            List::Nil => None,
-            List::Cons(e) => e.get(1),
-        }
+        self.at(1)
     }
 
     #[inline]
     pub fn third(&self) -> Option<&Value> {
-        match self {
-            List::Nil => None,
-            List::Cons(e) => e.get(2),
-        }
+        self.at(2)
     }
 
     #[inline]
     pub fn fourth(&self) -> Option<&Value> {
+        self.at(3)
+    }
+
+    pub fn at(&self, i: usize) -> Option<&Value> {
         match self {
             List::Nil => None,
-            List::Cons(e) => e.get(3),
+            List::Cons(elts) => elts.get(i),
         }
     }
 
@@ -149,21 +146,10 @@ impl FromIterator<Value> for List {
     }
 }
 
-impl IntoIterator for List {
-    type Item = Value;
-    type IntoIter = im_rc::vector::ConsumingIter<Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            List::Nil => im_rc::vector::Vector::new().into_iter(),
-            List::Cons(e) => e.into_iter(),
-        }
-    }
-}
-
 impl From<Vec<Value>> for List {
     fn from(elements: Vec<Value>) -> Self {
-        let ls: im_rc::vector::Vector<Value> = elements.into_iter().collect();
+        let ls: im_rc::vector::Vector<Value> =
+            elements.into_iter().map(|e| e.to_reference()).collect();
 
         if ls.is_empty() {
             List::Nil

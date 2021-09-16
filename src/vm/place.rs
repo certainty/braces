@@ -1,3 +1,4 @@
+use crate::vm::value::equality::SchemeEqual;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -55,6 +56,20 @@ impl<T: Clone> Reference<T> {
 impl<T: Clone> From<T> for Reference<T> {
     fn from(v: T) -> Self {
         Self::new(v)
+    }
+}
+
+impl<T: SchemeEqual<T> + Clone> SchemeEqual<Reference<T>> for Reference<T> {
+    fn is_eq(&self, other: &Reference<T>) -> bool {
+        Reference::<T>::ref_eq(self, other)
+    }
+
+    fn is_eqv(&self, other: &Reference<T>) -> bool {
+        Reference::<T>::ref_eq(self, other)
+    }
+
+    fn is_equal(&self, other: &Reference<T>) -> bool {
+        self.with_ref(|lhs| other.with_ref(|rhs| lhs.is_equal(rhs)))
     }
 }
 

@@ -3,7 +3,7 @@ use crate::vm::value::number::fixnum::Fixnum;
 use crate::vm::value::number::flonum::Flonum;
 use crate::vm::value::number::{real::RealNumber, Number, SchemeNumber};
 use crate::vm::value::procedure;
-use crate::vm::value::{Factory, Value};
+use crate::vm::value::Value;
 use std::collections::HashSet;
 
 /// The scheme writer is responsible to create external representations
@@ -28,13 +28,13 @@ impl Writer {
         }
     }
 
-    pub fn write(&self, v: &Value, values: &Factory) -> String {
-        self.write_impl(v, &values, true)
+    pub fn write(&self, v: &Value) -> String {
+        self.write_impl(v, true)
     }
 
-    fn write_impl(&self, v: &Value, values: &Factory, quote: bool) -> String {
+    fn write_impl(&self, v: &Value, quote: bool) -> String {
         match v {
-            Value::Ref(inner) => inner.with_ref(|e| self.write_impl(&e, &values, quote)),
+            Value::Ref(inner) => inner.with_ref(|e| self.write_impl(&e, quote)),
             Value::Syntax(datum) => self.write_string(format!("#<syntax {}>", datum).as_str()),
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
@@ -48,10 +48,7 @@ impl Writer {
             }
             Value::Procedure(proc) => self.write_procedure(&proc),
             Value::Vector(elts) => {
-                let body: Vec<String> = elts
-                    .iter()
-                    .map(|e| self.write_impl(&e, values, false))
-                    .collect();
+                let body: Vec<String> = elts.iter().map(|e| self.write_impl(&e, false)).collect();
 
                 format!("#({})", body.join(" "))
             }
@@ -61,19 +58,14 @@ impl Writer {
                 format!("#u8({})", body.join(" "))
             }
             Value::ProperList(elts) => {
-                let body: Vec<String> = elts
-                    .iter()
-                    .map(|e| self.write_impl(&e, values, false))
-                    .collect();
+                let body: Vec<String> = elts.iter().map(|e| self.write_impl(&e, quote)).collect();
 
                 format!("'({})", body.join(" "))
             }
             Value::ImproperList(head, tail) => {
-                let head_body: Vec<String> = head
-                    .iter()
-                    .map(|e| self.write_impl(&e, values, false))
-                    .collect();
-                let tail_body = self.write_impl(&tail, values, false);
+                let head_body: Vec<String> =
+                    head.iter().map(|e| self.write_impl(&e, quote)).collect();
+                let tail_body = self.write_impl(&tail, false);
 
                 format!("'({} . {})", head_body.join(" "), tail_body)
             }
@@ -236,7 +228,7 @@ mod tests {
     use crate::compiler::frontend::reader;
     use crate::compiler::source::{Registry, StringSource};
     use crate::vm::value::arbitrary::SymbolString;
-    use crate::vm::value::Value;
+    use crate::vm::value::{Factory, Value};
     use quickcheck;
 
     #[test]
@@ -245,10 +237,10 @@ mod tests {
         let writer = Writer::new();
 
         let v = values.bool_true();
-        assert_eq!(writer.write(&v, &values), "#t");
+        assert_eq!(writer.write(&v), "#t");
 
         let v = values.bool_false();
-        assert_eq!(writer.write(&v, &values), "#f");
+        assert_eq!(writer.write(&v), "#f");
     }
 
     #[test]
@@ -257,7 +249,7 @@ mod tests {
         let writer = Writer::new();
 
         let v = values.character('\u{0018}');
-        assert_eq!(writer.write(&v, &values), "#\\delete");
+        assert_eq!(writer.write(&v), "#\\delete");
     }
 
     #[test]
@@ -266,32 +258,32 @@ mod tests {
         let writer = Writer::new();
 
         let v = values.symbol("...");
-        assert_eq!(writer.write(&v, &values), "'|...|");
+        assert_eq!(writer.write(&v), "'|...|");
 
         let v = values.symbol("foo bar");
-        assert_eq!(writer.write(&v, &values), "'|foo bar|");
+        assert_eq!(writer.write(&v), "'|foo bar|");
 
         let v = values.symbol("foo 💣 bar");
-        assert_eq!(writer.write(&v, &values), "'|foo \\x1f4a3; bar|");
+        assert_eq!(writer.write(&v), "'|foo \\x1f4a3; bar|");
 
         let v = values.symbol("");
-        assert_eq!(writer.write(&v, &values), "'||");
+        assert_eq!(writer.write(&v), "'||");
 
         let v = values.symbol("\t");
-        assert_eq!(writer.write(&v, &values), "'|\\t|");
+        assert_eq!(writer.write(&v), "'|\\t|");
 
         let v = values.symbol("test \\| foo");
-        assert_eq!(writer.write(&v, &values), "'|test \\x5c;\\| foo|");
+        assert_eq!(writer.write(&v), "'|test \\x5c;\\| foo|");
 
         let v = values.symbol("test2 | foo");
-        assert_eq!(writer.write(&v, &values), "'|test2 \\| foo|");
+        assert_eq!(writer.write(&v), "'|test2 \\| foo|");
 
         let v = values.symbol("test2 \\ foo");
-        assert_eq!(writer.write(&v, &values), "'|test2 \\x5c; foo|");
+        assert_eq!(writer.write(&v), "'|test2 \\x5c; foo|");
 
         // special initial or number as the first char
         let v = values.symbol("2foo");
-        assert_eq!(writer.write(&v, &values), "'|2foo|");
+        assert_eq!(writer.write(&v), "'|2foo|");
     }
 
     #[test]
@@ -301,36 +293,25 @@ mod tests {
         let elts = vec![values.bool_true().clone(), values.bool_false().clone()];
         let ls = values.proper_list(elts);
 
-        assert_eq!(writer.write(&ls, &values), "'(#t #f)");
+        assert_eq!(writer.write(&ls), "'(#t #f)");
     }
 
     #[test]
     fn test_read_is_writer_inverse_bugs() {
         let mut values = Factory::default();
-
         let input = values.character('\r').clone();
-        assert!(
-            read_my_write(&input, &mut values).is_ok(),
-            "expected read of write"
-        );
+        assert!(read_my_write(&input).is_ok(), "expected read of write");
 
         let input = values.symbol("@foo").clone();
-        assert!(
-            read_my_write(&input, &mut values).is_ok(),
-            "expected read of write"
-        );
+        assert!(read_my_write(&input).is_ok(), "expected read of write");
 
         let input = values.symbol(".foo").clone();
-        assert!(
-            read_my_write(&input, &mut values).is_ok(),
-            "expected read of write"
-        );
+        assert!(read_my_write(&input).is_ok(), "expected read of write");
     }
 
     #[quickcheck]
     fn test_read_is_write_inverse(val: Value) -> bool {
-        let mut values = Factory::default();
-        read_my_write(&val, &mut values).is_ok()
+        read_my_write(&val).is_ok()
     }
 
     #[quickcheck]
@@ -338,16 +319,18 @@ mod tests {
         let mut values = Factory::default();
         let sym = values.symbol(val.0);
 
-        read_my_write(&sym, &mut values).is_ok()
+        read_my_write(&sym).is_ok()
     }
 
-    fn read_my_write(val: &Value, values: &mut Factory) -> frontend::Result<Value> {
+    fn read_my_write(val: &Value) -> frontend::Result<Value> {
         let writer = Writer::new();
-        let external = writer.write(&val, &values);
+        let external = writer.write(&val);
         let mut registry = Registry::new();
         let source = registry.add(&mut StringSource::new(&external)).unwrap();
         let reader = reader::Reader::new();
         let ast = reader.parse(&source)?;
+        let mut values = Factory::default();
+
         Ok(values.from_datum(ast.first()))
     }
 }

@@ -63,7 +63,7 @@ impl VM {
     }
 
     pub fn write(&self, value: &Value) -> String {
-        self.writer.write(value, &self.values).to_string()
+        self.writer.write(value).to_string()
     }
 
     pub fn register_foreign(&mut self, proc: foreign::Procedure) -> Result<()> {
