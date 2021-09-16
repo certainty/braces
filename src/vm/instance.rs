@@ -47,7 +47,7 @@ use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
-use crate::vm::value::RefValue;
+use crate::vm::place::Reference;
 use call_frame::CallFrame;
 use std::rc::Rc;
 
@@ -70,7 +70,7 @@ pub struct Instance<'a> {
     // the currently active stack frame
     active_frame: *mut CallFrame,
     // open up-values are indexed by absolute stack address
-    open_up_values: FxHashMap<AddressType, RefValue>,
+    open_up_values: FxHashMap<AddressType, Reference<Value>>,
     // enable cycle debugging
     debug_mode: bool,
 }
@@ -99,7 +99,7 @@ impl<'a> Instance<'a> {
     ) -> Self {
         let stack = ValueStack::new(call_stack_size * 255);
         let call_stack = CallStack::new(call_stack_size);
-        let open_up_values = FxHashMap::<AddressType, RefValue>::default();
+        let open_up_values = FxHashMap::<AddressType, Reference<Value>>::default();
 
         Self {
             values,
@@ -559,7 +559,7 @@ impl<'a> Instance<'a> {
             return Ok(());
         } else {
             let value = self.stack.at(stack_idx as usize).clone();
-            self.open_up_values.insert(stack_idx, RefValue::new(value));
+            self.open_up_values.insert(stack_idx, value.into());
             Ok(())
         }
     }
@@ -894,7 +894,7 @@ impl<'a> Instance<'a> {
     #[inline]
     fn get_up_value(&mut self, addr: AddressType) -> Result<()> {
         let value = self.active_frame().closure.get_up_value(addr);
-        self.push(value.to_value())?;
+        self.push(value.get_inner())?;
         Ok(())
     }
 

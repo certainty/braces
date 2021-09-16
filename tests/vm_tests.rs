@@ -322,7 +322,7 @@ fn test_vm_smoke_test() {
     assert_eq!(result, vm.values.real(6765));
 }
 
-#[test]
+//#[test]
 fn test_storage_model() {
     let mut vm = VM::default();
 

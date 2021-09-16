@@ -15,10 +15,7 @@ use self::{string::InternedString, symbol::Symbol};
 use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::utils::string_table::StringTable;
 use crate::vm::value::number::real::RealNumber;
-use std::cell::Ref;
-use std::cell::RefCell;
 use std::convert::Into;
-use std::rc::Rc;
 use thiserror::Error;
 
 use equality::SchemeEqual;
@@ -27,38 +24,6 @@ use equality::SchemeEqual;
 pub enum Error {
     #[error("Not an interned value")]
     NotInterned,
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct RefValue {
-    inner: Rc<RefCell<Value>>,
-}
-
-impl RefValue {
-    pub fn new(v: Value) -> Self {
-        RefValue {
-            inner: Rc::new(RefCell::new(v)),
-        }
-    }
-
-    pub fn to_value(&self) -> Value {
-        self.inner.borrow().clone()
-    }
-
-    pub fn as_ref(&self) -> Ref<Value> {
-        self.inner.borrow()
-    }
-
-    pub fn set(&mut self, v: Value) {
-        self.inner.replace(v);
-    }
-}
-
-impl PartialEq for RefValue {
-    fn eq(&self, other: &RefValue) -> bool {
-        self.inner.as_ptr() == other.inner.as_ptr()
-    }
 }
 
 /// Runtime representation of values
@@ -315,24 +280,4 @@ impl Factory {
             .map(InternedString)
             .collect()
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    pub fn test_ref_value() {
-        let v1 = RefValue::new(Value::Bool(true));
-        let v2 = RefValue::new(Value::Bool(true));
-        let v3 = v1.clone();
-
-        assert_ne!(v1, v2);
-        assert_eq!(v1, v1);
-        assert_eq!(v1, v3);
-    }
-
-    // TODO: add equality tests (especially for upvalues)
-
-    // TODO: add test for is_false() (especially for up-values)
 }
