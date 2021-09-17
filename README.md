@@ -97,3 +97,10 @@ There are plenty :D
 
 ### Questions
 * let/let*/letrec currently expand to the corresponding lambda expressions. Should it not do that and instead I handle those as special cases in the VM. Would that yield benefits other than being easier to trace and potentially better error reporting?
+
+### Optimisations
+Once I have the language in a place where it's correct, I can look at more optmisations. I'm still learning rust and some things I simply didn't know when I 
+started.
+
+- [ ] make use of COW when dealing with constants
+- [ ] make sure that references are used correctly to minimise cloning
