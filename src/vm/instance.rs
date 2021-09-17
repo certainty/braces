@@ -901,7 +901,7 @@ impl<'a> Instance<'a> {
     fn define(&mut self, address: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(address)?;
-        self.top_level.define(id.clone(), v.to_owned());
+        self.top_level.define(id, v.to_owned());
         self.push(self.values.unspecified())?;
         Ok(())
     }

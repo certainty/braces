@@ -52,8 +52,8 @@ impl CoreParser {
 
     fn do_parse_set(&mut self, datum: &Datum) -> Result<SetExpression> {
         match self.parse_list(datum)? {
-            [_, identifier, expr] => Ok(SetExpression::new(
-                self.parse(identifier)?,
+            [_, location, expr] => Ok(SetExpression::new(
+                self.parse(location)?,
                 self.parse(expr)?,
                 datum.source_location().clone(),
             )),

@@ -76,13 +76,13 @@ impl Expander {
                 }
             }
             //(define <id> <expr>)
-            [identifier, expr] => {
-                let expanded_place = self.expand_macros(identifier)?;
+            [location, expr] => {
+                let expanded_location = self.expand_macros(location)?;
                 let expanded_expr = self.expand_macros(expr)?;
                 Ok(Datum::list(
                     vec![
                         operator.clone(),
-                        expanded_place.clone(),
+                        expanded_location.clone(),
                         expanded_expr.clone(),
                     ],
                     datum.source_location().clone(),
