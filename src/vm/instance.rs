@@ -47,7 +47,7 @@ use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
-use crate::vm::place::Reference;
+use crate::vm::value::access::Reference;
 use call_frame::CallFrame;
 use std::rc::Rc;
 

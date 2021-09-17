@@ -1,36 +1,38 @@
+use std::io::stdout;
+
+use thiserror::Error;
+
+pub use error::Error;
+use global::TopLevel;
+use instance::Instance;
+use scheme::core;
+use scheme::writer::Writer;
+pub use settings::{Setting, Settings};
+use value::Value;
+
+use crate::compiler::frontend::reader::datum::Datum;
+use crate::compiler::frontend::syntax::environment::SyntaxEnvironment;
+use crate::compiler::source::Location;
+use crate::compiler::CompilationUnit;
+use crate::compiler::Compiler;
+use crate::vm::disassembler::Disassembler;
+use crate::vm::error::reporting::ErrorReporter;
+use crate::vm::value::procedure::Procedure;
+
+use self::value::procedure::foreign;
+use self::value::procedure::native;
+
 pub mod byte_code;
 pub mod debug;
 pub mod disassembler;
 pub mod error;
 pub mod global;
 pub mod instance;
-pub mod place;
 pub mod scheme;
 pub mod settings;
 pub mod stack;
 pub mod stack_trace;
 pub mod value;
-
-use self::value::procedure::foreign;
-use self::value::procedure::native;
-use crate::compiler::CompilationUnit;
-use crate::compiler::Compiler;
-use crate::vm::disassembler::Disassembler;
-use global::TopLevel;
-use instance::Instance;
-use scheme::core;
-use scheme::writer::Writer;
-use std::io::stdout;
-use thiserror::Error;
-use value::Value;
-
-use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::frontend::syntax::environment::SyntaxEnvironment;
-use crate::compiler::source::Location;
-use crate::vm::error::reporting::ErrorReporter;
-use crate::vm::value::procedure::Procedure;
-pub use error::Error;
-pub use settings::{Setting, Settings};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

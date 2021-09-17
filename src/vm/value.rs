@@ -1,3 +1,19 @@
+use std::convert::Into;
+use std::fmt::Formatter;
+
+use thiserror::Error;
+
+use access::Reference;
+use equality::SchemeEqual;
+
+use crate::compiler::frontend::reader::datum::Datum;
+use crate::compiler::utils::string_table::StringTable;
+use crate::vm::scheme::writer::Writer;
+use crate::vm::value::number::real::RealNumber;
+
+use self::{string::InternedString, symbol::Symbol};
+
+pub mod access;
 #[cfg(test)]
 pub mod arbitrary;
 pub mod byte_vector;
@@ -10,18 +26,6 @@ pub mod procedure;
 pub mod string;
 pub mod symbol;
 pub mod vector;
-
-use self::{string::InternedString, symbol::Symbol};
-use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::utils::string_table::StringTable;
-use crate::vm::value::number::real::RealNumber;
-use std::convert::Into;
-use thiserror::Error;
-
-use crate::vm::place::Reference;
-use crate::vm::scheme::writer::Writer;
-use equality::SchemeEqual;
-use std::fmt::Formatter;
 
 #[derive(Error, Debug)]
 pub enum Error {

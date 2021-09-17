@@ -1,6 +1,6 @@
 use super::procedure;
 use crate::vm::byte_code::chunk::Chunk;
-use crate::vm::place::Reference;
+use crate::vm::value::access::Reference;
 use crate::vm::value::equality::SchemeEqual;
 use crate::vm::Value;
 use std::rc::Rc;

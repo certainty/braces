@@ -1,6 +1,6 @@
 use super::value::symbol::Symbol;
 use super::value::Value;
-use crate::vm::place::Reference;
+use crate::vm::value::access::Reference;
 use rustc_hash::FxHashMap;
 
 #[derive(Debug)]
