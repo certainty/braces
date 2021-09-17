@@ -47,6 +47,11 @@ impl<V> Stack<V> {
         self.repr.drain(start..).collect()
     }
 
+    pub fn top_n_mut(&mut self, n: usize) -> &mut [V] {
+        let start = self.len() - n;
+        &mut self.repr.as_mut_slice()[start..]
+    }
+
     // Peek into the stack at the position that is `distance` elements away from the stack top.
     //
     // | 10 | <- top
@@ -159,5 +164,17 @@ mod tests {
 
         assert_eq!(stack.peek(0), &Value::Char('d'));
         assert_eq!(stack.peek(3), &Value::Bool(true));
+    }
+
+    #[test]
+    fn test_top_n_mut() {
+        let mut stack: Stack<i32> = Stack::default();
+
+        stack.push(1);
+        stack.push(2);
+        stack.push(3);
+        stack.push(4);
+
+        assert_eq!(stack.top_n_mut(3), &[2, 3, 4])
     }
 }

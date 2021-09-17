@@ -306,9 +306,9 @@ impl<'a> CodeGenerator<'a> {
         }
 
         let instr = if context.is_tail_context() {
-            Instruction::TailCall(application.operands.len())
+            Instruction::ApplyTCO(application.operands.len())
         } else {
-            Instruction::Call(application.operands.len())
+            Instruction::Apply(application.operands.len())
         };
 
         self.emit_instruction(instr, application.source_location())?;
@@ -506,7 +506,7 @@ mod tests {
                 Instruction::Pop,
                 Instruction::GetGlobal(_),
                 // (foo)
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Jump(_),
                 Instruction::Pop,
                 Instruction::Const(_),
@@ -524,11 +524,11 @@ mod tests {
                 Instruction::Pop,
                 Instruction::GetGlobal(_),
                 // (foo)
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 Instruction::Jump(_),
                 Instruction::Pop,
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         )
@@ -543,7 +543,7 @@ mod tests {
             [
                 // (bar)
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -555,9 +555,9 @@ mod tests {
             [
                 // (bar)
                 Instruction::GetGlobal(_),
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -577,9 +577,9 @@ mod tests {
                 Instruction::Closure(_),
                 Instruction::GetGlobal(_),
                 // (foo)
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 // the body of the (let)
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -589,9 +589,9 @@ mod tests {
             &let_closure.code().code[..],
             [
                 Instruction::GetGlobal(_),
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         )
@@ -618,12 +618,12 @@ mod tests {
                 // create closure
                 Instruction::Closure(_), // define closure
                 Instruction::True,
-                Instruction::Call(_), // call closure
+                Instruction::Apply(_), // call closure
                 // define foo
                 Instruction::Define(_),
                 // apply foo
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -634,7 +634,7 @@ mod tests {
             [
                 Instruction::GetGlobal(_), // get y
                 Instruction::Const(_),     // 'foo
-                Instruction::Call(_),      // apply 'foo to y
+                Instruction::Apply(_),     // apply 'foo to y
                 // setup the up-value for the x constant
                 Instruction::UpValue(0, true), //x #t
                 // build the closure

@@ -47,13 +47,13 @@ use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
-use crate::vm::value::access::Reference;
+use crate::vm::value::access::{Access, Reference};
 use call_frame::CallFrame;
 use std::rc::Rc;
 
 type Result<T> = std::result::Result<T, Error>;
 
-type ValueStack = Stack<Value>;
+type ValueStack = Stack<Access<Value>>;
 pub type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
@@ -138,8 +138,8 @@ impl<'a> Instance<'a> {
         vm.push(syntax.clone())?;
         vm.push(Value::Procedure(rename))?;
         vm.push(Value::Procedure(compare))?;
-        vm.tail_call(3)?;
-        Ok(vm.stack.pop().to_value())
+        vm.apply_tail_call(3)?;
+        Ok(vm.stack.pop().into_inner())
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -163,8 +163,8 @@ impl<'a> Instance<'a> {
                 &Instruction::GetLocal(addr) => self.get_local(addr)?,
                 &Instruction::Set => self.set()?,
                 &Instruction::Closure(addr) => self.create_closure(addr)?,
-                &Instruction::Call(args) => self.apply(args)?,
-                &Instruction::TailCall(args) => self.tail_call(args)?,
+                &Instruction::Apply(args) => self.apply(args)?,
+                &Instruction::ApplyTCO(args) => self.apply_tail_call(args)?,
                 &Instruction::JumpIfFalse(to) => self.jump_if_false(to)?,
                 &Instruction::Jump(to) => self.jump(to)?,
                 &Instruction::Return => {
@@ -207,18 +207,17 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn push(&mut self, v: Value) -> Result<()> {
-        self.stack.push(v);
+    fn push<T: Into<Access<Value>>>(&mut self, v: T) -> Result<()> {
+        self.stack.push(v.into());
         Ok(())
     }
 
     #[inline]
-    fn pop(&mut self) -> Value {
+    fn pop(&mut self) -> Access<Value> {
         self.stack.pop().into()
     }
 
-    #[inline]
-    fn pop_n(&mut self, n: usize) -> Vec<Value> {
+    fn pop_n(&mut self, n: usize) -> Vec<Access<Value>> {
         let mut result = vec![];
 
         for _ in 0..n {
@@ -227,6 +226,11 @@ impl<'a> Instance<'a> {
         result.reverse();
 
         result
+    }
+
+    #[inline]
+    fn stack_slice_mut(&mut self, n: usize) -> &mut [Access<Value>] {
+        self.stack.top_n_mut(n)
     }
 
     // Return the item that is `distance` slots away from the top of the stack.
@@ -245,7 +249,7 @@ impl<'a> Instance<'a> {
     // peek(2) returns 0x10
 
     #[inline]
-    fn peek(&self, distance: usize) -> &Value {
+    fn peek(&self, distance: usize) -> &Access<Value> {
         self.stack.peek(distance)
     }
 
@@ -401,7 +405,7 @@ impl<'a> Instance<'a> {
 
     // Retrieve the value from a given slot of the currently active frame.
     #[inline]
-    fn frame_get_slot(&self, slot_address: AddressType) -> &Value {
+    fn frame_get_slot(&self, slot_address: AddressType) -> &Access<Value> {
         let index = self.frame_slot_address_to_stack_index(slot_address);
         self.stack.at(index)
     }
@@ -420,7 +424,12 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn jump_if_false(&mut self, to: AddressType) -> Result<()> {
-        if self.peek(0).is_false() {
+        let is_false = match self.peek(0) {
+            Access::ByRef(r) => r.get_inner_ref().is_false(),
+            Access::ByVal(v) => v.is_false(),
+        };
+
+        if is_false {
             self.active_mut_frame().set_ip(to)
         }
         Ok(())
@@ -473,7 +482,7 @@ impl<'a> Instance<'a> {
 
     fn _return(&mut self) -> Result<Option<Value>> {
         // save the return value
-        let value = self.pop().to_value(); // unwrap any references
+        let value = self.pop().to_owned(); // unwrap any references
         let (remaining, frame) = self.pop_frame();
 
         // unwind the stack
@@ -547,7 +556,7 @@ impl<'a> Instance<'a> {
         if self.open_up_values.contains_key(&stack_idx) {
             return Ok(());
         } else {
-            let value = self.stack.at(stack_idx as usize).clone();
+            let value = self.stack.at(stack_idx as usize).to_owned();
             self.open_up_values
                 .insert(stack_idx, Reference::from(value));
             Ok(())
@@ -572,9 +581,16 @@ impl<'a> Instance<'a> {
     //
     ///////////////////////////////////////////////////////
 
-    #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
-        let callable = self.peek(args).clone().to_value();
+        let callable = self.peek(args).clone();
+        let result = match callable {
+            Access::ByRef(r) => self._apply(&r.get_inner_ref(), args),
+            Access::ByVal(v) => self._apply(&v, args),
+        };
+        result
+    }
+
+    fn _apply(&mut self, callable: &Value, args: usize) -> Result<()> {
         match callable {
             value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
             value::Value::Procedure(procedure::Procedure::Native(p)) => {
@@ -584,7 +600,7 @@ impl<'a> Instance<'a> {
                 self.apply_foreign(p.clone(), args)?
             }
             other => {
-                return self.runtime_error(error::non_callable(other), None);
+                return self.runtime_error(error::non_callable(other.clone()), None);
             }
         };
         Ok(())
@@ -651,7 +667,7 @@ impl<'a> Instance<'a> {
         let arguments = self
             .pop_n(arg_count)
             .iter()
-            .map(|a| a.clone().to_value())
+            .map(|a| a.clone().to_owned())
             .collect();
         // also pop the procedure itself
         self.pop();
@@ -691,11 +707,17 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
-    #[inline]
-    fn tail_call(&mut self, args: usize) -> Result<()> {
+    fn apply_tail_call(&mut self, args: usize) -> Result<()> {
         self.setup_tail_call(args)?;
-        let callable = self.peek(args).clone().to_value();
+        let callable = self.peek(args).clone();
 
+        match callable {
+            Access::ByRef(r) => self._apply_tail_call(&r.get_inner_ref(), args),
+            Access::ByVal(v) => self._apply_tail_call(&v, args),
+        }
+    }
+
+    fn _apply_tail_call(&mut self, callable: &Value, args: usize) -> Result<()> {
         match callable {
             value::Value::Closure(cl) => self.tail_call_closure(cl.clone(), args)?,
             value::Value::Procedure(procedure::Procedure::Native(p)) => {
@@ -706,7 +728,7 @@ impl<'a> Instance<'a> {
                 self.apply_foreign(p.clone(), args)?
             }
             other => {
-                return self.runtime_error(error::non_callable(other), None);
+                return self.runtime_error(error::non_callable(other.clone()), None);
             }
         };
         Ok(())
@@ -808,43 +830,54 @@ impl<'a> Instance<'a> {
     //    0  │ 'fro         │
     //       └──────────────┘
 
+    // Make sure to check that the arity matches th arg_count before you call this function
     fn bind_arguments(&mut self, arity: &Arity, arg_count: usize) -> Result<usize> {
         match arity {
             Arity::Exactly(n) => {
+                let stack_slice = self.stack_slice_mut(*n);
                 // we place the values on the stack into references, which are then available during the function call
-                let args: Vec<Value> = self.pop_n(*n);
-                for arg in args {
-                    // place the pure value into the reference represented by the variable (argument)
-                    self.push(arg.to_value().to_reference())?;
+                for i in 0..*n {
+                    // re-package the value as a reference thus effectively binding it
+                    // to the variable that represents that argument
+                    stack_slice[i] = Access::ByRef(Reference::from(stack_slice[i].to_owned()));
                 }
+
+                self.debug_stack();
                 Ok(arg_count)
             }
             Arity::AtLeast(n) => {
-                let args: Vec<Value> = self.pop_n(arg_count);
-                let (named_args, rest_args) = args.split_at(*n);
+                let stack_slice = self.stack_slice_mut(arg_count);
+
+                // bind the positional arguments first
+                for i in 0..*n {
+                    stack_slice[i] = Access::ByRef(Reference::from(stack_slice[i].to_owned()));
+                }
+
+                // now stuff the rest into a list and bind that to the last argument
+                let rest_args = self.pop_n(arg_count - n);
                 let rest_list = self.values.proper_list(
                     rest_args
                         .iter()
-                        .map(|e| e.clone().to_value())
+                        .map(|e| e.clone().to_owned())
                         .collect::<Vec<_>>()
                         .into(),
                 );
 
-                for arg in named_args {
-                    // now place the pure value into the reference represented by the variable (argument)
-                    self.push(arg.clone().to_value().to_reference())?;
-                }
-                self.push(rest_list.to_reference())?;
+                self.push(Access::ByRef(Reference::from(rest_list)))?;
+
+                self.debug_stack();
                 Ok(n + 1)
             }
             Arity::Many => {
-                let rest_values: Vec<Value> = self
+                let rest_values = self
                     .pop_n(arg_count)
                     .iter()
-                    .map(|e| e.clone().to_value())
+                    .map(|e| e.clone().to_owned())
                     .collect();
                 let rest_list = self.values.proper_list(rest_values);
-                self.push(rest_list.to_reference())?;
+                self.push(Access::ByRef(Reference::from(rest_list)))?;
+
+                self.debug_stack();
                 Ok(1)
             }
         }
@@ -868,7 +901,7 @@ impl<'a> Instance<'a> {
     fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
         let v = self.pop();
         let id = self.read_identifier(addr)?;
-        self.top_level.define(id.clone(), v);
+        self.top_level.define(id.clone(), v.to_owned());
         self.push(self.values.unspecified())?;
         Ok(())
     }
@@ -883,7 +916,7 @@ impl<'a> Instance<'a> {
         let value = self.top_level.get(&id).cloned();
 
         if let Some(reference) = value {
-            self.push(Value::Ref(reference))?;
+            self.push(Access::ByRef(reference))?;
         } else {
             self.runtime_error(error::undefined_variable(id), None)?;
         }
@@ -897,7 +930,7 @@ impl<'a> Instance<'a> {
     #[inline]
     fn get_up_value(&mut self, addr: AddressType) -> Result<()> {
         let value = self.active_frame().closure.get_up_value(addr);
-        self.push(Value::Ref(value))?;
+        self.push(Access::ByRef(value))?;
         Ok(())
     }
 
@@ -906,8 +939,8 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
 
     #[inline]
-    fn get_local(&mut self, addr: AddressType) -> Result<()> {
-        self.push(self.frame_get_slot(addr).clone())
+    fn get_local(&mut self, address: AddressType) -> Result<()> {
+        self.push(self.frame_get_slot(address).clone())
     }
 
     // the stack before the call to stack looks like this:
@@ -923,10 +956,10 @@ impl<'a> Instance<'a> {
         let location = self.pop();
 
         match location {
-            Value::Ref(mut reference) => reference.set(value.to_value()),
+            Access::ByRef(mut r) => r.set(value.to_owned()),
             _ => {
                 return self.runtime_error(
-                    error::argument_error(location, "Can't set! immutable value"),
+                    error::argument_error(location.to_owned(), "Can't set! immutable value"),
                     None,
                 )
             }
@@ -1015,5 +1048,62 @@ impl<'a> Instance<'a> {
             ),
         );
         println!("\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::vm::global::TopLevel;
+    use crate::vm::instance::Instance;
+    use crate::vm::value::access::{Access, Reference};
+    use crate::vm::value::procedure::Arity;
+    use crate::vm::value::{Factory, Value};
+
+    #[test]
+    fn test_bind_arguments_exactly_n() -> super::Result<()> {
+        let mut top_level = TopLevel::new();
+        let mut values = Factory::default();
+        let mut instance = Instance::vanilla(255, &mut top_level, &mut values, false);
+
+        instance.push(Access::ByVal(Value::Bool(true)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+
+        instance.bind_arguments(&Arity::Exactly(2), 2)?;
+
+        assert_eq!(
+            instance.stack.as_vec().as_slice(),
+            &[
+                Access::ByRef(Reference::from(Value::Bool(true))),
+                Access::ByRef(Reference::from(Value::Bool(false)))
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_bind_arguments_rest_args() -> super::Result<()> {
+        let mut top_level = TopLevel::new();
+        let mut values = Factory::default();
+        let expected_rest_args = values.proper_list(vec![Value::Bool(false), Value::Bool(false)]);
+        let mut instance = Instance::vanilla(255, &mut top_level, &mut values, false);
+
+        instance.push(Access::ByVal(Value::Bool(true)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+
+        instance.bind_arguments(&Arity::AtLeast(2), 4)?;
+
+        assert_eq!(
+            instance.stack.as_vec().as_slice(),
+            &[
+                Access::ByRef(Reference::from(Value::Bool(true))),
+                Access::ByRef(Reference::from(Value::Bool(false))),
+                Access::ByRef(Reference::from(expected_rest_args))
+            ]
+        );
+
+        Ok(())
     }
 }

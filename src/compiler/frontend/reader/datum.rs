@@ -119,7 +119,6 @@ impl Datum {
     /// for runtime values as it uses for s-expressions. This converts between the two worlds.
     pub fn from_value(v: &Value, location: Location) -> Option<Self> {
         match v {
-            Value::Ref(inner) => inner.with_ref(|e| Self::from_value(&e, location)),
             Value::Syntax(datum) => Some(datum.clone()),
             Value::Char(c) => Some(Self::character(c.clone(), location)),
             Value::Symbol(sym) => Some(Self::forged_symbol(sym.as_str(), location)),
@@ -130,7 +129,7 @@ impl Datum {
             Value::ProperList(ls) => {
                 let elts: Option<Vec<_>> = ls
                     .iter()
-                    .map(|e| Self::from_value(&e.clone(), location.clone()))
+                    .map(|e| Self::from_value(&e.get_inner_ref(), location.clone()))
                     .collect();
                 elts.map(|e| Self::list(e, location))
             }

@@ -1,15 +1,19 @@
 use crate::vm::stack::Stack;
+use crate::vm::value::access::Access;
 use crate::vm::value::Value;
 
 // Utilities to get insights into how the stacks are arranged
 
-pub fn pretty_print(stack: &Stack<Value>, frame_base: usize) -> String {
+pub fn pretty_print(stack: &Stack<Access<Value>>, frame_base: usize) -> String {
     let mut out = String::new();
     let mut longest_value = 0;
     let mut values: Vec<String> = vec![];
 
     for value in stack.as_vec().iter() {
-        let v = stack_print(value);
+        let v = match value {
+            Access::ByRef(r) => format!("&{}", stack_print(&r.get_inner_ref())),
+            Access::ByVal(v) => stack_print(&v),
+        };
         longest_value = std::cmp::max(longest_value, v.len());
         values.push(v);
     }
@@ -49,7 +53,7 @@ fn stack_print(v: &Value) -> String {
                 "({})",
                 inner
                     .iter()
-                    .map(stack_print)
+                    .map(|e| stack_print(&e.get_inner_ref()))
                     .collect::<Vec<String>>()
                     .join(", ")
             )

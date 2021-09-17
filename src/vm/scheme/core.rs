@@ -12,6 +12,7 @@ macro_rules! register_core {
             .unwrap()
     };
 }
+use crate::vm::value::access::{Access, Reference};
 use crate::vm::value::list::List;
 pub(crate) use register_core;
 
@@ -42,86 +43,86 @@ pub fn register(vm: &mut VM) {
 
 //  R7RS 6.1
 //  (eqv? obj1 obj2
-pub fn eqv(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn eqv(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (lhs, rhs) => Ok(Value::Bool(lhs.is_eqv(rhs))),
+        (lhs, rhs) => Ok(Value::Bool(lhs.is_eqv(rhs)).into()),
     }
 }
 
-pub fn eq(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn eq(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (lhs, rhs) => Ok(Value::Bool(lhs.is_eq(rhs))),
+        (lhs, rhs) => Ok(Value::Bool(lhs.is_eq(rhs)).into()),
     }
 }
 
-pub fn equal(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn equal(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (lhs, rhs) => Ok(Value::Bool(lhs.is_equal(rhs))),
+        (lhs, rhs) => Ok(Value::Bool(lhs.is_equal(rhs)).into()),
     }
 }
 
 // predicates
-pub fn string_p(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn string_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::InternedString(_) => Ok(Value::Bool(true)),
-        Value::UninternedString(_) => Ok(Value::Bool(true)),
-        _ => Ok(Value::Bool(false)),
+        Value::InternedString(_) => Ok(Value::Bool(true).into()),
+        Value::UninternedString(_) => Ok(Value::Bool(true).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn symbol_p(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn symbol_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::Symbol(_) => Ok(Value::Bool(true)),
-        _ => Ok(Value::Bool(false)),
+        Value::Symbol(_) => Ok(Value::Bool(true).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn char_p(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn char_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::Char(_) => Ok(Value::Bool(true)),
-        _ => Ok(Value::Bool(false)),
+        Value::Char(_) => Ok(Value::Bool(true).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn list_p(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn list_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::ProperList(_) => Ok(Value::Bool(true)),
-        _ => Ok(Value::Bool(false)),
+        Value::ProperList(_) => Ok(Value::Bool(true).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn null_p(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn null_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::ProperList(ls) => Ok(Value::Bool(ls.is_null())),
-        _ => Ok(Value::Bool(false)),
+        Value::ProperList(ls) => Ok(Value::Bool(ls.is_null()).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn procedure_p(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn procedure_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::Procedure(_) => Ok(Value::Bool(true)),
-        Value::Closure(_) => Ok(Value::Bool(true)),
-        _ => Ok(Value::Bool(false)),
+        Value::Procedure(_) => Ok(Value::Bool(true).into()),
+        Value::Closure(_) => Ok(Value::Bool(true).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn bool_not(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn bool_not(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::Bool(v) => Ok(Value::Bool(!v)),
-        _ => Ok(Value::Bool(false)),
+        Value::Bool(v) => Ok(Value::Bool(!v).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn inspect(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn inspect(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     println!("Debug: {:?}", args.first().unwrap());
-    Ok(Value::Unspecified)
+    Ok(Value::Unspecified.into())
 }
 
-pub fn list_car(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn list_car(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     unary_procedure(&args).and_then(|v| match v {
         Value::ProperList(ls) => {
             if let Some(v) = ls.first() {
-                Ok(v.clone())
+                Ok(Access::ByRef(v.clone()))
             } else {
                 Err(error::argument_error(
                     v.clone(),
@@ -131,7 +132,7 @@ pub fn list_car(args: Vec<Value>) -> FunctionResult<Value> {
         }
         Value::ImproperList(ls, _) => {
             if let Some(v) = ls.first() {
-                Ok(v.clone())
+                Ok(Access::ByRef(v.clone()))
             } else {
                 Err(error::argument_error(
                     v.clone(),
@@ -143,21 +144,24 @@ pub fn list_car(args: Vec<Value>) -> FunctionResult<Value> {
     })
 }
 
-pub fn list_cons(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn list_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (v, Value::ProperList(elts)) => Ok(Value::ProperList(elts.cons(v.clone()))),
+        (v, Value::ProperList(elts)) => Ok(Value::ProperList(elts.cons(v.clone())).into()),
         (lhs, rhs) => Ok(Value::ImproperList(
-            List::Cons(vec![lhs.clone()].into()),
-            Box::new(rhs.clone()),
-        )),
+            List::singleton(lhs.clone()),
+            Reference::from(rhs.clone()),
+        )
+        .into()),
     }
 }
 
-pub fn list_append(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn list_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (Value::ProperList(lhs), Value::ProperList(rhs)) => Ok(Value::ProperList(lhs.append(rhs))),
+        (Value::ProperList(lhs), Value::ProperList(rhs)) => {
+            Ok(Value::ProperList(lhs.append(rhs)).into())
+        }
         (Value::ProperList(lhs), Value::ImproperList(rhs_head, rhs_tail)) => {
-            Ok(Value::ImproperList(lhs.append(rhs_head), rhs_tail.clone()))
+            Ok(Value::ImproperList(lhs.append(rhs_head), rhs_tail.clone()).into())
         }
         (lhs, Value::ProperList(_)) => Err(error::argument_error(lhs.clone(), "Expected list")),
         (lhs, Value::ImproperList(_rhs_head, _rhs_tail)) => {
@@ -168,12 +172,12 @@ pub fn list_append(args: Vec<Value>) -> FunctionResult<Value> {
     }
 }
 
-pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::Vector(vector), Value::Number(index)) => {
             if let Some(idx) = index.to_usize() {
                 if let Some(v) = vector.get(idx) {
-                    Ok(v.clone())
+                    Ok(Access::ByRef(v.clone()))
                 } else {
                     Err(error::out_of_bound_error(idx, 0..vector.len()))
                 }
@@ -196,23 +200,23 @@ pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Value> {
     }
 }
 
-pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (v, Value::Vector(elts)) => {
             let mut new_vec = elts.clone();
-            new_vec.push(v.clone());
-            Ok(Value::Vector(new_vec))
+            new_vec.push(Reference::from(v.clone()));
+            Ok(Value::Vector(new_vec).into())
         }
         (_, other) => Err(error::argument_error(other.clone(), "Expected vector")),
     }
 }
 
-pub fn vector_append(args: Vec<Value>) -> FunctionResult<Value> {
+pub fn vector_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::Vector(lhs), Value::Vector(rhs)) => {
             let mut out = lhs.clone();
             out.extend(rhs.clone());
-            Ok(Value::Vector(out))
+            Ok(Value::Vector(out).into())
         }
         (lhs, Value::Vector(_)) => Err(error::argument_error(lhs.clone(), "Expected vector")),
         (Value::Vector(_), rhs) => Err(error::argument_error(rhs.clone(), "Expected vector")),

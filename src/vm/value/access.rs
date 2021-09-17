@@ -29,7 +29,7 @@ impl<'b, T> Deref for RefGuard<'b, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.guard.deref()
+        &self.guard.deref()
     }
 }
 
@@ -38,6 +38,10 @@ impl<T: Clone> Reference<T> {
         Self {
             inner: Rc::new(RefCell::new(v)),
         }
+    }
+
+    pub fn to_owned(&self) -> T {
+        self.inner.borrow().clone()
     }
 
     /// ref_eq is true iff the value that the reference points to is the same
@@ -103,12 +107,27 @@ impl<T: SchemeEqual<T> + Clone> SchemeEqual<Reference<T>> for Reference<T> {
 // Explicit modeling of access patterns
 //
 // This is used to deal with values which can be places (references) or immutable values
+#[derive(Clone, Debug, PartialEq)]
 pub enum Access<T> {
     ByVal(T),
     ByRef(Reference<T>),
 }
 
-impl<T> Access<T> {
+impl<T: Clone> Access<T> {
+    pub fn to_owned(&self) -> T {
+        match self {
+            Self::ByRef(r) => r.to_owned(),
+            Self::ByVal(v) => v.clone(),
+        }
+    }
+
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::ByVal(v) => v,
+            Self::ByRef(r) => r.get_inner_ref().clone(),
+        }
+    }
+
     #[inline]
     pub fn is_by_val(&self) -> bool {
         !self.is_by_ref()
@@ -118,6 +137,7 @@ impl<T> Access<T> {
     pub fn is_mutable(&self) -> bool {
         self.is_by_ref()
     }
+
     pub fn is_by_ref(&self) -> bool {
         match self {
             Self::ByRef(_) => true,

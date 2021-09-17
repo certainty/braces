@@ -13,6 +13,7 @@ use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::scheme::ffi::{binary_procedure, unary_procedure};
+use crate::vm::value::access::Access;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
 use crate::vm::value::Value;
 use crate::vm::VM;
@@ -130,7 +131,7 @@ impl Expander {
     fn create_renamer(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "rename",
-            |values| unary_procedure(&values).map(|v| v.clone()),
+            |values| unary_procedure(&values).map(|v| Access::ByVal(v.clone())),
             Arity::Exactly(1),
         ))
     }
@@ -139,7 +140,7 @@ impl Expander {
     fn create_comparator(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "compare",
-            |values| binary_procedure(&values).map(|(l, r)| Value::Bool(l == r)),
+            |values| binary_procedure(&values).map(|(l, r)| Access::from(Value::Bool(l == r))),
             Arity::Exactly(2),
         ))
     }

@@ -5,6 +5,7 @@ use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::frontend::syntax::Transformer;
 use crate::compiler::source::{HasSourceLocation, Location};
 use crate::vm::scheme::ffi::{explicit_rename_transformer, FunctionResult};
+use crate::vm::value::access::Access;
 use crate::vm::value::error;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
 use crate::vm::value::Value;
@@ -24,7 +25,7 @@ fn make_let_expander() -> Procedure {
     ))
 }
 
-fn expand_let(args: Vec<Value>) -> FunctionResult<Value> {
+fn expand_let(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     explicit_rename_transformer(&args).and_then({
         |(datum, _rename, _compare)| match datum.list_slice() {
             // Named let
@@ -42,10 +43,7 @@ fn expand_let(args: Vec<Value>) -> FunctionResult<Value> {
                 let mut application = vec![lambda];
                 application.extend(values);
 
-                Ok(Value::syntax(Datum::list(
-                    application,
-                    datum.source_location().clone(),
-                )))
+                Ok(Value::syntax(Datum::list(application, datum.source_location().clone())).into())
             }
             _ => Err(error::argument_error(
                 Value::Syntax(datum.clone()),

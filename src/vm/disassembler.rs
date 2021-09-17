@@ -42,11 +42,11 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Return => self.disassemble_simple("OP_RET", address),
-            &Instruction::Call(args) => {
+            &Instruction::Apply(args) => {
                 self.disassemble_simple(&format!("OP_CALL({})", args), address)
             }
 
-            &Instruction::TailCall(args) => {
+            &Instruction::ApplyTCO(args) => {
                 self.disassemble_simple(&format!("OP_TC({})", args), address)
             }
 

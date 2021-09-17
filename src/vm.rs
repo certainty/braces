@@ -92,7 +92,6 @@ impl VM {
             &mut self.values,
             debug_mode,
         )
-        .map(|v| v.to_value())
     }
 
     pub fn interpret_expander(

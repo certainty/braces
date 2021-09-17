@@ -1,4 +1,5 @@
 use crate::vm::scheme::ffi::*;
+use crate::vm::value::access::Access;
 use crate::vm::value::number::SchemeNumber;
 use crate::vm::value::procedure::foreign;
 use crate::vm::value::procedure::Arity;
@@ -8,10 +9,10 @@ use std::ops::{Add, Div, Mul, Sub};
 
 macro_rules! define_predicate {
     ($name:ident, $number:ident, $pred:expr) => {
-        fn $name(args: Vec<Value>) -> FunctionResult<Value> {
+        fn $name(args: Vec<Value>) -> FunctionResult<Access<Value>> {
             match unary_procedure(&args)? {
-                Value::Number($number) => Ok(Value::Bool($pred)),
-                _ => Ok(Value::Bool(false)),
+                Value::Number($number) => Ok(Value::Bool($pred).into()),
+                _ => Ok(Value::Bool(false).into()),
             }
         }
     };
@@ -40,10 +41,10 @@ pub fn register(vm: &mut VM) {
 }
 
 // R7RS 6.2.6 Numerical operations
-fn number_p(args: Vec<Value>) -> FunctionResult<Value> {
+fn number_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::Number(_) => Ok(Value::Bool(true)),
-        _ => Ok(Value::Bool(false)),
+        Value::Number(_) => Ok(Value::Bool(true).into()),
+        _ => Ok(Value::Bool(false).into()),
     }
 }
 
@@ -66,7 +67,7 @@ define_predicate!(inexact_p, n, n.is_inexact());
 
 macro_rules! define_fold {
     ($func:ident, $identity:expr, $op:ident) => {
-        pub fn $func(args: Vec<Value>) -> FunctionResult<Value> {
+        pub fn $func(args: Vec<Value>) -> FunctionResult<Access<Value>> {
             let mut result = number::Number::fixnum($identity);
 
             for n in args {
@@ -76,7 +77,7 @@ macro_rules! define_fold {
                 }
             }
 
-            Ok(Value::Number(result))
+            Ok(Value::Number(result).into())
         }
     };
 }
@@ -86,7 +87,7 @@ define_fold!(mul, 1, mul);
 
 macro_rules! define_reduction {
     ($func:ident, $op:ident) => {
-        pub fn $func(args: Vec<Value>) -> FunctionResult<Value> {
+        pub fn $func(args: Vec<Value>) -> FunctionResult<Access<Value>> {
             if let Value::Number(mut result) = args[0].clone() {
                 for n in args[1..].iter().cloned() {
                     match n {
@@ -95,7 +96,7 @@ macro_rules! define_reduction {
                     }
                 }
 
-                Ok(Value::Number(result))
+                Ok(Value::Number(result).into())
             } else {
                 return Err(error::argument_error(args[0].clone(), "is not a number"));
             }
@@ -108,7 +109,7 @@ define_reduction!(div, div);
 
 macro_rules! define_ordering {
     ($func:ident, $op:tt) => {
-        fn $func(args: Vec<Value>) -> FunctionResult<Value> {
+        fn $func(args: Vec<Value>) -> FunctionResult<Access<Value>> {
             let mut result = true;
 
             for n in 0..args.len() {
@@ -119,7 +120,7 @@ macro_rules! define_ordering {
                 }
             }
 
-            Ok(Value::Bool(result))
+            Ok(Value::Bool(result).into())
         }
     };
 }

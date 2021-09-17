@@ -46,36 +46,13 @@ pub enum Value {
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
-    ImproperList(list::List, Box<Value>),
+    ImproperList(list::List, Reference<Value>),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
     Unspecified,
-    Ref(Reference<Value>),
 }
 
 impl Value {
-    pub fn to_reference(self) -> Value {
-        match self {
-            Self::Ref(_) => self,
-            _ => Value::Ref(Reference::from(self)),
-        }
-    }
-
-    pub fn to_value(self) -> Value {
-        match self {
-            // we're unpacking until the value is full unwrapped
-            Self::Ref(inner) => inner.get_inner().to_value(),
-            _ => self,
-        }
-    }
-
-    pub fn is_set_able(&self) -> bool {
-        match self {
-            Self::Ref(_) => true,
-            _ => false,
-        }
-    }
-
     pub fn is_false(&self) -> bool {
         match self {
             Self::Bool(false) => true,
@@ -118,7 +95,6 @@ impl Value {
 impl SchemeEqual<Value> for Value {
     fn is_eq(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::Ref(lhs), Value::Ref(rhs)) => lhs.is_eq(rhs),
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
             (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
@@ -139,7 +115,6 @@ impl SchemeEqual<Value> for Value {
 
     fn is_eqv(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::Ref(lhs), Value::Ref(rhs)) => lhs.is_eqv(rhs),
             (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eqv(rhs),
@@ -161,7 +136,6 @@ impl SchemeEqual<Value> for Value {
 
     fn is_equal(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::Ref(lhs), Value::Ref(rhs)) => lhs.is_equal(rhs),
             (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_equal(rhs),
@@ -258,11 +232,12 @@ impl Factory {
     }
 
     pub fn improper_list(&self, head: Vec<Value>, tail: Value) -> Value {
-        Value::ImproperList(head.into(), Box::new(tail.to_reference()))
+        Value::ImproperList(head.into(), Reference::from(tail))
     }
 
-    pub fn vector(&self, vals: Vec<Value>) -> Value {
-        Value::Vector(vals.iter().map(|e| e.clone().to_reference()).collect())
+    pub fn vector(&self, values: Vec<Value>) -> Value {
+        let v: Vec<Reference<Value>> = values.into_iter().map(Reference::from).collect();
+        Value::Vector(v)
     }
 
     pub fn byte_vector(&self, vals: Vec<u8>) -> Value {
@@ -295,14 +270,14 @@ impl Factory {
                 let head_values = head.iter().map(|e| self.from_datum(e)).collect::<Vec<_>>();
                 Value::ImproperList(
                     list::List::from(head_values),
-                    Box::new(self.from_datum(tail)),
+                    Reference::from(self.from_datum(tail)),
                 )
             }
             Datum::Char(c, _) => self.character(*c),
             Datum::Number(num, _) => Value::Number(num.clone()),
             Datum::Vector(v, _) => Value::Vector(
                 v.iter()
-                    .map(|e| self.from_datum(e).to_reference())
+                    .map(|e| Reference::from(self.from_datum(e)))
                     .collect(),
             ),
             Datum::ByteVector(v, _) => Value::ByteVector(v.clone()),
@@ -324,14 +299,10 @@ impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let writer = Writer::new();
         match self {
-            Value::Ref(inner) => {
-                let printed = inner.with_ref(|r| writer.write(&r));
-                f.write_fmt(format_args!("&{}", printed))
-            }
             Value::ProperList(elements) => {
                 let printend_elements = elements
                     .iter()
-                    .map(|e| format!("{}", e))
+                    .map(|e| format!("&{}", e))
                     .collect::<Vec<_>>()
                     .join(" ");
                 f.write_fmt(format_args!("({})", printend_elements))
@@ -344,16 +315,6 @@ impl std::fmt::Display for Value {
 #[cfg(test)]
 mod tests {
     use crate::vm::value::Factory;
-
-    #[test]
-    fn test_is_settable() {
-        let values = Factory::default();
-
-        assert!(!values.false_value.is_set_able());
-        assert!(!values.character('a').is_set_able());
-
-        assert!(values.false_value.to_reference().is_set_able())
-    }
 
     #[test]
     fn test_display_lists() {

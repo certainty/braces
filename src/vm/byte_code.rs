@@ -15,8 +15,8 @@ pub enum Instruction {
     Set,
     JumpIfFalse(AddressType),
     Jump(AddressType),
-    Call(usize),     // number of arguments
-    TailCall(usize), // number of arguments
+    Apply(usize),    // number of arguments
+    ApplyTCO(usize), // number of arguments
     Break,           // Reserved for future use
     Return,
     Nop, // do nothing

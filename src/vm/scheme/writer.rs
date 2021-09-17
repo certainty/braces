@@ -34,7 +34,6 @@ impl Writer {
 
     fn write_impl(&self, v: &Value, quote: bool) -> String {
         match v {
-            Value::Ref(inner) => inner.with_ref(|e| self.write_impl(&e, quote)),
             Value::Syntax(datum) => self.write_string(format!("#<syntax {}>", datum).as_str()),
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
@@ -48,7 +47,10 @@ impl Writer {
             }
             Value::Procedure(proc) => self.write_procedure(&proc),
             Value::Vector(elts) => {
-                let body: Vec<String> = elts.iter().map(|e| self.write_impl(&e, false)).collect();
+                let body: Vec<String> = elts
+                    .iter()
+                    .map(|e| self.write_impl(&e.get_inner_ref(), false))
+                    .collect();
 
                 format!("#({})", body.join(" "))
             }
@@ -58,14 +60,19 @@ impl Writer {
                 format!("#u8({})", body.join(" "))
             }
             Value::ProperList(elts) => {
-                let body: Vec<String> = elts.iter().map(|e| self.write_impl(&e, quote)).collect();
+                let body: Vec<String> = elts
+                    .iter()
+                    .map(|e| self.write_impl(&e.get_inner_ref(), quote))
+                    .collect();
 
                 format!("'({})", body.join(" "))
             }
             Value::ImproperList(head, tail) => {
-                let head_body: Vec<String> =
-                    head.iter().map(|e| self.write_impl(&e, quote)).collect();
-                let tail_body = self.write_impl(&tail, false);
+                let head_body: Vec<String> = head
+                    .iter()
+                    .map(|e| self.write_impl(&e.get_inner_ref(), quote))
+                    .collect();
+                let tail_body = self.write_impl(&tail.get_inner_ref(), false);
 
                 format!("'({} . {})", head_body.join(" "), tail_body)
             }
