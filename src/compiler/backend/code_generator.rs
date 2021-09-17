@@ -11,6 +11,7 @@
 /// computation of addresses.
 use thiserror::Error;
 
+use super::variables::{Variables, VariablesRef};
 use crate::compiler::frontend::parser::{
     apply::ApplicationExpression,
     assignment::SetExpression,
@@ -35,8 +36,6 @@ use crate::vm::value;
 use crate::vm::value::closure::Closure;
 use crate::vm::value::procedure::Arity;
 use crate::vm::value::Value;
-
-use super::variables::{Variables, VariablesRef};
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
@@ -223,7 +222,7 @@ impl<'a> CodeGenerator<'a> {
     fn emit_instructions(&mut self, ast: &Expression, context: &Context) -> Result<()> {
         match ast {
             Expression::Identifier(id) => self.emit_get_variable(id)?,
-            Expression::Assign(expr) => self.emit_set_variable(expr, context)?,
+            Expression::Assign(expr) => self.emit_set(expr, context)?,
             Expression::Literal(lit) => self.emit_lit(lit.datum())?,
             Expression::If(if_expr) => self.emit_if(if_expr, context)?,
             Expression::Define(definition) => self.emit_definition(definition)?,
@@ -307,9 +306,9 @@ impl<'a> CodeGenerator<'a> {
         }
 
         let instr = if context.is_tail_context() {
-            Instruction::TailCall(application.operands.len())
+            Instruction::ApplyTCO(application.operands.len())
         } else {
-            Instruction::Call(application.operands.len())
+            Instruction::Apply(application.operands.len())
         };
 
         self.emit_instruction(instr, application.source_location())?;
@@ -363,21 +362,10 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
-    fn emit_set_variable(&mut self, expr: &SetExpression, context: &Context) -> Result<()> {
-        // push the value of the expression
+    fn emit_set(&mut self, expr: &SetExpression, context: &Context) -> Result<()> {
+        self.emit_instructions(&expr.location, context)?;
         self.emit_instructions(&expr.value, context)?;
-
-        // is it local?
-        if let Some(addr) = self.resolve_local(&expr.name) {
-            self.emit_instruction(Instruction::SetLocal(addr), expr.source_location())
-        } else if let Some(addr) = self.resolve_up_value(&expr.name)? {
-            self.emit_instruction(Instruction::SetUpValue(addr), expr.source_location())
-        } else {
-            // top level variable
-            let id_sym = self.sym(&expr.name.string());
-            let const_addr = self.current_chunk().add_constant(id_sym);
-            self.emit_instruction(Instruction::SetGlobal(const_addr), expr.source_location())
-        }
+        self.emit_instruction(Instruction::Set, expr.source_location())
     }
 
     fn emit_body(&mut self, body: &BodyExpression) -> Result<()> {
@@ -518,7 +506,7 @@ mod tests {
                 Instruction::Pop,
                 Instruction::GetGlobal(_),
                 // (foo)
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Jump(_),
                 Instruction::Pop,
                 Instruction::Const(_),
@@ -536,11 +524,11 @@ mod tests {
                 Instruction::Pop,
                 Instruction::GetGlobal(_),
                 // (foo)
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 Instruction::Jump(_),
                 Instruction::Pop,
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         )
@@ -555,7 +543,7 @@ mod tests {
             [
                 // (bar)
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -567,9 +555,9 @@ mod tests {
             [
                 // (bar)
                 Instruction::GetGlobal(_),
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -589,9 +577,9 @@ mod tests {
                 Instruction::Closure(_),
                 Instruction::GetGlobal(_),
                 // (foo)
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 // the body of the (let)
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -601,9 +589,9 @@ mod tests {
             &let_closure.code().code[..],
             [
                 Instruction::GetGlobal(_),
-                Instruction::Call(_),
+                Instruction::Apply(_),
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         )
@@ -630,12 +618,12 @@ mod tests {
                 // create closure
                 Instruction::Closure(_), // define closure
                 Instruction::True,
-                Instruction::Call(_), // call closure
+                Instruction::Apply(_), // call closure
                 // define foo
                 Instruction::Define(_),
                 // apply foo
                 Instruction::GetGlobal(_),
-                Instruction::TailCall(_),
+                Instruction::ApplyTCO(_),
                 Instruction::Return
             ]
         );
@@ -646,7 +634,7 @@ mod tests {
             [
                 Instruction::GetGlobal(_), // get y
                 Instruction::Const(_),     // 'foo
-                Instruction::Call(_),      // apply 'foo to y
+                Instruction::Apply(_),     // apply 'foo to y
                 // setup the up-value for the x constant
                 Instruction::UpValue(0, true), //x #t
                 // build the closure

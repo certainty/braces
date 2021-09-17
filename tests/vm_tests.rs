@@ -222,11 +222,12 @@ fn test_vm_simple_closures() {
     let result = run_code(
         &mut vm,
         r#"
-        (define test
-          ((lambda (x y) (lambda () (set! x (not x)) x)) #t 'ignored)
-        )
-       (define ls (lambda x x))
-       (ls (test) (test) (test))
+        (define (list . rest) rest)
+        (define test 
+           (let ((x #t)
+                 (y 'ignored))
+             (lambda () (set! x (not x)) x)))
+        (list (test) (test) (test))
         "#,
     )
     .unwrap();
@@ -277,7 +278,7 @@ fn test_vm_complex_closures() {
         (define get-x #t)
         (define make-closures (lambda (value)
            ((lambda (x)
-             (set! get-x (lambda () x))
+              (set! get-x (lambda () x))
               (set! set-x (lambda (new) (set! x new)))) value)))
 
         (make-closures #t)
@@ -319,6 +320,114 @@ fn test_vm_smoke_test() {
     )
     .unwrap();
     assert_eq!(result, vm.values.real(6765));
+}
+
+#[test]
+fn test_storage_model_locals_modfied_locally() {
+    let mut vm = VM::default();
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define (list . x) x)
+        
+        (define (foo x) (set! x #t) x)
+        (define y #f)
+        (list (foo y) y)
+        "#,
+    )
+    .unwrap();
+    println!("result: {}", result);
+    assert_eq!(
+        result,
+        vm.values
+            .proper_list(vec![vm.values.bool_true(), vm.values.bool_false()]),
+    );
+}
+#[test]
+fn test_storage_model_set_cons_cell() {
+    let mut vm = VM::default();
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define ls '(#t #f #f))
+        (set! (car ls) #f)
+        ls
+        "#,
+    )
+    .unwrap();
+    println!("result: {}", result);
+    assert_eq!(
+        result,
+        vm.values.proper_list(vec![
+            vm.values.bool_false(),
+            vm.values.bool_false(),
+            vm.values.bool_false(),
+        ]),
+    );
+}
+
+#[test]
+fn test_storage_model_set_references_to_cons_cells() {
+    let mut vm = VM::default();
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define (ls . args) args)
+        (define x '(1 2 3 4))
+        (define y '(5 6 7))
+        (set! (car x) (car y))
+        (set! (car y) 0)
+        (ls x y)
+        "#,
+    )
+    .unwrap();
+    let expected = vm.values.proper_list(vec![
+        vm.values.proper_list(vec![
+            vm.values.real(5),
+            vm.values.real(2),
+            vm.values.real(3),
+            vm.values.real(4),
+        ]),
+        vm.values.proper_list(vec![
+            vm.values.real(0),
+            vm.values.real(6),
+            vm.values.real(7),
+        ]),
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_storage_model_improper_list() {
+    let mut vm = VM::default();
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define ls '(1 2 3 . 4))
+        (set! (car ls) 3)
+        (car ls)
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(result, vm.values.real(3));
+}
+
+#[test]
+fn test_storage_model_vector() {
+    let mut vm = VM::default();
+    let result = run_code(
+        &mut vm,
+        r#"
+        (define v #(1 2 3))
+        (set! (vector-ref v 0) 5)
+        (vector-ref v 0)
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(result, vm.values.real(5));
 }
 
 #[test]

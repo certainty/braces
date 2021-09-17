@@ -1,9 +1,10 @@
 use super::{Arity, HasArity};
 use crate::vm::scheme::ffi::FunctionResult;
+use crate::vm::value::access::Access;
 use crate::vm::value::equality::SchemeEqual;
 use crate::vm::value::Value;
 
-pub type ProcedureImpl = dyn Fn(Vec<Value>) -> FunctionResult<Value>;
+pub type ProcedureImpl = dyn Fn(Vec<Value>) -> FunctionResult<Access<Value>>;
 
 pub struct Procedure {
     pub name: String,
@@ -15,7 +16,7 @@ impl Procedure {
     pub fn new<S, I>(name: S, op: I, arity: Arity) -> Self
     where
         S: Into<String>,
-        I: 'static + Fn(Vec<Value>) -> FunctionResult<Value>,
+        I: 'static + Fn(Vec<Value>) -> FunctionResult<Access<Value>>,
     {
         Self {
             name: name.into(),
@@ -24,7 +25,7 @@ impl Procedure {
         }
     }
 
-    pub fn call(&self, arguments: Vec<Value>) -> FunctionResult<Value> {
+    pub fn call(&self, arguments: Vec<Value>) -> FunctionResult<Access<Value>> {
         (self.proc)(arguments)
     }
 }

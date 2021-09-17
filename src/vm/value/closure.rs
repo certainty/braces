@@ -1,13 +1,13 @@
 use super::procedure;
 use crate::vm::byte_code::chunk::Chunk;
+use crate::vm::value::access::Reference;
 use crate::vm::value::equality::SchemeEqual;
-use crate::vm::value::RefValue;
 use crate::vm::Value;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
-    pub up_values: Vec<RefValue>,
+    pub up_values: Vec<Reference<Value>>,
     pub proc: Rc<procedure::native::Procedure>,
 }
 
@@ -16,7 +16,10 @@ impl Closure {
         Self::from_rc(Rc::new(proc), vec![])
     }
 
-    pub fn from_rc(proc: Rc<procedure::native::Procedure>, up_values: Vec<RefValue>) -> Self {
+    pub fn from_rc(
+        proc: Rc<procedure::native::Procedure>,
+        up_values: Vec<Reference<Value>>,
+    ) -> Self {
         Self { proc, up_values }
     }
 
@@ -38,7 +41,7 @@ impl Closure {
 }
 
 impl Closure {
-    pub fn get_up_value(&self, addr: usize) -> RefValue {
+    pub fn get_up_value(&self, addr: usize) -> Reference<Value> {
         self.up_values[addr].clone()
     }
 

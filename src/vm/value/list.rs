@@ -1,5 +1,6 @@
 use super::equality::SchemeEqual;
 use super::Value;
+use crate::vm::value::access::Reference;
 use im_rc::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
@@ -7,7 +8,7 @@ use std::iter::{FromIterator, IntoIterator};
 #[derive(Debug, PartialEq, Clone)]
 pub enum List {
     Nil,
-    Cons(Vector<Value>),
+    Cons(Vector<Reference<Value>>),
 }
 
 impl List {
@@ -19,25 +20,38 @@ impl List {
         List::Cons(Vector::new())
     }
 
-    pub fn cons(&self, v: Value) -> List {
+    pub fn singleton(v: Value) -> Self {
+        Self::Cons(Vector::from(vec![Reference::from(v)]))
+    }
+
+    pub fn copied(&self) -> Self {
         match self {
-            List::Nil => List::Cons(Vector::from(vec![v])),
-            List::Cons(elts) => {
-                let mut new_elts = elts.clone();
-                new_elts.push_front(v);
-                List::Cons(new_elts)
+            Self::Nil => self.clone(),
+            Self::Cons(inner) => Self::Cons(inner.iter().map(|e| e.copied()).collect()),
+        }
+    }
+
+    // create a fresh list by concateneting the two supplied lists
+    pub fn append(lhs: &List, rhs: &List) -> List {
+        match (lhs.copied(), rhs.copied()) {
+            (List::Nil, rhs) => rhs,
+            (lhs, List::Nil) => lhs,
+            (List::Cons(mut lhs), List::Cons(rhs)) => {
+                lhs.extend(rhs);
+                List::Cons(lhs)
             }
         }
     }
 
-    pub fn append(&self, other: &List) -> List {
-        match (self, other) {
-            (List::Nil, _) => other.clone(),
-            (_, List::Nil) => self.clone(),
-            (List::Cons(lhs), List::Cons(rhs)) => {
-                let mut elts = lhs.clone();
-                elts.append(rhs.clone());
-                List::Cons(elts)
+    pub fn cons(&self, v: Value) -> List {
+        match self {
+            List::Nil => List::Cons(Vector::from(vec![Reference::from(v)])),
+            List::Cons(elts) => {
+                let mut new_elts = elts.clone();
+                // if it's a reference itself we first copy it value out and then wrap it
+                // into a references again
+                new_elts.push_front(Reference::from(v));
+                List::Cons(new_elts)
             }
         }
     }
@@ -58,39 +72,34 @@ impl List {
     }
 
     #[inline]
-    pub fn head(&self) -> Option<&Value> {
-        match self {
-            List::Nil => None,
-            List::Cons(e) => e.head(),
-        }
+    pub fn head(&self) -> Option<&Reference<Value>> {
+        self.first()
     }
 
     #[inline]
-    pub fn first(&self) -> Option<&Value> {
-        self.head()
+    pub fn first(&self) -> Option<&Reference<Value>> {
+        self.at(0)
     }
 
     #[inline]
-    pub fn second(&self) -> Option<&Value> {
-        match self {
-            List::Nil => None,
-            List::Cons(e) => e.get(1),
-        }
+    pub fn second(&self) -> Option<&Reference<Value>> {
+        self.at(1)
     }
 
     #[inline]
-    pub fn third(&self) -> Option<&Value> {
-        match self {
-            List::Nil => None,
-            List::Cons(e) => e.get(2),
-        }
+    pub fn third(&self) -> Option<&Reference<Value>> {
+        self.at(2)
     }
 
     #[inline]
-    pub fn fourth(&self) -> Option<&Value> {
+    pub fn fourth(&self) -> Option<&Reference<Value>> {
+        self.at(3)
+    }
+
+    pub fn at(&self, i: usize) -> Option<&Reference<Value>> {
         match self {
             List::Nil => None,
-            List::Cons(e) => e.get(3),
+            List::Cons(elts) => elts.get(i),
         }
     }
 
@@ -104,7 +113,7 @@ impl List {
 
 pub struct Iter<'a> {
     is_empty: bool,
-    inner: Option<im_rc::vector::Iter<'a, Value>>,
+    inner: Option<im_rc::vector::Iter<'a, Reference<Value>>>,
 }
 
 impl<'a> Iter<'a> {
@@ -115,7 +124,7 @@ impl<'a> Iter<'a> {
         }
     }
 
-    fn new(inner: im_rc::vector::Iter<'a, Value>) -> Iter<'a> {
+    fn new(inner: im_rc::vector::Iter<'a, Reference<Value>>) -> Iter<'a> {
         Iter {
             is_empty: false,
             inner: Some(inner),
@@ -124,7 +133,7 @@ impl<'a> Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = &'a Value;
+    type Item = &'a Reference<Value>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_empty {
@@ -140,30 +149,20 @@ impl<'a> Iterator for Iter<'a> {
 
 impl FromIterator<Value> for List {
     fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
-        let ls: im_rc::vector::Vector<Value> = std::iter::FromIterator::from_iter(iter);
+        let ls: im_rc::vector::Vector<Reference<Value>> =
+            iter.into_iter().map(Reference::from).collect();
         if ls.is_empty() {
             List::Nil
         } else {
             List::Cons(ls)
-        }
-    }
-}
-
-impl IntoIterator for List {
-    type Item = Value;
-    type IntoIter = im_rc::vector::ConsumingIter<Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            List::Nil => im_rc::vector::Vector::new().into_iter(),
-            List::Cons(e) => e.into_iter(),
         }
     }
 }
 
 impl From<Vec<Value>> for List {
     fn from(elements: Vec<Value>) -> Self {
-        let ls: im_rc::vector::Vector<Value> = elements.into_iter().collect();
+        let ls: im_rc::vector::Vector<Reference<Value>> =
+            elements.into_iter().map(Reference::from).collect();
 
         if ls.is_empty() {
             List::Nil
@@ -173,6 +172,7 @@ impl From<Vec<Value>> for List {
     }
 }
 
+// TODO: fix equality. See r7rs 6.1
 impl SchemeEqual<List> for List {
     fn is_eq(&self, other: &List) -> bool {
         if self.len() != other.len() {

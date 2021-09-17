@@ -42,11 +42,11 @@ impl<T: Write> Disassembler<T> {
 
         match &chunk.code[address] {
             &Instruction::Return => self.disassemble_simple("OP_RET", address),
-            &Instruction::Call(args) => {
+            &Instruction::Apply(args) => {
                 self.disassemble_simple(&format!("OP_CALL({})", args), address)
             }
 
-            &Instruction::TailCall(args) => {
+            &Instruction::ApplyTCO(args) => {
                 self.disassemble_simple(&format!("OP_TC({})", args), address)
             }
 
@@ -78,15 +78,7 @@ impl<T: Write> Disassembler<T> {
             &Instruction::GetLocal(addr) => {
                 self.disassemble_variable_access("OP_GET_LOCAL", address, addr, true)
             }
-            &Instruction::SetGlobal(const_address) => {
-                self.disassemble_constant(chunk, "OP_SET_GLOBAL", address, const_address)
-            }
-            &Instruction::SetUpValue(addr) => {
-                self.disassemble_variable_access("OP_SET_UP_VALUE", address, addr, false)
-            }
-            &Instruction::SetLocal(addr) => {
-                self.disassemble_variable_access("OP_SET_LOCAL", address, addr, true)
-            }
+            &Instruction::Set => self.disassemble_simple("OP_SET", address),
 
             &Instruction::Define(const_address) => {
                 self.disassemble_constant(chunk, "OP_DEFINE", address, const_address)

@@ -3,13 +3,13 @@
 /// # Stack based virtual machine for our scheme implementation
 ///
 /// This is the implementation of the virtual machine for our scheme implementation. It's a standard stack based
-/// VM that borrows concepts from LUA's VM implementation to make it non-naive. However there is probably still a lot
+/// VM that borrows concepts from LUA's VM implementation to make it non-naive. However, there is probably still a lot
 /// of room for improvement in terms of performance.
 ///
 /// ## Usage
 ///
 /// Most of the time you shouldn't have to use `Instance` directly but use the `VM` interface instead.
-/// That will give you access to high-level functions that compile and run code on the VM. However in case you
+/// That will give you access to high-level functions that compile and run code on the VM. However, in case you
 /// build your own code this low level interface might come in handy.
 ///
 /// Examples:
@@ -47,13 +47,13 @@ use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
-use crate::vm::value::RefValue;
+use crate::vm::value::access::{Access, Reference};
 use call_frame::CallFrame;
 use std::rc::Rc;
 
 type Result<T> = std::result::Result<T, Error>;
 
-type ValueStack = Stack<Value>;
+type ValueStack = Stack<Access<Value>>;
 pub type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
@@ -70,7 +70,7 @@ pub struct Instance<'a> {
     // the currently active stack frame
     active_frame: *mut CallFrame,
     // open up-values are indexed by absolute stack address
-    open_up_values: FxHashMap<AddressType, RefValue>,
+    open_up_values: FxHashMap<AddressType, Reference<Value>>,
     // enable cycle debugging
     debug_mode: bool,
 }
@@ -99,7 +99,7 @@ impl<'a> Instance<'a> {
     ) -> Self {
         let stack = ValueStack::new(call_stack_size * 255);
         let call_stack = CallStack::new(call_stack_size);
-        let open_up_values = FxHashMap::<AddressType, RefValue>::default();
+        let open_up_values = FxHashMap::<AddressType, Reference<Value>>::default();
 
         Self {
             values,
@@ -138,8 +138,8 @@ impl<'a> Instance<'a> {
         vm.push(syntax.clone())?;
         vm.push(Value::Procedure(rename))?;
         vm.push(Value::Procedure(compare))?;
-        vm.tail_call(3)?;
-        Ok(vm.stack.pop())
+        vm.apply_tail_call(3)?;
+        Ok(vm.stack.pop().into_inner())
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -152,24 +152,21 @@ impl<'a> Instance<'a> {
                 &Instruction::True => self.push(self.values.bool_true())?,
                 &Instruction::False => self.push(self.values.bool_false())?,
                 &Instruction::Nil => self.push(self.values.nil())?,
-                &Instruction::Const(addr) => self.push(self.read_constant(addr).clone())?,
+                &Instruction::Const(address) => self.push(self.read_constant(address).clone())?,
 
-                &Instruction::Define(addr) => self.define_value(addr)?,
+                &Instruction::Define(address) => self.define(address)?,
 
-                &Instruction::GetGlobal(addr) => self.get_global(addr)?,
-                &Instruction::SetGlobal(addr) => self.set_global(addr)?,
-                &Instruction::UpValue(addr, is_local) => self.create_up_value(addr, is_local)?,
-                &Instruction::CloseUpValue(addr) => self.close_up_value(addr)?,
-                &Instruction::GetUpValue(addr) => self.get_up_value(addr)?,
-                &Instruction::SetUpValue(addr) => self.set_up_value(addr)?,
-                &Instruction::GetLocal(addr) => self.get_local(addr)?,
-                &Instruction::SetLocal(addr) => self.set_local(addr)?,
-
-                &Instruction::Closure(addr) => self.create_closure(addr)?,
-
-                &Instruction::Call(args) => self.apply(args)?,
-                &Instruction::TailCall(args) => self.tail_call(args)?,
-
+                &Instruction::GetGlobal(address) => self.fetch_global(address)?,
+                &Instruction::UpValue(address, is_local) => {
+                    self.create_up_value(address, is_local)?
+                }
+                &Instruction::CloseUpValue(address) => self.close_up_value(address)?,
+                &Instruction::GetUpValue(address) => self.fetch_up_value(address)?,
+                &Instruction::GetLocal(address) => self.fetch_local(address)?,
+                &Instruction::Set => self.set()?,
+                &Instruction::Closure(address) => self.create_closure(address)?,
+                &Instruction::Apply(args) => self.apply(args)?,
+                &Instruction::ApplyTCO(args) => self.apply_tail_call(args)?,
                 &Instruction::JumpIfFalse(to) => self.jump_if_false(to)?,
                 &Instruction::Jump(to) => self.jump(to)?,
                 &Instruction::Return => {
@@ -195,8 +192,8 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn read_constant(&self, addr: ConstAddressType) -> &Value {
-        self.active_frame().code().read_constant(addr)
+    fn read_constant(&self, address: ConstAddressType) -> &Value {
+        self.active_frame().code().read_constant(address)
     }
 
     ///////////////////////////////////////////////////////////
@@ -212,26 +209,24 @@ impl<'a> Instance<'a> {
     }
 
     #[inline]
-    fn push(&mut self, v: Value) -> Result<()> {
-        self.stack.push(v);
+    fn push<T: Into<Access<Value>>>(&mut self, v: T) -> Result<()> {
+        self.stack.push(v.into());
         Ok(())
     }
 
     #[inline]
-    fn pop(&mut self) -> Value {
+    fn pop(&mut self) -> Access<Value> {
         self.stack.pop().into()
     }
 
     #[inline]
-    fn pop_n(&mut self, n: usize) -> Vec<Value> {
-        let mut result = vec![];
+    fn pop_n(&mut self, n: usize) -> Vec<Access<Value>> {
+        self.stack.pop_n(n)
+    }
 
-        for _ in 0..n {
-            result.push(self.pop())
-        }
-        result.reverse();
-
-        result
+    #[inline]
+    fn stack_slice_mut(&mut self, n: usize) -> &mut [Access<Value>] {
+        self.stack.top_n_mut(n)
     }
 
     // Return the item that is `distance` slots away from the top of the stack.
@@ -250,7 +245,7 @@ impl<'a> Instance<'a> {
     // peek(2) returns 0x10
 
     #[inline]
-    fn peek(&self, distance: usize) -> &Value {
+    fn peek(&self, distance: usize) -> &Access<Value> {
         self.stack.peek(distance)
     }
 
@@ -300,7 +295,7 @@ impl<'a> Instance<'a> {
     //      └─────────────┘
     //
     // The stack base for the closure will be 8 in this case.
-    // The data before that belongs to the previously active closure and wont be touched.
+    // The data before that belongs to the previously active closure and won't be touched.
     // The values at the stack addresses 9, 10 and 11 will hold the arguments that re provided
     // to the procedure represented by the closure.
     //
@@ -314,7 +309,7 @@ impl<'a> Instance<'a> {
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
-    // Reuse the current stack frame to set-up a tail call
+    // Reuse the current stack frame to set up a tail call
     //
     // For the documentation of the stack layout before a call check the documentation of `push_frame`.
     //
@@ -352,7 +347,7 @@ impl<'a> Instance<'a> {
     }
 
     // Retrieve a reference to the currently active frame.
-    // This is the always the frame at the top of the call-stack
+    // This is always the frame at the top of the call-stack
     // which is currently executed.
     #[inline]
     fn active_frame(&self) -> &CallFrame {
@@ -406,15 +401,9 @@ impl<'a> Instance<'a> {
 
     // Retrieve the value from a given slot of the currently active frame.
     #[inline]
-    fn frame_get_slot(&self, slot_address: AddressType) -> &Value {
+    fn frame_get_slot(&self, slot_address: AddressType) -> &Access<Value> {
         let index = self.frame_slot_address_to_stack_index(slot_address);
         self.stack.at(index)
-    }
-
-    #[inline]
-    fn frame_set_slot(&mut self, slot_address: AddressType, value: Value) {
-        let index = self.frame_slot_address_to_stack_index(slot_address);
-        self.stack.set(index, value);
     }
 
     ///////////////////////////////////////////////////////
@@ -431,7 +420,12 @@ impl<'a> Instance<'a> {
 
     #[inline]
     fn jump_if_false(&mut self, to: AddressType) -> Result<()> {
-        if self.peek(0).is_false() {
+        let is_false = match self.peek(0) {
+            Access::ByRef(r) => r.get_inner_ref().is_false(),
+            Access::ByVal(v) => v.is_false(),
+        };
+
+        if is_false {
             self.active_mut_frame().set_ip(to)
         }
         Ok(())
@@ -484,17 +478,18 @@ impl<'a> Instance<'a> {
 
     fn _return(&mut self) -> Result<Option<Value>> {
         // save the return value
-        let value = self.pop();
+        let value = self.pop().to_owned(); // unwrap any references
         let (remaining, frame) = self.pop_frame();
 
         // unwind the stack
         self.stack.truncate(frame.stack_base);
-        self.push(value.clone())?;
 
         if remaining <= 0 {
+            self.push(value.clone())?;
             self.debug_stack();
             Ok(Some(value))
         } else {
+            self.push(value)?;
             Ok(None)
         }
     }
@@ -502,15 +497,15 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
     // Closure creation
     //
-    // Reads the procedure from the address specified by `addr`
+    // Reads the procedure from the address specified by `address`
     // and creates a closure out of it. A closure is code + up-values so this
     // collects all the `open_up_values` and provides these to the closure.
     //
     // ## Stack effect
     //
     // The top of the stack will hold the resulting closure.
-    fn create_closure(&mut self, addr: ConstAddressType) -> Result<()> {
-        match self.read_constant(addr).clone() {
+    fn create_closure(&mut self, address: ConstAddressType) -> Result<()> {
+        match self.read_constant(address).clone() {
             Value::Procedure(proc) => {
                 let up_values = self.open_up_values.values().cloned().collect();
                 let closure = Closure::from_rc(proc.as_native().clone(), up_values);
@@ -522,55 +517,56 @@ impl<'a> Instance<'a> {
 
     ////////////////////////////////////////////////////////////////////////////
     //
-    // Creates an up-value from the value add the slot-address provided by `addr`.
+    // Creates an up-value from the value add the slot-address provided by `address`.
     //
     // This adds the up-value to the currently open ones. They will be closed as soon
     // as the local variables they capture get out of scope.
     //
     // If the value is a local it is captured.
-    // Otherwise it is already an up-value in the active closure and we can add it from there.
+    // If not, it is already an up-value in the active closure, and we can add it from there.
     //
     // ## Stack effect
     // None
-    fn create_up_value(&mut self, addr: AddressType, is_local: bool) -> Result<()> {
+    fn create_up_value(&mut self, address: AddressType, is_local: bool) -> Result<()> {
         if is_local {
             // capture local as new up-value
-            self.capture_up_value(addr)?;
+            self.capture_up_value(address)?;
         } else {
             // up-value already exists in outer scope
-            let stack_idx = self.frame_slot_address_to_stack_index(addr);
+            let stack_idx = self.frame_slot_address_to_stack_index(address);
             self.open_up_values
-                .insert(stack_idx, self.active_frame().closure.get_up_value(addr));
+                .insert(stack_idx, self.active_frame().closure.get_up_value(address));
         }
         Ok(())
     }
 
     // Up values are indexed by absolute stack address.
-    // This function captures the variable at `addr`
+    // This function captures the variable at `address`
     // and adds it to the currently open up-values.
     //
     // ## Stack effect
     // None
-    fn capture_up_value(&mut self, addr: AddressType) -> Result<()> {
-        let stack_idx = self.frame_slot_address_to_stack_index(addr);
+    fn capture_up_value(&mut self, address: AddressType) -> Result<()> {
+        let stack_idx = self.frame_slot_address_to_stack_index(address);
 
         if self.open_up_values.contains_key(&stack_idx) {
             return Ok(());
         } else {
-            let value = self.stack.at(stack_idx as usize).clone();
-            self.open_up_values.insert(stack_idx, RefValue::new(value));
+            let value = self.stack.at(stack_idx as usize).to_owned();
+            self.open_up_values
+                .insert(stack_idx, Reference::from(value));
             Ok(())
         }
     }
 
     // Close currently open up-values
     //
-    // This removes the up-value resulted from `addr` from the open-up-values.
-    // This happens when the variable that is associated with `addr` goes
+    // This removes the up-value resulted from `address` from the open-up-values.
+    // This happens when the variable that is associated with `address` goes
     // out of scope.
     #[inline]
-    fn close_up_value(&mut self, addr: AddressType) -> Result<()> {
-        let stack_idx = self.frame_slot_address_to_stack_index(addr);
+    fn close_up_value(&mut self, address: AddressType) -> Result<()> {
+        let stack_idx = self.frame_slot_address_to_stack_index(address);
         self.open_up_values.remove(&stack_idx);
         Ok(())
     }
@@ -581,10 +577,16 @@ impl<'a> Instance<'a> {
     //
     ///////////////////////////////////////////////////////
 
-    #[inline]
     fn apply(&mut self, args: usize) -> Result<()> {
         let callable = self.peek(args).clone();
+        let result = match callable {
+            Access::ByRef(r) => self._apply(&r.get_inner_ref(), args),
+            Access::ByVal(v) => self._apply(&v, args),
+        };
+        result
+    }
 
+    fn _apply(&mut self, callable: &Value, args: usize) -> Result<()> {
         match callable {
             value::Value::Closure(cl) => self.apply_closure(cl.clone(), args)?,
             value::Value::Procedure(procedure::Procedure::Native(p)) => {
@@ -594,7 +596,7 @@ impl<'a> Instance<'a> {
                 self.apply_foreign(p.clone(), args)?
             }
             other => {
-                return self.runtime_error(error::non_callable(other), None);
+                return self.runtime_error(error::non_callable(other.clone()), None);
             }
         };
         Ok(())
@@ -644,7 +646,7 @@ impl<'a> Instance<'a> {
     // ## Call stack
     //
     // Foreign procedure calls don't result in a call-frame being pushed.
-    // Instead the VM directly executes the foreign procedures and pushes the result
+    // Instead, the VM directly executes the foreign procedures and pushes the result
     // onto the stack.
     //
     // ## Stack effect
@@ -658,7 +660,11 @@ impl<'a> Instance<'a> {
         arg_count: usize,
     ) -> Result<()> {
         self.check_arity(&proc.arity, arg_count)?;
-        let arguments = self.pop_n(arg_count).iter().cloned().collect();
+        let arguments = self
+            .pop_n(arg_count)
+            .iter()
+            .map(|a| a.clone().to_owned())
+            .collect();
         // also pop the procedure itself
         self.pop();
         match proc.call(arguments) {
@@ -679,7 +685,7 @@ impl<'a> Instance<'a> {
         // prepare the stack
         // all the arguments are now at the top of the stack
         // we transfer them to the start of the frame_base here, which is safe to do only at this point
-        // since all local variable references have been resolved and we're right before the call
+        // since all local variable references have been resolved, and we're right before the call
         let arguments = self.stack.pop_n(args);
         // now save the last value
         let value = self.pop();
@@ -697,11 +703,17 @@ impl<'a> Instance<'a> {
         Ok(())
     }
 
-    #[inline]
-    fn tail_call(&mut self, args: usize) -> Result<()> {
+    fn apply_tail_call(&mut self, args: usize) -> Result<()> {
         self.setup_tail_call(args)?;
         let callable = self.peek(args).clone();
 
+        match callable {
+            Access::ByRef(r) => self._apply_tail_call(&r.get_inner_ref(), args),
+            Access::ByVal(v) => self._apply_tail_call(&v, args),
+        }
+    }
+
+    fn _apply_tail_call(&mut self, callable: &Value, args: usize) -> Result<()> {
         match callable {
             value::Value::Closure(cl) => self.tail_call_closure(cl.clone(), args)?,
             value::Value::Procedure(procedure::Procedure::Native(p)) => {
@@ -712,24 +724,24 @@ impl<'a> Instance<'a> {
                 self.apply_foreign(p.clone(), args)?
             }
             other => {
-                return self.runtime_error(error::non_callable(other), None);
+                return self.runtime_error(error::non_callable(other.clone()), None);
             }
         };
         Ok(())
     }
 
     ///////////////////////////////////////////////////////
-    // tail call closure with supplied arguments
-    //
+    // Tail call closure with supplied arguments
+    // A tail call re-uses the current stack frame instead of pushing a new one.
     //
     // ## Stack effect
     //
-    // Pushes the arguments onto the stack
+    // Pushes the result of the procedure onto the stack
     //
     #[inline]
     fn tail_call_closure(&mut self, closure: Closure, arg_count: usize) -> Result<()> {
         self.check_arity(&closure.procedure().arity, arg_count)?;
-        // make sure the previous arguments are reset on the stack so we can provide the new ones
+        // make sure the previous arguments are reset on the stack, so we can provide the new ones
         // since the function doesn't really return we can simply discard the arguments
         let arg_count = self.bind_arguments(&closure.procedure().arity, arg_count)?;
 
@@ -740,12 +752,16 @@ impl<'a> Instance<'a> {
     }
 
     ///////////////////////////////////////////////////////
-    // tail call a native procedure with supplied arguments
+    // Tail call a native procedure with supplied arguments.
+    // A tail call re-uses the current stack frame instead of pushing a new one.
     //
+    // This allows (tail) recursive procedures to be implemented with constant
+    // stack space. So, without risking a stack overflow.
     //
     // ## Stack effect
     //
-    //
+    // Replaces the top of the stack with the result of the procedure
+    //////////////////////////////////////////////////////
     #[inline]
     fn tail_call_native(
         &mut self,
@@ -781,7 +797,7 @@ impl<'a> Instance<'a> {
     // ## 2. At least n arguments
     //
     // In this case the function makes sure that at least n arguments are supplied. This fist n are
-    // already at the right place on the stack. However all the additional arguments, if supplied, will
+    // already at the right place on the stack. However, all the additional arguments, if supplied, will
     // be represented with a single variable, which holds a list. This means extra arguments are popped
     // from the stack and new list value holding the values of those variables will be pushed onto the stack.
     //
@@ -814,21 +830,54 @@ impl<'a> Instance<'a> {
     //    0  │ 'fro         │
     //       └──────────────┘
 
+    // Make sure to check that the arity matches th arg_count before you call this function
     fn bind_arguments(&mut self, arity: &Arity, arg_count: usize) -> Result<usize> {
         match arity {
-            Arity::Exactly(_) => Ok(arg_count), // nothing to do as the variables are layed out as expected already on the stack
+            Arity::Exactly(n) => {
+                let stack_slice = self.stack_slice_mut(*n);
+                // we place the values on the stack into references, which are then available during the function call
+                for i in 0..*n {
+                    // re-package the value as a reference thus effectively binding it
+                    // to the variable that represents that argument
+                    stack_slice[i] = Access::ByRef(Reference::from(stack_slice[i].to_owned()));
+                }
+
+                self.debug_stack();
+                Ok(arg_count)
+            }
             Arity::AtLeast(n) => {
-                // stuff the last values into a new local
-                let rest_count = arg_count - n;
-                let rest_values = self.pop_n(rest_count);
-                let rest_list = self.values.proper_list(rest_values);
-                self.push(rest_list)?;
+                let stack_slice = self.stack_slice_mut(arg_count);
+
+                // bind the positional arguments first
+                for i in 0..*n {
+                    stack_slice[i] = Access::ByRef(Reference::from(stack_slice[i].to_owned()));
+                }
+
+                // now stuff the rest into a list and bind that to the last argument
+                let rest_args = self.pop_n(arg_count - n);
+                let rest_list = self.values.proper_list(
+                    rest_args
+                        .iter()
+                        .map(|e| e.clone().to_owned())
+                        .collect::<Vec<_>>()
+                        .into(),
+                );
+
+                self.push(Access::ByRef(Reference::from(rest_list)))?;
+
+                self.debug_stack();
                 Ok(n + 1)
             }
             Arity::Many => {
-                let rest_values = self.pop_n(arg_count);
+                let rest_values = self
+                    .pop_n(arg_count)
+                    .iter()
+                    .map(|e| e.clone().to_owned())
+                    .collect();
                 let rest_list = self.values.proper_list(rest_values);
-                self.push(rest_list)?;
+                self.push(Access::ByRef(Reference::from(rest_list)))?;
+
+                self.debug_stack();
                 Ok(1)
             }
         }
@@ -849,10 +898,10 @@ impl<'a> Instance<'a> {
     //
     ///////////////////////////////////////////////////////
 
-    fn define_value(&mut self, addr: ConstAddressType) -> Result<()> {
+    fn define(&mut self, address: ConstAddressType) -> Result<()> {
         let v = self.pop();
-        let id = self.read_identifier(addr)?;
-        self.top_level.set(id.clone(), v.clone());
+        let id = self.read_identifier(address)?;
+        self.top_level.define(id, v.to_owned());
         self.push(self.values.unspecified())?;
         Ok(())
     }
@@ -862,26 +911,14 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
 
     #[inline]
-    fn get_global(&mut self, addr: ConstAddressType) -> Result<()> {
-        let id = self.read_identifier(addr)?;
+    fn fetch_global(&mut self, address: ConstAddressType) -> Result<()> {
+        let id = self.read_identifier(address)?;
+        let value = self.top_level.get(&id).cloned();
 
-        if let Some(value) = self.top_level.get_owned(&id) {
-            self.push(value)?;
+        if let Some(reference) = value {
+            self.push(Access::ByRef(reference))?;
         } else {
             self.runtime_error(error::undefined_variable(id), None)?;
-        }
-        Ok(())
-    }
-
-    fn set_global(&mut self, addr: ConstAddressType) -> Result<()> {
-        let v = self.pop();
-        let id = self.read_identifier(addr)?;
-
-        if !self.top_level.get(&id).is_some() {
-            return self.runtime_error(error::undefined_variable(id.clone()), None);
-        } else {
-            self.top_level.set(id.clone(), v.clone());
-            self.push(self.values.unspecified())?;
         }
         Ok(())
     }
@@ -891,17 +928,9 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
 
     #[inline]
-    fn get_up_value(&mut self, addr: AddressType) -> Result<()> {
-        let value = self.active_frame().closure.get_up_value(addr);
-        self.push(value.to_value())?;
-        Ok(())
-    }
-
-    #[inline]
-    fn set_up_value(&mut self, addr: AddressType) -> Result<()> {
-        let value = self.peek(0).clone();
-        self.active_mut_frame().closure.set_up_value(addr, value);
-        self.push(self.values.unspecified())?;
+    fn fetch_up_value(&mut self, address: AddressType) -> Result<()> {
+        let value = self.active_frame().closure.get_up_value(address);
+        self.push(Access::ByRef(value))?;
         Ok(())
     }
 
@@ -910,26 +939,43 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
 
     #[inline]
-    fn get_local(&mut self, addr: AddressType) -> Result<()> {
-        self.push(self.frame_get_slot(addr).clone())
+    fn fetch_local(&mut self, address: AddressType) -> Result<()> {
+        self.push(self.frame_get_slot(address).clone())
     }
 
-    #[inline]
-    fn set_local(&mut self, addr: AddressType) -> Result<()> {
-        self.frame_set_slot(addr, self.peek(0).clone());
-        self.push(self.values.unspecified())?;
-        Ok(())
+    // the stack before the call to stack looks like this:
+    //       ┌──────────────┐
+    //    3  │ value        │
+    //       ├──────────────┤
+    //    2  │ location     │
+    //       └──────────────┘
+    //
+    // set replaces the value in location with the value on the top of the stack
+    fn set(&mut self) -> Result<()> {
+        let value = self.pop();
+        let location = self.pop();
+
+        match location {
+            Access::ByRef(mut r) => r.set(value.to_owned()),
+            _ => {
+                return self.runtime_error(
+                    error::argument_error(location.to_owned(), "Can't set! immutable value"),
+                    None,
+                )
+            }
+        }
+
+        self.push(self.values.unspecified())
     }
 
     ///////////////////////////////////////////////////////
     // Various utilities and helpers
     ///////////////////////////////////////////////////////
-
-    fn read_identifier(&mut self, addr: ConstAddressType) -> Result<Symbol> {
-        if let Value::Symbol(s) = self.read_constant(addr) {
+    fn read_identifier(&mut self, address: ConstAddressType) -> Result<Symbol> {
+        if let Value::Symbol(s) = self.read_constant(address) {
             Ok(s.clone())
         } else {
-            self.compiler_bug(&format!("Expected symbol at address: {}", addr))
+            self.compiler_bug(&format!("Expected symbol at address: {}", address))
         }
     }
 
@@ -940,7 +986,6 @@ impl<'a> Instance<'a> {
         result
     }
 
-    // TODO: add a representation for stack trace and add it to the error
     fn runtime_error<T>(&self, e: error::RuntimeError, context: Option<String>) -> Result<T> {
         if self.has_active_frame() {
             let result = Err(Error::RuntimeError(
@@ -1001,5 +1046,62 @@ impl<'a> Instance<'a> {
             ),
         );
         println!("\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::vm::global::TopLevel;
+    use crate::vm::instance::Instance;
+    use crate::vm::value::access::{Access, Reference};
+    use crate::vm::value::procedure::Arity;
+    use crate::vm::value::{Factory, Value};
+
+    #[test]
+    fn test_bind_arguments_exactly_n() -> super::Result<()> {
+        let mut top_level = TopLevel::new();
+        let mut values = Factory::default();
+        let mut instance = Instance::vanilla(255, &mut top_level, &mut values, false);
+
+        instance.push(Access::ByVal(Value::Bool(true)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+
+        instance.bind_arguments(&Arity::Exactly(2), 2)?;
+
+        assert_eq!(
+            instance.stack.as_vec().as_slice(),
+            &[
+                Access::ByRef(Reference::from(Value::Bool(true))),
+                Access::ByRef(Reference::from(Value::Bool(false)))
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_bind_arguments_rest_args() -> super::Result<()> {
+        let mut top_level = TopLevel::new();
+        let mut values = Factory::default();
+        let expected_rest_args = values.proper_list(vec![Value::Bool(false), Value::Bool(false)]);
+        let mut instance = Instance::vanilla(255, &mut top_level, &mut values, false);
+
+        instance.push(Access::ByVal(Value::Bool(true)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+        instance.push(Access::ByVal(Value::Bool(false)))?;
+
+        instance.bind_arguments(&Arity::AtLeast(2), 4)?;
+
+        assert_eq!(
+            instance.stack.as_vec().as_slice(),
+            &[
+                Access::ByRef(Reference::from(Value::Bool(true))),
+                Access::ByRef(Reference::from(Value::Bool(false))),
+                Access::ByRef(Reference::from(expected_rest_args))
+            ]
+        );
+
+        Ok(())
     }
 }

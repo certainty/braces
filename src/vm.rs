@@ -1,3 +1,27 @@
+use std::io::stdout;
+
+use thiserror::Error;
+
+pub use error::Error;
+use global::TopLevel;
+use instance::Instance;
+use scheme::core;
+use scheme::writer::Writer;
+pub use settings::{Setting, Settings};
+use value::Value;
+
+use crate::compiler::frontend::reader::datum::Datum;
+use crate::compiler::frontend::syntax::environment::SyntaxEnvironment;
+use crate::compiler::source::Location;
+use crate::compiler::CompilationUnit;
+use crate::compiler::Compiler;
+use crate::vm::disassembler::Disassembler;
+use crate::vm::error::reporting::ErrorReporter;
+use crate::vm::value::procedure::Procedure;
+
+use self::value::procedure::foreign;
+use self::value::procedure::native;
+
 pub mod byte_code;
 pub mod debug;
 pub mod disassembler;
@@ -9,27 +33,6 @@ pub mod settings;
 pub mod stack;
 pub mod stack_trace;
 pub mod value;
-
-use self::value::procedure::foreign;
-use self::value::procedure::native;
-use crate::compiler::CompilationUnit;
-use crate::compiler::Compiler;
-use crate::vm::disassembler::Disassembler;
-use global::TopLevel;
-use instance::Instance;
-use scheme::core;
-use scheme::writer::Writer;
-use std::io::stdout;
-use thiserror::Error;
-use value::Value;
-
-use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::frontend::syntax::environment::SyntaxEnvironment;
-use crate::compiler::source::Location;
-use crate::vm::error::reporting::ErrorReporter;
-use crate::vm::value::procedure::Procedure;
-pub use error::Error;
-pub use settings::{Setting, Settings};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -62,13 +65,13 @@ impl VM {
     }
 
     pub fn write(&self, value: &Value) -> String {
-        self.writer.write(value, &self.values).to_string()
+        self.writer.write(value).to_string()
     }
 
     pub fn register_foreign(&mut self, proc: foreign::Procedure) -> Result<()> {
         let name = self.values.sym(proc.name.clone());
         let proc_value = self.values.foreign_procedure(proc);
-        self.top_level.set(name, proc_value);
+        self.top_level.define(name, proc_value);
         Ok(())
     }
 

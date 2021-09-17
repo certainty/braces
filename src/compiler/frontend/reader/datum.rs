@@ -129,7 +129,7 @@ impl Datum {
             Value::ProperList(ls) => {
                 let elts: Option<Vec<_>> = ls
                     .iter()
-                    .map(|e| Self::from_value(e, location.clone()))
+                    .map(|e| Self::from_value(&e.get_inner_ref(), location.clone()))
                     .collect();
                 elts.map(|e| Self::list(e, location))
             }

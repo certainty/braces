@@ -7,18 +7,16 @@ pub enum Instruction {
     Const(ConstAddressType),
     Define(ConstAddressType),
     Closure(ConstAddressType),
-    SetGlobal(ConstAddressType),
     GetGlobal(ConstAddressType),
-    SetUpValue(AddressType),
     GetUpValue(AddressType),
-    SetLocal(AddressType),
     GetLocal(AddressType),
     UpValue(AddressType, bool),
     CloseUpValue(AddressType),
+    Set,
     JumpIfFalse(AddressType),
     Jump(AddressType),
-    Call(usize),     // number of arguments
-    TailCall(usize), // number of arguments
+    Apply(usize),    // number of arguments
+    ApplyTCO(usize), // number of arguments
     Break,           // Reserved for future use
     Return,
     Nop, // do nothing

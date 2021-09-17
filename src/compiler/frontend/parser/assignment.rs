@@ -4,41 +4,36 @@ use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::source::{HasSourceLocation, Location};
 
 use super::frontend::error::Error;
-use super::identifier;
 use super::Expression;
 use super::ParseResult;
 use super::Result;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct SetExpression {
-    pub name: identifier::Identifier,
+    pub location: Box<Expression>,
     pub value: Box<Expression>,
-    location: Location,
+    source_location: Location,
 }
 
 impl SetExpression {
-    pub fn new(id: identifier::Identifier, expr: Expression, loc: Location) -> Self {
+    pub fn new(location: Expression, expr: Expression, loc: Location) -> Self {
         SetExpression {
-            name: id,
+            location: Box::new(location),
             value: Box::new(expr),
-            location: loc,
+            source_location: loc,
         }
     }
 }
 
 impl HasSourceLocation for SetExpression {
     fn source_location(&self) -> &Location {
-        &self.location
+        &self.source_location
     }
 }
 
 impl Expression {
-    pub fn assign<L: Into<Location>>(
-        id: identifier::Identifier,
-        expr: Expression,
-        loc: L,
-    ) -> Expression {
-        Expression::Assign(SetExpression::new(id, expr, loc.into()))
+    pub fn assign<L: Into<Location>>(location: Expression, expr: Expression, loc: L) -> Expression {
+        Expression::Assign(SetExpression::new(location, expr, loc.into()))
     }
 }
 
@@ -57,14 +52,14 @@ impl CoreParser {
 
     fn do_parse_set(&mut self, datum: &Datum) -> Result<SetExpression> {
         match self.parse_list(datum)? {
-            [_, identifier, expr] => Ok(SetExpression::new(
-                self.do_parse_identifier(identifier).res()?,
+            [_, location, expr] => Ok(SetExpression::new(
+                self.parse(location)?,
                 self.parse(expr)?,
                 datum.source_location().clone(),
             )),
 
             _other => Err(Error::parse_error(
-                "Expected (set! <identifier> <expression>)",
+                "Expected (set! <expression> <expression>)",
                 Detail::new("", datum.source_location().clone()),
                 vec![],
             )),
@@ -82,7 +77,7 @@ mod tests {
         assert_parse_as(
             "(set! foo #t)",
             Expression::assign(
-                identifier::Identifier::synthetic("foo"),
+                Expression::identifier("foo".to_string(), 6..9),
                 Expression::literal(Datum::boolean(true, 10..12)),
                 0..13,
             ),

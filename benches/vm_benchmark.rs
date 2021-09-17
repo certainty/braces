@@ -32,19 +32,19 @@ fn writer_benchmark(c: &mut Criterion) {
     ]);
 
     c.bench_function("Writer#write_list", |b| {
-        b.iter(|| black_box(writer.write(&list, &factory)))
+        b.iter(|| black_box(writer.write(&list)))
     });
 
     let vector_input = factory.vector(vec![value::Value::Bool(true), value::Value::Char('z')]);
     c.bench_function("Writer#write_vector", |b| {
-        b.iter(|| black_box(writer.write(&vector_input, &factory)))
+        b.iter(|| black_box(writer.write(&vector_input)))
     });
 
     let symbol_input = factory.symbol(" a weird symbol  ");
     c.bench_with_input(
         BenchmarkId::new("Writer#write_symbol", format!("{:?}", symbol_input)),
         &symbol_input,
-        |b, i| b.iter(|| black_box(writer.write(i, &factory))),
+        |b, i| b.iter(|| black_box(writer.write(i))),
     );
 }
 

@@ -52,6 +52,9 @@ impl<'a> ErrorReporter<'a> {
             RuntimeError::UndefinedVariable(s) => {
                 format!("UndefinedVariable: Variable `{}` is undefined", s.as_str())
             }
+            RuntimeError::OutOfBoundError(idx, accepted) => {
+                format!("OutOfBoudError: can't access element at index `{}`. The allowed ranged is ({}..{})", idx, accepted.start, accepted.end)
+            }
             RuntimeError::SyntaxError(msg) => {
                 format!("Error during macro expansion: {}", msg)
             }

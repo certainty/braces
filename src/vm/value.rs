@@ -1,3 +1,19 @@
+use std::convert::Into;
+use std::fmt::Formatter;
+
+use thiserror::Error;
+
+use access::Reference;
+use equality::SchemeEqual;
+
+use crate::compiler::frontend::reader::datum::Datum;
+use crate::compiler::utils::string_table::StringTable;
+use crate::vm::scheme::writer::Writer;
+use crate::vm::value::number::real::RealNumber;
+
+use self::{string::InternedString, symbol::Symbol};
+
+pub mod access;
 #[cfg(test)]
 pub mod arbitrary;
 pub mod byte_vector;
@@ -11,59 +27,16 @@ pub mod string;
 pub mod symbol;
 pub mod vector;
 
-use self::{string::InternedString, symbol::Symbol};
-use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::utils::string_table::StringTable;
-use crate::vm::value::number::real::RealNumber;
-use std::cell::Ref;
-use std::cell::RefCell;
-use std::convert::Into;
-use std::rc::Rc;
-use thiserror::Error;
-
-use equality::SchemeEqual;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Not an interned value")]
     NotInterned,
 }
 
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct RefValue {
-    inner: Rc<RefCell<Value>>,
-}
-
-impl RefValue {
-    pub fn new(v: Value) -> Self {
-        RefValue {
-            inner: Rc::new(RefCell::new(v)),
-        }
-    }
-
-    pub fn to_value(&self) -> Value {
-        self.inner.borrow().clone()
-    }
-
-    pub fn as_ref(&self) -> Ref<Value> {
-        self.inner.borrow()
-    }
-
-    pub fn set(&mut self, v: Value) {
-        self.inner.replace(v);
-    }
-}
-
-impl PartialEq for RefValue {
-    fn eq(&self, other: &RefValue) -> bool {
-        self.inner.as_ptr() == other.inner.as_ptr()
-    }
-}
-
 /// Runtime representation of values
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    Syntax(Datum),
     Bool(bool),
     Symbol(Symbol),
     Char(char),
@@ -73,10 +46,9 @@ pub enum Value {
     InternedString(InternedString),
     UninternedString(std::string::String),
     ProperList(list::List),
-    ImproperList(list::List, Box<Value>),
+    ImproperList(list::List, Reference<Value>),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
-    Syntax(Datum),
     Unspecified,
 }
 
@@ -254,17 +226,18 @@ impl Factory {
         if vals.is_empty() {
             Value::ProperList(list::List::Nil)
         } else {
-            let ls: list::List = vals.into();
+            let ls: list::List = list::List::from(vals);
             Value::ProperList(ls)
         }
     }
 
     pub fn improper_list(&self, head: Vec<Value>, tail: Value) -> Value {
-        Value::ImproperList(head.into(), Box::new(tail))
+        Value::ImproperList(head.into(), Reference::from(tail))
     }
 
-    pub fn vector(&self, vals: Vec<Value>) -> Value {
-        Value::Vector(vals)
+    pub fn vector(&self, values: Vec<Value>) -> Value {
+        let v: Vec<Reference<Value>> = values.into_iter().map(Reference::from).collect();
+        Value::Vector(v)
     }
 
     pub fn byte_vector(&self, vals: Vec<u8>) -> Value {
@@ -297,12 +270,16 @@ impl Factory {
                 let head_values = head.iter().map(|e| self.from_datum(e)).collect::<Vec<_>>();
                 Value::ImproperList(
                     list::List::from(head_values),
-                    Box::new(self.from_datum(tail)),
+                    Reference::from(self.from_datum(tail)),
                 )
             }
             Datum::Char(c, _) => self.character(*c),
             Datum::Number(num, _) => Value::Number(num.clone()),
-            Datum::Vector(v, _) => Value::Vector(v.iter().map(|e| self.from_datum(e)).collect()),
+            Datum::Vector(v, _) => Value::Vector(
+                v.iter()
+                    .map(|e| Reference::from(self.from_datum(e)))
+                    .collect(),
+            ),
             Datum::ByteVector(v, _) => Value::ByteVector(v.clone()),
         }
     }
@@ -317,22 +294,34 @@ impl Factory {
     }
 }
 
+// Implementation of display that's useful for logging and printf debugging
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let writer = Writer::new();
+        match self {
+            Value::ProperList(elements) => {
+                let printend_elements = elements
+                    .iter()
+                    .map(|e| format!("&{}", e))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                f.write_fmt(format_args!("({})", printend_elements))
+            }
+            _ => f.write_str(writer.write(&self).as_str()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::vm::value::Factory;
 
     #[test]
-    pub fn test_ref_value() {
-        let v1 = RefValue::new(Value::Bool(true));
-        let v2 = RefValue::new(Value::Bool(true));
-        let v3 = v1.clone();
+    fn test_display_lists() {
+        let values = Factory::default();
 
-        assert_ne!(v1, v2);
-        assert_eq!(v1, v1);
-        assert_eq!(v1, v3);
+        let v = values.proper_list(vec![values.bool_true(), values.bool_false()]);
+
+        assert_eq!(format!("{}", v), "(&#t &#f)")
     }
-
-    // TODO: add equality tests (especially for upvalues)
-
-    // TODO: add test for is_false() (especially for up-values)
 }

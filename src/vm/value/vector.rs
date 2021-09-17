@@ -1,7 +1,8 @@
 use super::Value;
+use crate::vm::value::access::Reference;
 use crate::vm::value::equality::SchemeEqual;
 
-pub type Vector = Vec<Value>;
+pub type Vector = Vec<Reference<Value>>;
 
 impl SchemeEqual<Vector> for Vector {
     fn is_eq(&self, other: &Vector) -> bool {
