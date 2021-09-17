@@ -66,7 +66,7 @@ fn stack_print(v: &Value) -> String {
             let up_values: Vec<String> = closure
                 .up_values
                 .iter()
-                .map(|e| format!("{} @ {:p}", stack_print(&e.clone().get_inner()), e))
+                .map(|e| format!("{} @ {:p}", stack_print(&e.clone().to_owned()), e))
                 .collect();
             let label = closure.name().clone();
 

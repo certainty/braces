@@ -82,7 +82,7 @@ impl Commands {
 
     fn handle_disass(&self, ident: &str, vm: &mut VM) -> anyhow::Result<()> {
         match vm.top_level.get(&vm.values.sym(ident)) {
-            Some(v) => v.with_ref(|value| match value {
+            Some(v) => match &*v.get_inner_ref() {
                 Value::Closure(closure) => match vm.disassemble(closure.procedure()) {
                     Err(e) => Err(anyhow!("{}", e)),
                     _ => Ok(()),
@@ -92,7 +92,7 @@ impl Commands {
                     _ => Ok(()),
                 },
                 _ => Err(anyhow!("Can't disassemble non-procedure")),
-            }),
+            },
             _ => Err(anyhow!("Can't disassemble non-procedure")),
         }
     }

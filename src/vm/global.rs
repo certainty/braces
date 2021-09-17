@@ -35,6 +35,6 @@ impl TopLevel {
     }
 
     pub fn get_owned(&self, k: &Symbol) -> Option<Value> {
-        self.bindings.get(k).map(|e| e.get_inner())
+        self.bindings.get(k).map(|e| e.to_owned())
     }
 }

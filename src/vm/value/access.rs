@@ -55,26 +55,8 @@ impl<T: Clone> Reference<T> {
         }
     }
 
-    pub fn get_inner(&self) -> T {
-        (*self.inner.borrow()).clone()
-    }
-
     pub fn set(&mut self, v: T) {
         self.inner.replace(v);
-    }
-
-    pub fn with_ref<F, O>(&self, f: F) -> O
-    where
-        F: FnOnce(&T) -> O,
-    {
-        f(&self.inner.borrow())
-    }
-
-    pub fn with_ref_mut<F, O>(&mut self, mut f: F) -> O
-    where
-        F: FnMut(&mut T) -> O,
-    {
-        f(&mut self.inner.borrow_mut())
     }
 }
 
@@ -100,13 +82,20 @@ impl<T: SchemeEqual<T> + Clone> SchemeEqual<Reference<T>> for Reference<T> {
     }
 
     fn is_equal(&self, other: &Reference<T>) -> bool {
-        self.with_ref(|lhs| other.with_ref(|rhs| lhs.is_equal(rhs)))
+        self.get_inner_ref().is_equal(&other.get_inner_ref())
     }
 }
 
-// Explicit modeling of access patterns
-//
-// This is used to deal with values which can be places (references) or immutable values
+/// Explicit modeling of access patterns
+///
+/// This is used to deal with values which can be places (references) or immutable values.
+/// Variables will always be accessed `ByRef`. The same is true for cons cells, i.e. list elements.
+/// All other values are usually access `ByVal`.
+///
+/// We could have modeled in the `Value` type directly, by adding a `Ref` variant
+/// or something like that. However this hid important details, that are required to understand
+/// the code of the VM instance. This type makes access so implicit, that the reader should
+/// always see what she's dealing with and follow the flow more easily.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Access<T> {
     ByVal(T),
@@ -121,6 +110,7 @@ impl<T: Clone> Access<T> {
         }
     }
 
+    /// consumes `self` and returns inner
     pub fn into_inner(self) -> T {
         match self {
             Self::ByVal(v) => v,
