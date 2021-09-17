@@ -40,6 +40,10 @@ impl<T: Clone> Reference<T> {
         }
     }
 
+    pub fn copied(&self) -> Self {
+        Self::new(self.to_owned())
+    }
+
     pub fn to_owned(&self) -> T {
         self.inner.borrow().clone()
     }
@@ -110,7 +114,8 @@ impl<T: Clone> Access<T> {
         }
     }
 
-    /// consumes `self` and returns inner
+    /// consumes `self` and returns the inner
+    /// If inner was a `Reference` it returns a clone of the value inside the reference
     pub fn into_inner(self) -> T {
         match self {
             Self::ByVal(v) => v,

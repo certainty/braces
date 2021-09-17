@@ -86,7 +86,7 @@ I probably should build one or maybe not.
 ### Problems
 There are plenty :D 
 
-* The storage model isn't as it must be. List/Vector/Byte-Vector cells are currently not locations. It's not possible to set! those currently. In fact the parser even rejects to set! anything other than an identifier. So this means currently only variables are locations. This can be changed and as a result will also simplify the model to set variables as no special handling will be needed anymore in the VM.
+* Equality isn't correctly implemented -> I will add a test file that verifies that the language implements as the r7rs specifies it, which will cover equality as well.
 * Runtime representation of values isn't at all optimised. It likely uses way too many allocations and holds the types wrong
 * The parser bails after the first error (you'd want to collect all)
 * I'm not sure if the custom ParseResult I use is really needed? (I will have to figure that out)

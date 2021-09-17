@@ -24,6 +24,25 @@ impl List {
         Self::Cons(Vector::from(vec![Reference::from(v)]))
     }
 
+    pub fn copied(&self) -> Self {
+        match self {
+            Self::Nil => self.clone(),
+            Self::Cons(inner) => Self::Cons(inner.iter().map(|e| e.copied()).collect()),
+        }
+    }
+
+    // create a fresh list by concateneting the two supplied lists
+    pub fn append(lhs: &List, rhs: &List) -> List {
+        match (lhs.copied(), rhs.copied()) {
+            (List::Nil, rhs) => rhs,
+            (lhs, List::Nil) => lhs,
+            (List::Cons(mut lhs), List::Cons(rhs)) => {
+                lhs.extend(rhs);
+                List::Cons(lhs)
+            }
+        }
+    }
+
     pub fn cons(&self, v: Value) -> List {
         match self {
             List::Nil => List::Cons(Vector::from(vec![Reference::from(v)])),
@@ -33,18 +52,6 @@ impl List {
                 // into a references again
                 new_elts.push_front(Reference::from(v));
                 List::Cons(new_elts)
-            }
-        }
-    }
-
-    pub fn append(&self, other: &List) -> List {
-        match (self, other) {
-            (List::Nil, _) => other.clone(),
-            (_, List::Nil) => self.clone(),
-            (List::Cons(lhs), List::Cons(rhs)) => {
-                let mut elts = lhs.clone();
-                elts.append(rhs.clone());
-                List::Cons(elts)
             }
         }
     }
@@ -165,6 +172,7 @@ impl From<Vec<Value>> for List {
     }
 }
 
+// TODO: fix equality. See r7rs 6.1
 impl SchemeEqual<List> for List {
     fn is_eq(&self, other: &List) -> bool {
         if self.len() != other.len() {

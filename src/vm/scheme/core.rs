@@ -30,6 +30,7 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "not", bool_not, Arity::Exactly(1));
     register_core!(vm, "inspect", inspect, Arity::Exactly(1));
 
+    register_core!(vm, "list", list_make, Arity::Many);
     register_core!(vm, "car", list_car, Arity::Exactly(1));
     register_core!(vm, "cons", list_cons, Arity::Exactly(2));
     register_core!(vm, "append", list_append, Arity::Exactly(2));
@@ -118,6 +119,11 @@ pub fn inspect(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     Ok(Value::Unspecified.into())
 }
 
+pub fn list_make(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    let ls = args.into();
+    Ok(Access::ByVal(Value::ProperList(ls)))
+}
+
 pub fn list_car(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     unary_procedure(&args).and_then(|v| match v {
         Value::ProperList(ls) => {
@@ -158,10 +164,10 @@ pub fn list_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
 pub fn list_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::ProperList(lhs), Value::ProperList(rhs)) => {
-            Ok(Value::ProperList(lhs.append(rhs)).into())
+            Ok(Value::ProperList(List::append(lhs, rhs)).into())
         }
         (Value::ProperList(lhs), Value::ImproperList(rhs_head, rhs_tail)) => {
-            Ok(Value::ImproperList(lhs.append(rhs_head), rhs_tail.clone()).into())
+            Ok(Value::ImproperList(List::append(lhs, rhs_head), rhs_tail.clone()).into())
         }
         (lhs, Value::ProperList(_)) => Err(error::argument_error(lhs.clone(), "Expected list")),
         (lhs, Value::ImproperList(_rhs_head, _rhs_tail)) => {
@@ -221,5 +227,50 @@ pub fn vector_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
         (lhs, Value::Vector(_)) => Err(error::argument_error(lhs.clone(), "Expected vector")),
         (Value::Vector(_), rhs) => Err(error::argument_error(rhs.clone(), "Expected vector")),
         (lhs, _) => Err(error::argument_error(lhs.clone(), "Expected vector")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::compiler::source::StringSource;
+    use crate::compiler::Compiler;
+    use crate::vm::value::{Factory, Value};
+    use crate::vm::VM;
+
+    #[test]
+    fn test_list_append() {
+        let values = Factory::default();
+        let mut vm = VM::default();
+
+        let result = run_code(
+            &mut vm,
+            r#"
+        (define x '(1 2 3))
+        (define y '(1 2 3))
+        (define z (append x y))
+        (set! (car x) 5)
+        z
+        "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            result,
+            values.proper_list(vec![
+                values.real(1),
+                values.real(2),
+                values.real(3),
+                values.real(1),
+                values.real(2),
+                values.real(3)
+            ])
+        )
+    }
+
+    fn run_code(vm: &mut VM, code: &str) -> crate::vm::Result<Value> {
+        let mut source = StringSource::new(code);
+        let mut compiler = Compiler::new();
+        let unit = compiler.compile(&mut source)?;
+        vm.interpret(unit)
     }
 }
