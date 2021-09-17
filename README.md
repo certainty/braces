@@ -45,7 +45,7 @@ make repl
 - [x] basic code generator 
 - [ ] collect all errors in reader  
 - [ ] collect all errors in parser 
-- [ ] bytecode serialization
+- [ ] bytecode serialization (ahead of time compilation)
 - [ ] libraries  
 - [ ] optimization pass 
 - [x] identify tail calls
