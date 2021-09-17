@@ -109,7 +109,7 @@ pub fn procedure_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
 
 pub fn bool_not(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::Bool(v) => Ok(Value::Bool(!v).into()),
+        Value::Bool(v) => Ok(Value::Bool(!*v).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
@@ -132,7 +132,7 @@ pub fn list_car(args: Vec<Value>) -> FunctionResult<Access<Value>> {
             } else {
                 Err(error::argument_error(
                     v.clone(),
-                    "can't take care of empty list",
+                    "can't take car of empty list",
                 ))
             }
         }
@@ -142,7 +142,7 @@ pub fn list_car(args: Vec<Value>) -> FunctionResult<Access<Value>> {
             } else {
                 Err(error::argument_error(
                     v.clone(),
-                    "can't take care of empty list",
+                    "can't take car of empty list",
                 ))
             }
         }
@@ -152,7 +152,7 @@ pub fn list_car(args: Vec<Value>) -> FunctionResult<Access<Value>> {
 
 pub fn list_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (v, Value::ProperList(elts)) => Ok(Value::ProperList(elts.cons(v.clone())).into()),
+        (v, Value::ProperList(elements)) => Ok(Value::ProperList(elements.cons(v.clone())).into()),
         (lhs, rhs) => Ok(Value::ImproperList(
             List::singleton(lhs.clone()),
             Reference::from(rhs.clone()),
@@ -201,15 +201,15 @@ pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Access<Value>> {
         )),
         (other, _) => Err(error::argument_error(
             other.clone(),
-            "Expected the two aruments to be of type vector and number",
+            "Expected the two arguments to be of type vector and number",
         )),
     }
 }
 
 pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (v, Value::Vector(elts)) => {
-            let mut new_vec = elts.clone();
+        (v, Value::Vector(elements)) => {
+            let mut new_vec = elements.clone();
             new_vec.push(Reference::from(v.clone()));
             Ok(Value::Vector(new_vec).into())
         }

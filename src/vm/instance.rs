@@ -971,7 +971,6 @@ impl<'a> Instance<'a> {
     ///////////////////////////////////////////////////////
     // Various utilities and helpers
     ///////////////////////////////////////////////////////
-
     fn read_identifier(&mut self, address: ConstAddressType) -> Result<Symbol> {
         if let Value::Symbol(s) = self.read_constant(address) {
             Ok(s.clone())
