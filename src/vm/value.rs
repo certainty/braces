@@ -210,7 +210,7 @@ impl Factory {
         Value::Symbol(self.sym(v))
     }
 
-    pub fn string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
+    pub fn string<T: Into<std::string::String>>(&self, v: T) -> Value {
         Value::String(string::String::from(v.into()))
     }
 

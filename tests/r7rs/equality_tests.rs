@@ -2,29 +2,24 @@ use crate::helpers::*;
 use braces::vm::value::Value;
 use braces::vm::VM;
 
-fn assert_eqv(lhs: &str, rhs: &str) {
-    let mut vm: VM = VM::default();
-    let code = format!("(eqv? {} {})", lhs, rhs);
-
-    assert_eq!(
-        run_code(&mut vm, &code).unwrap(),
-        Value::Bool(true),
-        "expected (eqv? {} {}) to be true",
-        lhs,
-        rhs
-    );
+fn assert_relation(op: &str, lhs: &str, rhs: &str) {
+    test_relation(op, lhs, rhs, true)
 }
 
-fn assert_neqv(lhs: &str, rhs: &str) {
+fn refute_relation(op: &str, lhs: &str, rhs: &str) {
+    test_relation(op, lhs, rhs, false)
+}
+
+fn test_relation(op: &str, lhs: &str, rhs: &str, result: bool) {
     let mut vm: VM = VM::default();
-    let code = format!("(eqv? {} {})", lhs, rhs);
+    let code = format!("({} {} {})", op, lhs, rhs);
 
     assert_eq!(
         run_code(&mut vm, &code).unwrap(),
-        Value::Bool(false),
-        "expected (eqv? {} {}) to be false",
-        lhs,
-        rhs
+        Value::Bool(result),
+        "expected {} to be {}",
+        code,
+        result
     );
 }
 
@@ -33,32 +28,32 @@ fn eqv_as_specified() {
     // see r7rs: 6.1
 
     // bool
-    assert_eqv("#t", "#t");
-    assert_eqv("#f", "#f");
-    assert_neqv("#f", "#t");
+    assert_relation("eqv?", "#t", "#t");
+    assert_relation("eqv?", "#f", "#f");
+    refute_relation("eqv?", "#f", "#t");
 
     // symbols
-    assert_eqv("'foo", "'foo");
-    assert_neqv("'foo", "'bar");
+    assert_relation("eqv?", "'foo", "'foo");
+    refute_relation("eqv?", "'foo", "'bar");
 
     //exact numbers
-    assert_eqv("1", "1");
-    assert_eqv("100000000", "100000000");
-    assert_eqv("3/4", "3/4");
-    assert_neqv("2", "2.0");
+    assert_relation("eqv?", "1", "1");
+    assert_relation("eqv?", "100000000", "100000000");
+    assert_relation("eqv?", "3/4", "3/4");
+    refute_relation("eqv?", "2", "2.0");
 
     //inexact numbers
-    assert_eqv("2.0", "2.0");
-    assert_neqv("2.0", "3.1");
-    assert_neqv("0.0", "+nan.0");
+    assert_relation("eqv?", "2.0", "2.0");
+    refute_relation("eqv?", "2.0", "3.1");
+    refute_relation("eqv?", "0.0", "+nan.0");
 
     // chars
-    assert_eqv("#\\a", "#\\a");
-    assert_neqv("#\\a", "#\\b");
+    assert_relation("eqv?", "#\\a", "#\\a");
+    refute_relation("eqv?", "#\\a", "#\\b");
 
     //lists
     let mut vm: VM = VM::default();
-    assert_eqv("'()", "'()");
+    assert_relation("eqv?", "'()", "'()");
     assert_result_eq(&mut vm, "(define x '(1 2 3)) (eqv? x x)", Value::Bool(true));
     assert_result_eq(
         &mut vm,
@@ -67,7 +62,7 @@ fn eqv_as_specified() {
     );
 
     // pairs
-    assert_neqv("(cons 1 2)", "(cons 1 2)");
+    refute_relation("eqv?", "(cons 1 2)", "(cons 1 2)");
     assert_result_eq(
         &mut vm,
         "(define x (cons 2 3)) (eqv? x x)",
@@ -80,7 +75,7 @@ fn eqv_as_specified() {
     );
 
     // vectors
-    assert_neqv("#(1 2)", "#(1 2)");
+    refute_relation("eqv?", "#(1 2)", "#(1 2)");
     assert_result_eq(&mut vm, "(define x #(1 2 3)) (eqv? x x)", Value::Bool(true));
     assert_result_eq(
         &mut vm,
@@ -89,7 +84,7 @@ fn eqv_as_specified() {
     );
 
     // bytevectors
-    assert_neqv("#u8(1 1)", "#u8(1 1)");
+    refute_relation("eqv?", "#u8(1 1)", "#u8(1 1)");
     assert_result_eq(
         &mut vm,
         "(define x #u8(1 2 3)) (eqv? x x)",
@@ -102,7 +97,113 @@ fn eqv_as_specified() {
     );
 
     // strings
-    assert_neqv(r#""foo""#, r#""foo""#);
+    refute_relation("eqv?", r#""foo""#, r#""foo""#);
+    assert_result_eq(&mut vm, "(define x \"foo\") (eqv? x x)", Value::Bool(true));
+    assert_result_eq(
+        &mut vm,
+        "(define x \"foo\") (define y \"foo\") (eqv? x y)",
+        Value::Bool(false),
+    );
+
+    // procedures
+    refute_relation("eqv?", "(lambda (x) x)", "(lambda (x) x)");
+    assert_result_eq(
+        &mut vm,
+        "(let ((p (lambda (x) x))) (eqv? p p))",
+        Value::Bool(true),
+    );
+}
+
+#[test]
+fn eq_as_specified() {
+    //On symbols, booleans, the empty list, pairs, and records,
+    //and also on non-empty strings, vectors, and bytevectors,
+    //eq? and eqv? are guaranteed to have the same behavior.
+
+    // bool
+    assert_relation("eq?", "#t", "#t");
+    assert_relation("eq?", "#f", "#f");
+    refute_relation("eq?", "#f", "#t");
+
+    // symbols
+    assert_relation("eq?", "'foo", "'foo");
+    refute_relation("eq?", "'foo", "'bar");
+
+    //lists
+    let mut vm: VM = VM::default();
+    assert_relation("eq?", "'()", "'()");
+
+    // pairs
+    refute_relation("eq?", "(cons 1 2)", "(cons 1 2)");
+    assert_result_eq(
+        &mut vm,
+        "(define x (cons 2 3)) (eq? x x)",
+        Value::Bool(true),
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x (cons 1 2)) (define y (cons 1 2)) (eq? x y)",
+        Value::Bool(false),
+    );
+
+    // vectors
+    refute_relation("eq?", "#(1 2)", "#(1 2)");
+    assert_result_eq(&mut vm, "(define x #(1 2 3)) (eq? x x)", Value::Bool(true));
+    assert_result_eq(
+        &mut vm,
+        "(define x #(1 2 3)) (define y #(1 2 3)) (eq? x y)",
+        Value::Bool(false),
+    );
+
+    // bytevectors
+    refute_relation("eq?", "#u8(1 1)", "#u8(1 1)");
+    assert_result_eq(
+        &mut vm,
+        "(define x #u8(1 2 3)) (eq? x x)",
+        Value::Bool(true),
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x #u8(1 2 3)) (define y #u8(1 2 3)) (eq? x y)",
+        Value::Bool(false),
+    );
+
+    // strings
+    assert_result_eq(&mut vm, "(define x \"foo\") (eq? x x)", Value::Bool(true));
+    assert_result_eq(
+        &mut vm,
+        "(define x \"foo\") (define y \"foo\") (eq? x y)",
+        Value::Bool(false),
+    );
+
+    assert_result_eq(
+        &mut vm,
+        "(let ((p (lambda (x) x))) (eq? p p))",
+        Value::Bool(true),
+    );
+
+    // the rest is implementation dependent
+    assert_result_eq(&mut vm, "(define x #(1 2 3)) (eq? x x)", Value::Bool(true));
+    assert_result_eq(
+        &mut vm,
+        "(define x #(1 2 3)) (define y #(1 2 3)) (eq? x y)",
+        Value::Bool(false),
+    );
+
+    //exact numbers
+    assert_relation("eq?", "1", "1");
+    assert_relation("eq?", "100000000", "100000000");
+    assert_relation("eq?", "3/4", "3/4");
+    refute_relation("eq?", "2", "2.0");
+
+    //inexact numbers
+    assert_relation("eq?", "2.0", "2.0");
+    refute_relation("eq?", "2.0", "3.1");
+    refute_relation("eq?", "0.0", "+nan.0");
+
+    // chars
+    assert_relation("eq?", "#\\a", "#\\a");
+    refute_relation("eq?", "#\\a", "#\\b");
 }
 
 #[test]

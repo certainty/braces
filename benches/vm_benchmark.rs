@@ -26,10 +26,7 @@ fn stack_benchmark(c: &mut Criterion) {
 fn writer_benchmark(c: &mut Criterion) {
     let writer = braces::vm::scheme::writer::Writer::new();
     let mut factory = value::Factory::default();
-    let list = factory.proper_list(vec![
-        factory.bool_true(),
-        value::Value::UninternedString(String::from("test")),
-    ]);
+    let list = factory.proper_list(vec![factory.bool_true(), factory.string("test")]);
 
     c.bench_function("Writer#write_list", |b| {
         b.iter(|| black_box(writer.write(&list)))
