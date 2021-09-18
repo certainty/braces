@@ -102,5 +102,5 @@ There are plenty :D
 Once I have the language in a place where it's correct, I can look at more optmisations. I'm still learning rust and some things I simply didn't know when I 
 started.
 
-- [ ] make use of COW when dealing with constants
+- [ ] make use of COW or even SUPERCOW for values 
 - [ ] make sure that references are used correctly to minimise cloning
