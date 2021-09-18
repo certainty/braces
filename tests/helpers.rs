@@ -14,5 +14,11 @@ pub fn run_code(vm: &mut VM, code: &str) -> Result<Value> {
 }
 
 pub fn assert_result_eq(vm: &mut VM, code: &str, expected: Value) {
-    assert_eq!(run_code(vm, code).unwrap(), expected)
+    assert_eq!(
+        run_code(vm, code).unwrap(),
+        expected,
+        "Expected that {} evaluates to {}",
+        code,
+        expected
+    )
 }

@@ -12,6 +12,8 @@ use crate::vm::scheme::writer::Writer;
 use crate::vm::value::number::real::RealNumber;
 
 use self::{string::InternedString, symbol::Symbol};
+use crate::vm::value::byte_vector::ByteVector;
+use crate::vm::value::vector::Vector;
 
 pub mod access;
 #[cfg(test)]
@@ -109,6 +111,8 @@ impl SchemeEqual<Value> for Value {
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
+            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
+            (Value::Number(lhs), Value::Number(rhs)) => lhs.is_eq(rhs),
             _ => false,
         }
     }
@@ -130,6 +134,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
+            (Value::Number(lhs), Value::Number(rhs)) => lhs.is_eqv(rhs),
             _ => false,
         }
     }
@@ -153,6 +158,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),
             (Value::Unspecified, Value::Unspecified) => true,
+            (Value::Number(lhs), Value::Number(rhs)) => lhs.is_equal(rhs),
             _ => false,
         }
     }
@@ -237,11 +243,11 @@ impl Factory {
 
     pub fn vector(&self, values: Vec<Value>) -> Value {
         let v: Vec<Reference<Value>> = values.into_iter().map(Reference::from).collect();
-        Value::Vector(v)
+        Value::Vector(Vector::from(v))
     }
 
     pub fn byte_vector(&self, vals: Vec<u8>) -> Value {
-        Value::ByteVector(vals)
+        Value::ByteVector(ByteVector::from(vals))
     }
 
     pub fn foreign_procedure(&mut self, v: procedure::foreign::Procedure) -> Value {
@@ -275,12 +281,12 @@ impl Factory {
             }
             Datum::Char(c, _) => self.character(*c),
             Datum::Number(num, _) => Value::Number(num.clone()),
-            Datum::Vector(v, _) => Value::Vector(
+            Datum::Vector(v, _) => Value::Vector(Vector::from(
                 v.iter()
                     .map(|e| Reference::from(self.from_datum(e)))
-                    .collect(),
-            ),
-            Datum::ByteVector(v, _) => Value::ByteVector(v.clone()),
+                    .collect::<Vec<_>>(),
+            )),
+            Datum::ByteVector(v, _) => Value::ByteVector(ByteVector::from(v.clone())),
         }
     }
 

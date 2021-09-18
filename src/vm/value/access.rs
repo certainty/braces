@@ -82,7 +82,7 @@ impl<T: SchemeEqual<T> + Clone> SchemeEqual<Reference<T>> for Reference<T> {
     }
 
     fn is_eqv(&self, other: &Reference<T>) -> bool {
-        Reference::<T>::ref_eq(self, other)
+        self.get_inner_ref().is_eqv(&other.get_inner_ref())
     }
 
     fn is_equal(&self, other: &Reference<T>) -> bool {

@@ -110,7 +110,12 @@ impl SchemeEqual<RealNumber> for RealNumber {
     }
 
     fn is_eqv(&self, other: &RealNumber) -> bool {
-        self.is_eq(other)
+        match (self, other) {
+            (RealNumber::Fixnum(lhs), RealNumber::Fixnum(rhs)) => lhs.is_eqv(rhs),
+            (RealNumber::Rational(lhs), RealNumber::Rational(rhs)) => lhs == rhs,
+            (RealNumber::Flonum(lhs), RealNumber::Flonum(rhs)) => lhs.is_eqv(rhs),
+            _ => false,
+        }
     }
 
     fn is_equal(&self, other: &RealNumber) -> bool {
