@@ -207,75 +207,112 @@ fn eq_as_specified() {
 }
 
 #[test]
-fn list_is_eq_to_itself() {
-    let mut vm = VM::default();
+fn equal_as_specified() {
+    // bool
+    assert_relation("equal?", "#t", "#t");
+    assert_relation("equal?", "#f", "#f");
+    refute_relation("equal?", "#f", "#t");
+
+    // symbols
+    assert_relation("equal?", "'foo", "'foo");
+    refute_relation("equal?", "'foo", "'bar");
+
+    //exact numbers
+    assert_relation("equal?", "1", "1");
+    assert_relation("equal?", "100000000", "100000000");
+    assert_relation("equal?", "3/4", "3/4");
+    refute_relation("equal?", "2", "2.0");
+
+    //inexact numbers
+    assert_relation("equal?", "2.0", "2.0");
+    refute_relation("equal?", "2.0", "3.1");
+    refute_relation("equal?", "0.0", "+nan.0");
+
+    // chars
+    assert_relation("equal?", "#\\a", "#\\a");
+    refute_relation("equal?", "#\\a", "#\\b");
+
+    //lists
+    let mut vm: VM = VM::default();
+    assert_relation("equal?", "'()", "'()");
+    assert_relation("equal?", "'(1 2 (1 2 3))", "'(1 2 (1 2 3))");
+    refute_relation("equal?", "'(1 2 3)", "'(1 2 3 4 5)");
 
     assert_result_eq(
         &mut vm,
-        r#"
-    (define x '(1 2 3))
-    (eq? x x)
-    "#,
+        "(define x '(1 2 3)) (equal? x x)",
         Value::Bool(true),
-    )
-}
-
-#[test]
-fn list_is_not_eq_to_other() {
-    let mut vm = VM::default();
-
+    );
     assert_result_eq(
         &mut vm,
-        r#"
-    (define x '(1 2 3))
-    (define y '(1 2 3))
-    (eq? x y)
-    "#,
+        "(define x '(1 2 3)) (define y '(1 2 3)) (equal? x y)",
+        Value::Bool(true),
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x '(1 2 3 4)) (define y '(1 2 3)) (equal? x y)",
         Value::Bool(false),
     );
 
+    // pairs
+    assert_relation("equal?", "(cons 1 2)", "(cons 1 2)");
+    assert_relation("equal?", "(cons 1 (cons 1 2))", "(cons 1 (cons 1 2))");
+    refute_relation("equal?", "(cons  1 2)", "(cons 1 3)");
     assert_result_eq(
         &mut vm,
-        r#"
-        (eq? '(1 2 3) '(1 2 3))
-    "#,
-        Value::Bool(false),
-    )
-}
-
-#[test]
-fn list_is_equal_to_itself() {
-    let mut vm = VM::default();
-
-    assert_result_eq(
-        &mut vm,
-        r#"
-    (define x '(1 2 3))
-    (equal? x x)
-    "#,
+        "(define x (cons 2 3)) (equal? x x)",
         Value::Bool(true),
-    )
-}
-
-#[test]
-fn list_is_equal_to_other_with_equal_elements() {
-    let mut vm = VM::default();
-
+    );
     assert_result_eq(
         &mut vm,
-        r#"
-    (define x '(1 2 3))
-    (define y '(1 2 3))
-    (equal? x y)
-    "#,
+        "(define x (cons 1 2)) (define y (cons 1 2)) (equal? x y)",
         Value::Bool(true),
     );
 
+    // vectors
+    assert_relation("equal?", "#(1 2)", "#(1 2)");
     assert_result_eq(
         &mut vm,
-        r#"
-        (equal? '(1 2 3) '(1 2 3))
-    "#,
+        "(define x #(1 2 3)) (equal? x x)",
         Value::Bool(true),
-    )
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x #(1 2 3)) (define y #(1 2 3)) (equal? x y)",
+        Value::Bool(true),
+    );
+
+    // bytevectors
+    assert_relation("equal?", "#u8(1 1)", "#u8(1 1)");
+    assert_result_eq(
+        &mut vm,
+        "(define x #u8(1 2 3)) (equal? x x)",
+        Value::Bool(true),
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x #u8(1 2 3)) (define y #u8(1 2 3)) (equal? x y)",
+        Value::Bool(true),
+    );
+
+    // strings
+    assert_relation("equal?", r#""foo""#, r#""foo""#);
+    assert_result_eq(
+        &mut vm,
+        "(define x \"foo\") (equal? x x)",
+        Value::Bool(true),
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x \"foo\") (define y \"foo\") (equal? x y)",
+        Value::Bool(true),
+    );
+
+    // procedures
+    refute_relation("equal?", "(lambda (x) x)", "(lambda (x) x)");
+    assert_result_eq(
+        &mut vm,
+        "(let ((p (lambda (x) x))) (equal? p p))",
+        Value::Bool(true),
+    );
 }
