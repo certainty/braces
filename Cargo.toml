@@ -26,6 +26,10 @@ harness=false
 name="vm_benchmark"
 harness=false
 
+[[bench]]
+name="scheme_values_benchmark"
+harness=false
+
 [features]
 debug_vm = []
 debug_code = []
@@ -58,6 +62,7 @@ nom_locate = "3.0"
 nom = "6.1"
 
 directories = "3.0"
+rand = "0.8.4"
 
 [dev-dependencies]
 matches = "0.1"
