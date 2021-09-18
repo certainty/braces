@@ -156,11 +156,6 @@ impl<'a> CodeGenerator<'a> {
         self.values.symbol(s)
     }
 
-    #[inline]
-    fn intern(&mut self, s: &str) -> Value {
-        self.values.interned_string(s)
-    }
-
     /// Begin a new lexical scope
     ///
     #[inline]
@@ -438,10 +433,6 @@ impl<'a> CodeGenerator<'a> {
             Datum::Bool(false, loc) => self.emit_instruction(Instruction::False, loc)?,
             Datum::List(ls, loc) if ls.is_empty() => {
                 self.emit_instruction(Instruction::Nil, loc)?
-            }
-            Datum::String(s, loc) => {
-                let interned = self.intern(s);
-                self.emit_constant(interned, loc)?;
             }
             _ => {
                 let value = self.values.from_datum(datum);

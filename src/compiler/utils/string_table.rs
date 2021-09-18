@@ -8,15 +8,21 @@ pub struct Interned(Rc<String>);
 
 impl Interned {
     pub fn is_identifical(&self, other: &Interned) -> bool {
-        (&*self.0 as *const _) == (&*other.0 as *const _)
+        Rc::ptr_eq(&self.0, &other.0)
     }
 
     pub fn as_str(&self) -> &str {
-        &(*self.0)
+        self.as_ref()
     }
 
     pub fn as_string(&self) -> String {
         (*self.0).clone()
+    }
+}
+
+impl AsRef<str> for Interned {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
     }
 }
 

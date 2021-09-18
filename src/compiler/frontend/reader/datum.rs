@@ -122,8 +122,7 @@ impl Datum {
             Value::Syntax(datum) => Some(datum.clone()),
             Value::Char(c) => Some(Self::character(c.clone(), location)),
             Value::Symbol(sym) => Some(Self::forged_symbol(sym.as_str(), location)),
-            Value::InternedString(s) => Some(Self::string(s.as_str(), location)),
-            Value::UninternedString(s) => Some(Self::string(s.clone(), location)),
+            Value::String(s) => Some(Self::string(s.as_ref(), location)),
             Value::Number(n) => Some(Self::number(n.clone(), location)),
             Value::Bool(b) => Some(Self::boolean(b.clone(), location)),
             Value::ProperList(ls) => {

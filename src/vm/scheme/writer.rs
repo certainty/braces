@@ -40,8 +40,7 @@ impl Writer {
             Value::Symbol(s) => self.write_symbol(s.as_str(), quote),
             Value::Char(c) => self.write_char(*c),
             Value::Number(num) => self.write_number(num),
-            Value::InternedString(s) => self.write_string(s.as_str()),
-            Value::UninternedString(s) => self.write_string(&s),
+            Value::String(s) => self.write_string(s.as_ref()),
             Value::Closure(closure) => {
                 self.write_procedure(&procedure::Procedure::Native(closure.procedure_rc()))
             }

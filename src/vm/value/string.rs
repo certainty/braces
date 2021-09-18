@@ -1,39 +1,56 @@
 use super::equality::SchemeEqual;
-use crate::compiler::utils::string_table;
+use std::rc::Rc;
 
 #[repr(transparent)]
-#[derive(Clone, PartialEq)]
-pub struct InternedString(pub string_table::Interned);
+#[derive(Clone, Debug, PartialEq)]
+pub struct String(Rc<std::string::String>);
 
-impl InternedString {
-    pub fn as_str<'a>(&'a self) -> &'a str {
-        self.0.as_str()
+impl String {
+    pub fn new() -> Self {
+        Self(Rc::new(std::string::String::from("")))
     }
 }
 
-impl std::fmt::Debug for InternedString {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter<'_>,
-    ) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_fmt(format_args!(
-            "Interned({} @ {:p})",
-            self.as_str(),
-            self.as_str()
-        ))
+impl AsRef<str> for String {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
     }
 }
 
-impl SchemeEqual<InternedString> for InternedString {
-    fn is_eq(&self, other: &InternedString) -> bool {
-        self.0.is_identifical(&other.0)
+impl From<&str> for String {
+    fn from(other: &str) -> Self {
+        Self(Rc::from(std::string::String::from(other)))
+    }
+}
+
+impl From<std::string::String> for String {
+    fn from(s: std::string::String) -> Self {
+        Self(Rc::from(s))
+    }
+}
+
+impl From<Rc<std::string::String>> for String {
+    fn from(s: Rc<std::string::String>) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&Rc<std::string::String>> for String {
+    fn from(s: &Rc<std::string::String>) -> Self {
+        Self(s.clone())
+    }
+}
+
+impl SchemeEqual<String> for String {
+    fn is_eq(&self, other: &String) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
 
-    fn is_eqv(&self, other: &InternedString) -> bool {
-        self.0.is_identifical(&other.0)
+    fn is_eqv(&self, other: &String) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
 
-    fn is_equal(&self, other: &InternedString) -> bool {
-        self.as_str() == other.as_str()
+    fn is_equal(&self, other: &String) -> bool {
+        self.0.as_ref() == other.0.as_ref()
     }
 }

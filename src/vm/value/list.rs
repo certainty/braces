@@ -4,11 +4,14 @@ use crate::vm::value::access::Reference;
 use im_rc::Vector;
 use std::convert::From;
 use std::iter::{FromIterator, IntoIterator};
+use std::rc::Rc;
+
+type ElementRepr = Reference<Value>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum List {
     Nil,
-    Cons(Vector<Reference<Value>>),
+    Cons(Rc<Vector<ElementRepr>>),
 }
 
 impl List {
@@ -16,42 +19,45 @@ impl List {
         Self::Nil
     }
 
-    pub fn new() -> Self {
-        List::Cons(Vector::new())
-    }
-
     pub fn singleton(v: Value) -> Self {
-        Self::Cons(Vector::from(vec![Reference::from(v)]))
+        List::from(Vector::from(vec![Reference::from(v)]))
     }
 
     pub fn copied(&self) -> Self {
         match self {
             Self::Nil => self.clone(),
-            Self::Cons(inner) => Self::Cons(inner.iter().map(|e| e.copied()).collect()),
+            Self::Cons(inner) => {
+                let elements = inner.iter().map(|e| e.copied()).collect::<Vector<_>>();
+                List::from(elements)
+            }
         }
     }
 
     // create a fresh list by concateneting the two supplied lists
     pub fn append(lhs: &List, rhs: &List) -> List {
-        match (lhs.copied(), rhs.copied()) {
-            (List::Nil, rhs) => rhs,
-            (lhs, List::Nil) => lhs,
-            (List::Cons(mut lhs), List::Cons(rhs)) => {
-                lhs.extend(rhs);
-                List::Cons(lhs)
+        match (lhs, rhs) {
+            (List::Nil, rhs) => rhs.copied(),
+            (lhs, List::Nil) => lhs.copied(),
+            (List::Cons(lhs), List::Cons(rhs)) => {
+                let mut lhs_copy = lhs.iter().map(|e| e.copied()).collect::<Vector<_>>();
+                let rhs_copy = rhs.iter().map(|e| e.copied());
+
+                lhs_copy.extend(rhs_copy);
+
+                List::Cons(Rc::from(lhs_copy))
             }
         }
     }
 
     pub fn cons(&self, v: Value) -> List {
         match self {
-            List::Nil => List::Cons(Vector::from(vec![Reference::from(v)])),
+            List::Nil => Self::singleton(v),
             List::Cons(elts) => {
-                let mut new_elts = elts.clone();
+                let mut new_elts = elts.iter().cloned().collect::<Vector<_>>();
                 // if it's a reference itself we first copy it value out and then wrap it
                 // into a references again
                 new_elts.push_front(Reference::from(v));
-                List::Cons(new_elts)
+                List::from(new_elts)
             }
         }
     }
@@ -151,11 +157,7 @@ impl FromIterator<Value> for List {
     fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
         let ls: im_rc::vector::Vector<Reference<Value>> =
             iter.into_iter().map(Reference::from).collect();
-        if ls.is_empty() {
-            List::Nil
-        } else {
-            List::Cons(ls)
-        }
+        List::from(ls)
     }
 }
 
@@ -164,10 +166,16 @@ impl From<Vec<Value>> for List {
         let ls: im_rc::vector::Vector<Reference<Value>> =
             elements.into_iter().map(Reference::from).collect();
 
-        if ls.is_empty() {
+        List::from(ls)
+    }
+}
+
+impl From<Vector<ElementRepr>> for List {
+    fn from(elements: Vector<ElementRepr>) -> Self {
+        if elements.is_empty() {
             List::Nil
         } else {
-            List::Cons(ls)
+            List::Cons(Rc::from(elements))
         }
     }
 }
@@ -175,18 +183,18 @@ impl From<Vec<Value>> for List {
 // TODO: fix equality. See r7rs 6.1
 impl SchemeEqual<List> for List {
     fn is_eq(&self, other: &List) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_eq(b))
+        match (self, other) {
+            (Self::Nil, Self::Nil) => true,
+            (Self::Cons(lhs), Self::Cons(rhs)) => Rc::ptr_eq(lhs, rhs),
+            _ => false,
         }
     }
 
     fn is_eqv(&self, other: &List) -> bool {
-        if self.len() != other.len() {
-            return false;
-        } else {
-            self.iter().zip(other.iter()).all(|(a, b)| a.is_eqv(b))
+        match (self, other) {
+            (Self::Nil, Self::Nil) => true,
+            (Self::Cons(lhs), Self::Cons(rhs)) => Rc::ptr_eq(lhs, rhs),
+            _ => false,
         }
     }
 

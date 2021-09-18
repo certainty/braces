@@ -7,7 +7,7 @@ pub struct SymbolString(pub String);
 
 impl Arbitrary for Value {
     fn arbitrary(gen: &mut quickcheck::Gen) -> Self {
-        let mut factory = super::Factory::default();
+        let factory = super::Factory::default();
 
         match gen.choose(&[1, 2, 3, 4, 5]) {
             Some(1) if bool::arbitrary(gen) => factory.bool_true().clone(),

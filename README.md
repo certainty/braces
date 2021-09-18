@@ -19,41 +19,24 @@ Start the REPL and play around with it
 make repl 
 ```
 
-### Language Support 
-
-- [x] literals
-  - [x] bool
-  - [x] symbol
-  - [x] char
-  - [x] number
-  - [x] vector
-  - [x] byte-vector
-  - [x] proper list
-  - [x] improper list
-  - [x] string
-  - [x] quoted constants
-- [x] variables
-- [x] conditionals
-- [x] lambda expressions
-- [x] procedure calls
-- [x] assignments
-- [x] quasi-quoted expression
+## TODO
 
 ### Compiler 
 - [x] datum (s-expression) parser
 - [x] expression parser 
 - [x] basic code generator 
-- [ ] collect all errors in reader  
+- [x] identify tail calls
+- [x] quasi quote
+- [ ] collect all errors in reader
 - [ ] collect all errors in parser 
 - [ ] bytecode serialization (ahead of time compilation)
 - [ ] libraries  
 - [ ] optimization pass 
-- [x] identify tail calls
-- [x] quasi quote 
+- [ ] CPS conversion
 
 #### Macros
 - [ ] add macro expansion phase
-- [ ] add syntactic closure macro system
+- [ ] add procedural closure macro system (explicit renaming?)
 
 #### Errors
 - [ ] fix backtraces 
@@ -65,7 +48,6 @@ make repl
 - [x] optimise tail calls
 - [x] closures 
 - [ ] continuations 
-- [ ] optimize stack 
 
 ### Debugger 
 - [ ] generate DWARF debug information 
@@ -83,10 +65,9 @@ I probably should build one or maybe not.
 ### Continuations
 - [ ] figure out how to implement them
 
-### Problems
+## Problems
 There are plenty :D 
 
-* Equality isn't correctly implemented -> I will add a test file that verifies that the language implements as the r7rs specifies it, which will cover equality as well.
 * Runtime representation of values isn't at all optimised. It likely uses way too many allocations and holds the types wrong
 * The parser bails after the first error (you'd want to collect all)
 * I'm not sure if the custom ParseResult I use is really needed? (I will have to figure that out)
@@ -95,11 +76,11 @@ There are plenty :D
 * I'm not sure the location tracking works all the time
 
 
-### Questions
+## Questions
 * let/let*/letrec currently expand to the corresponding lambda expressions. Should it not do that and instead I handle those as special cases in the VM. Would that yield benefits other than being easier to trace and potentially better error reporting?
 
-### Optimisations
-Once I have the language in a place where it's correct, I can look at more optmisations. I'm still learning rust and some things I simply didn't know when I 
+## Optimisations
+Once I have the language in a place where it's correct, I can look at more optimizations. I'm still learning rust and some things I simply didn't know when I 
 started.
 
 - [ ] make use of COW or even SUPERCOW for values 

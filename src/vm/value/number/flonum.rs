@@ -115,11 +115,11 @@ impl SchemeNumber for Flonum {
         self.inner.is_infinite()
     }
 
-    fn is_nan(&self) -> bool {
-        self.inner.is_nan()
-    }
     fn is_neg_infinite(&self) -> bool {
         self.is_infinite() && self.inner.is_sign_negative()
+    }
+    fn is_nan(&self) -> bool {
+        self.inner.is_nan()
     }
 }
 
@@ -140,7 +140,7 @@ impl SchemeEqual<Flonum> for Flonum {
     }
 
     fn is_eqv(&self, other: &Flonum) -> bool {
-        self.is_eq(other)
+        self.inner == other.inner
     }
 
     fn is_equal(&self, other: &Flonum) -> bool {

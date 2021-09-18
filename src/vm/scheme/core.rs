@@ -1,7 +1,10 @@
 pub mod numbers;
 use super::ffi::*;
+use crate::vm::value::access::{Access, Reference};
 use crate::vm::value::error;
+use crate::vm::value::list::List;
 use crate::vm::value::procedure::foreign;
+use crate::vm::value::vector::Vector;
 use crate::vm::value::Value;
 use crate::vm::value::{equality::SchemeEqual, procedure::Arity};
 use crate::vm::VM;
@@ -12,10 +15,8 @@ macro_rules! register_core {
             .unwrap()
     };
 }
-use crate::vm::value::access::{Access, Reference};
-use crate::vm::value::list::List;
-pub(crate) use register_core;
 
+pub(crate) use register_core;
 pub fn register(vm: &mut VM) {
     register_core!(vm, "eqv?", eqv, Arity::Exactly(2));
     register_core!(vm, "eq?", eq, Arity::Exactly(2));
@@ -65,8 +66,7 @@ pub fn equal(args: Vec<Value>) -> FunctionResult<Access<Value>> {
 // predicates
 pub fn string_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::InternedString(_) => Ok(Value::Bool(true).into()),
-        Value::UninternedString(_) => Ok(Value::Bool(true).into()),
+        Value::String(_) => Ok(Value::Bool(true).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
@@ -182,7 +182,7 @@ pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::Vector(vector), Value::Number(index)) => {
             if let Some(idx) = index.to_usize() {
-                if let Some(v) = vector.get(idx) {
+                if let Some(v) = vector.at(idx) {
                     Ok(Access::ByRef(v.clone()))
                 } else {
                     Err(error::out_of_bound_error(idx, 0..vector.len()))
@@ -208,11 +208,7 @@ pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Access<Value>> {
 
 pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
-        (v, Value::Vector(elements)) => {
-            let mut new_vec = elements.clone();
-            new_vec.push(Reference::from(v.clone()));
-            Ok(Value::Vector(new_vec).into())
-        }
+        (v, Value::Vector(vector)) => Ok(Value::Vector(vector.cons(v.clone())).into()),
         (_, other) => Err(error::argument_error(other.clone(), "Expected vector")),
     }
 }
@@ -220,9 +216,7 @@ pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
 pub fn vector_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::Vector(lhs), Value::Vector(rhs)) => {
-            let mut out = lhs.clone();
-            out.extend(rhs.clone());
-            Ok(Value::Vector(out).into())
+            Ok(Value::Vector(Vector::append(lhs, rhs)).into())
         }
         (lhs, Value::Vector(_)) => Err(error::argument_error(lhs.clone(), "Expected vector")),
         (Value::Vector(_), rhs) => Err(error::argument_error(rhs.clone(), "Expected vector")),

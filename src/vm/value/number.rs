@@ -119,11 +119,15 @@ impl SchemeEqual<Number> for Number {
     }
 
     fn is_eqv(&self, other: &Number) -> bool {
-        self.is_eq(other)
+        match (self, other) {
+            (Number::Real(lhs), Number::Real(rhs)) => lhs.is_eqv(rhs),
+        }
     }
 
     fn is_equal(&self, other: &Number) -> bool {
-        self.is_eq(other)
+        match (self, other) {
+            (Number::Real(lhs), Number::Real(rhs)) => lhs.is_equal(rhs),
+        }
     }
 }
 

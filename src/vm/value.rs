@@ -7,11 +7,13 @@ use access::Reference;
 use equality::SchemeEqual;
 
 use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::utils::string_table::StringTable;
+use crate::compiler::utils::string_table::{Interned, StringTable};
 use crate::vm::scheme::writer::Writer;
 use crate::vm::value::number::real::RealNumber;
 
-use self::{string::InternedString, symbol::Symbol};
+use self::symbol::Symbol;
+use crate::vm::value::byte_vector::ByteVector;
+use crate::vm::value::vector::Vector;
 
 pub mod access;
 #[cfg(test)]
@@ -41,10 +43,9 @@ pub enum Value {
     Symbol(Symbol),
     Char(char),
     Number(number::Number),
+    String(string::String),
     Vector(vector::Vector),
     ByteVector(byte_vector::ByteVector),
-    InternedString(InternedString),
-    UninternedString(std::string::String),
     ProperList(list::List),
     ImproperList(list::List, Reference<Value>),
     Procedure(procedure::Procedure),
@@ -68,7 +69,7 @@ impl Value {
         match v {
             Datum::Char(c, _) => Self::Char(c.clone()),
             Datum::Symbol(s, _) => values.symbol(s.as_str()),
-            Datum::String(s, _) => values.interned_string(s),
+            Datum::String(s, _) => values.string(s),
             Datum::Number(n, _) => Self::Number(n.clone()),
             Datum::Bool(v, _) => Self::Bool(v.clone()),
             Datum::List(v, _) => {
@@ -97,9 +98,7 @@ impl SchemeEqual<Value> for Value {
         match (self, other) {
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eq(rhs),
-            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eq(rhs),
-            (Value::UninternedString(_), Value::InternedString(_)) => false,
-            (Value::UninternedString(_), Value::UninternedString(_)) => false,
+            (Value::String(lhs), Value::String(rhs)) => lhs.is_eq(rhs),
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eq(rhs),
             (Value::ByteVector(lhs), Value::ByteVector(rhs)) => lhs.is_eq(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eq(rhs),
@@ -109,6 +108,8 @@ impl SchemeEqual<Value> for Value {
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eq(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eq(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
+            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
+            (Value::Number(lhs), Value::Number(rhs)) => lhs.is_eq(rhs),
             _ => false,
         }
     }
@@ -118,9 +119,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_eqv(rhs),
-            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_eqv(rhs),
-            (Value::UninternedString(_), Value::InternedString(_)) => false,
-            (Value::UninternedString(_), Value::UninternedString(_)) => false,
+            (Value::String(lhs), Value::String(rhs)) => lhs.is_eqv(rhs),
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_eqv(rhs),
             (Value::ByteVector(lhs), Value::ByteVector(rhs)) => lhs.is_eqv(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_eqv(rhs),
@@ -130,6 +129,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_eqv(rhs),
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_eqv(rhs),
             (Value::Unspecified, Value::Unspecified) => false,
+            (Value::Number(lhs), Value::Number(rhs)) => lhs.is_eqv(rhs),
             _ => false,
         }
     }
@@ -139,11 +139,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
             (Value::Char(lhs), Value::Char(rhs)) => lhs == rhs,
             (Value::Symbol(lhs), Value::Symbol(rhs)) => lhs.is_equal(rhs),
-            (Value::InternedString(lhs), Value::InternedString(rhs)) => lhs.is_equal(rhs),
-            (Value::UninternedString(lhs), Value::InternedString(rhs)) => {
-                lhs.as_str() == rhs.as_str()
-            }
-            (Value::UninternedString(lhs), Value::UninternedString(rhs)) => lhs == rhs,
+            (Value::String(lhs), Value::String(rhs)) => lhs.is_equal(rhs),
             (Value::Vector(lhs), Value::Vector(rhs)) => lhs.is_equal(rhs),
             (Value::ByteVector(lhs), Value::ByteVector(rhs)) => lhs.is_equal(rhs),
             (Value::ProperList(lhs), Value::ProperList(rhs)) => lhs.is_equal(rhs),
@@ -153,6 +149,7 @@ impl SchemeEqual<Value> for Value {
             (Value::Procedure(lhs), Value::Procedure(rhs)) => lhs.is_equal(rhs),
             (Value::Closure(lhs), Value::Closure(rhs)) => lhs.is_equal(rhs),
             (Value::Unspecified, Value::Unspecified) => true,
+            (Value::Number(lhs), Value::Number(rhs)) => lhs.is_equal(rhs),
             _ => false,
         }
     }
@@ -213,13 +210,8 @@ impl Factory {
         Value::Symbol(self.sym(v))
     }
 
-    pub fn interned_string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
-        let k = self.strings.get_or_intern(v.into());
-        Value::InternedString(InternedString(k))
-    }
-
-    pub fn string<T: Into<std::string::String>>(&mut self, v: T) -> Value {
-        Value::UninternedString(v.into())
+    pub fn string<T: Into<std::string::String>>(&self, v: T) -> Value {
+        Value::String(string::String::from(v.into()))
     }
 
     pub fn proper_list(&self, vals: Vec<Value>) -> Value {
@@ -237,11 +229,11 @@ impl Factory {
 
     pub fn vector(&self, values: Vec<Value>) -> Value {
         let v: Vec<Reference<Value>> = values.into_iter().map(Reference::from).collect();
-        Value::Vector(v)
+        Value::Vector(Vector::from(v))
     }
 
     pub fn byte_vector(&self, vals: Vec<u8>) -> Value {
-        Value::ByteVector(vals)
+        Value::ByteVector(ByteVector::from(vals))
     }
 
     pub fn foreign_procedure(&mut self, v: procedure::foreign::Procedure) -> Value {
@@ -275,22 +267,17 @@ impl Factory {
             }
             Datum::Char(c, _) => self.character(*c),
             Datum::Number(num, _) => Value::Number(num.clone()),
-            Datum::Vector(v, _) => Value::Vector(
+            Datum::Vector(v, _) => Value::Vector(Vector::from(
                 v.iter()
                     .map(|e| Reference::from(self.from_datum(e)))
-                    .collect(),
-            ),
-            Datum::ByteVector(v, _) => Value::ByteVector(v.clone()),
+                    .collect::<Vec<_>>(),
+            )),
+            Datum::ByteVector(v, _) => Value::ByteVector(ByteVector::from(v.clone())),
         }
     }
 
-    pub fn interned_strings(&self) -> Vec<InternedString> {
-        self.strings
-            .interned_vec()
-            .iter()
-            .cloned()
-            .map(InternedString)
-            .collect()
+    pub fn interned_strings(&self) -> Vec<Interned> {
+        self.strings.interned_vec()
     }
 }
 
