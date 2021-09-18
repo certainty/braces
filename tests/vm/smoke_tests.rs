@@ -9,7 +9,7 @@ fn test_vm_literal() {
     assert_result_eq(&mut vm, "#t", values.bool_true());
     assert_result_eq(&mut vm, "#f", values.bool_false());
     assert_result_eq(&mut vm, "#\\c", values.character('c'));
-    assert_result_eq(&mut vm, "\"foo\"", values.interned_string("foo"));
+    assert_result_eq(&mut vm, "\"foo\"", values.string("foo"));
     assert_result_eq(&mut vm, "'foo", values.symbol("foo"));
     assert_result_eq(&mut vm, "3", values.real(3));
     assert_result_eq(

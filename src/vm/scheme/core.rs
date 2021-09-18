@@ -66,8 +66,7 @@ pub fn equal(args: Vec<Value>) -> FunctionResult<Access<Value>> {
 // predicates
 pub fn string_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
-        Value::InternedString(_) => Ok(Value::Bool(true).into()),
-        Value::UninternedString(_) => Ok(Value::Bool(true).into()),
+        Value::String(_) => Ok(Value::Bool(true).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }

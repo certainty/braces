@@ -68,12 +68,41 @@ fn eqv_as_specified() {
 
     // pairs
     assert_neqv("(cons 1 2)", "(cons 1 2)");
+    assert_result_eq(
+        &mut vm,
+        "(define x (cons 2 3)) (eqv? x x)",
+        Value::Bool(true),
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x (cons 1 2)) (define y (cons 1 2)) (eqv? x y)",
+        Value::Bool(false),
+    );
 
     // vectors
     assert_neqv("#(1 2)", "#(1 2)");
+    assert_result_eq(&mut vm, "(define x #(1 2 3)) (eqv? x x)", Value::Bool(true));
+    assert_result_eq(
+        &mut vm,
+        "(define x #(1 2 3)) (define y #(1 2 3)) (eqv? x y)",
+        Value::Bool(false),
+    );
 
     // bytevectors
     assert_neqv("#u8(1 1)", "#u8(1 1)");
+    assert_result_eq(
+        &mut vm,
+        "(define x #u8(1 2 3)) (eqv? x x)",
+        Value::Bool(true),
+    );
+    assert_result_eq(
+        &mut vm,
+        "(define x #u8(1 2 3)) (define y #u8(1 2 3)) (eqv? x y)",
+        Value::Bool(false),
+    );
+
+    // strings
+    assert_neqv(r#""foo""#, r#""foo""#);
 }
 
 #[test]
