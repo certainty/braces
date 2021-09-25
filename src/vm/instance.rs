@@ -127,19 +127,25 @@ impl<'a> Instance<'a> {
     pub fn interpret_expander(
         expander: procedure::Procedure,
         syntax: &Value,
-        rename: procedure::Procedure,
-        compare: procedure::Procedure,
+        arguments: &[Value],
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Result<Value> {
         let mut vm = Self::vanilla(255, top_level, values, false);
+        let is_native = expander.is_native();
 
         vm.push(Value::Procedure(expander))?;
         vm.push(syntax.clone())?;
-        vm.push(Value::Procedure(rename))?;
-        vm.push(Value::Procedure(compare))?;
-        vm.apply_tail_call(3)?;
-        Ok(vm.stack.pop().into_inner())
+        for arg in arguments {
+            vm.push(arg.clone())?
+        }
+        vm.apply_tail_call(arguments.len() + 1)?;
+
+        if is_native {
+            vm.run()
+        } else {
+            Ok(vm.stack.pop().into_inner())
+        }
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -323,11 +329,15 @@ impl<'a> Instance<'a> {
         closure: value::closure::Closure,
         arg_count: usize,
     ) -> Result<()> {
-        //re-use the current frame for tail calls
-        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
-        self.active_mut_frame().stack_base = base;
-        self.active_mut_frame().closure = closure;
-        self.active_mut_frame().set_ip(0);
+        if self.has_active_frame() {
+            //re-use the current frame for tail calls
+            let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
+            self.active_mut_frame().stack_base = base;
+            self.active_mut_frame().closure = closure;
+            self.active_mut_frame().set_ip(0);
+        } else {
+            self.push_frame(closure, arg_count)?;
+        }
         Ok(())
     }
 
@@ -768,7 +778,6 @@ impl<'a> Instance<'a> {
         proc: Rc<procedure::native::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
-        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
         self.check_arity(&proc.arity, arg_count)?;
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();

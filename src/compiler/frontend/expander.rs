@@ -8,6 +8,7 @@ use super::syntax::environment::{Denotation, Special, SyntaxEnvironment};
 use super::Result;
 use crate::compiler::core_compiler::CoreCompiler;
 use crate::compiler::frontend::parser::core_parser::CoreParser;
+use crate::compiler::frontend::parser::Expression;
 use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
@@ -16,7 +17,7 @@ use crate::vm::scheme::ffi::{binary_procedure, unary_procedure};
 use crate::vm::value::access::Access;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
 use crate::vm::value::Value;
-use crate::vm::VM;
+use crate::vm::{value, VM};
 
 #[derive(Debug)]
 pub struct Expander {
@@ -39,20 +40,27 @@ impl Expander {
         expander
     }
 
-    pub fn expand(&mut self, datum: &Datum) -> Result<Datum> {
+    pub fn expand(&mut self, datum: &Datum) -> Result<Option<Datum>> {
         self.expand_macros(&datum)
     }
 
-    pub fn expand_macros(&mut self, datum: &Datum) -> Result<Datum> {
+    pub fn expand_macros(&mut self, datum: &Datum) -> Result<Option<Datum>> {
         match datum.list_slice() {
             Some([operator, operands @ ..]) if operator.is_symbol() => {
                 let denotation = self.denotation_of(operator)?;
                 log::trace!("denotation of {:?} is {:?}", datum, denotation);
                 match denotation {
                     Denotation::Special(special) => match special {
-                        Special::Define => self.expand_define(&datum, &operator, &operands),
-                        Special::Lambda => self.expand_lambda(&datum, &operator, &operands),
-                        Special::DefineSyntax => todo!(),
+                        Special::Define => {
+                            Ok(Some(self.expand_define(&datum, &operator, &operands)?))
+                        }
+                        Special::Lambda => {
+                            Ok(Some(self.expand_lambda(&datum, &operator, &operands)?))
+                        }
+                        Special::DefineSyntax if operands.len() == 2 => {
+                            self.define_syntax(&datum, &operands[0], &operands[1])?;
+                            Ok(None)
+                        }
                         Special::LetSyntax => todo!(),
                         Special::LetrecSyntax => todo!(),
                         Special::Unquote => Err(Error::expansion_error(
@@ -63,33 +71,44 @@ impl Expander {
                             "unexpected unquote-splicing outside of quasi-quote",
                             &datum,
                         )),
-                        Special::QuasiQuote => {
-                            self.expand_quasi_quotation(&datum, &operator, &operands)
-                        }
-                        Special::Quote => Ok(datum.clone()),
-                        _ => self.expand_apply(operator, operands, datum.source_location().clone()),
+                        Special::QuasiQuote => Ok(Some(
+                            self.expand_quasi_quotation(&datum, &operator, &operands)?,
+                        )),
+                        Special::Quote => Ok(Some(datum.clone())),
+                        _ => Ok(Some(self.expand_apply(
+                            operator,
+                            operands,
+                            datum.source_location().clone(),
+                        )?)),
                     },
                     Denotation::Macro(transformer) => {
                         let expanded = self.expand_macro(&datum, &transformer)?;
                         // recursively expand
                         self.expand_macros(&expanded)
                     }
-                    _ => self.expand_apply(operator, operands, datum.source_location().clone()),
+                    _ => Ok(Some(self.expand_apply(
+                        operator,
+                        operands,
+                        datum.source_location().clone(),
+                    )?)),
                 }
             }
-            Some([operator, operands @ ..]) => {
-                self.expand_apply(operator, operands, datum.source_location().clone())
-            }
+            Some([operator, operands @ ..]) => Ok(Some(self.expand_apply(
+                operator,
+                operands,
+                datum.source_location().clone(),
+            )?)),
             Some(_) => Err(Error::expansion_error("Unexpected unquoted list", &datum)),
             None => {
                 log::trace!("nothing to expand. Returning datum as is.");
-                Ok(datum.clone())
+                Ok(Some(datum.clone()))
             }
         }
     }
 
     fn expand_all(&mut self, all: &[Datum]) -> Result<Vec<Datum>> {
-        all.iter().map(|d| self.expand_macros(d)).collect()
+        let data: Result<Vec<Option<_>>> = all.iter().map(|d| self.expand_macros(d)).collect();
+        Ok(data?.into_iter().flatten().collect())
     }
 
     fn expand_apply(
@@ -98,7 +117,7 @@ impl Expander {
         operands: &[Datum],
         loc: Location,
     ) -> Result<Datum> {
-        let mut new_ls = vec![self.expand(operator)?];
+        let mut new_ls = vec![self.expand(operator)?.unwrap()];
         new_ls.extend(self.expand_all(operands)?);
 
         Ok(Datum::list(new_ls.into_iter(), loc))
@@ -106,14 +125,11 @@ impl Expander {
 
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         match transformer {
-            syntax::Transformer::ExplicitRenaming(expander) => {
-                let renamer = self.create_renamer();
-                let cmp = self.create_comparator();
+            syntax::Transformer::LowLevel(expander) => {
                 match self.vm.interpret_expander(
                     expander.clone(),
                     datum,
-                    renamer,
-                    cmp,
+                    &[],
                     self.expansion_env.clone(),
                     datum.source_location().clone(),
                 ) {
@@ -124,6 +140,75 @@ impl Expander {
                     )),
                 }
             }
+            syntax::Transformer::ExplicitRenaming(expander) => {
+                let renamer = self.create_renamer();
+                let cmp = self.create_comparator();
+                match self.vm.interpret_expander(
+                    expander.clone(),
+                    datum,
+                    &[Value::Procedure(renamer), Value::Procedure(cmp)],
+                    self.expansion_env.clone(),
+                    datum.source_location().clone(),
+                ) {
+                    Ok(expanded) => Ok(expanded),
+                    Err(e) => Err(Error::expansion_error(
+                        format!("Invocation of macro expander failed: {:?}", e),
+                        &datum,
+                    )),
+                }
+            }
+        }
+    }
+
+    fn define_syntax(&mut self, datum: &Datum, id: &Datum, operand: &Datum) -> Result<()> {
+        match id {
+            Datum::Symbol(sym, _) => match operand.list_slice() {
+                Some([Datum::Symbol(transformer_type, _), procedure]) => {
+                    match transformer_type.as_str() {
+                        "er-macro-transformer" => {
+                            let transformer = syntax::Transformer::ExplicitRenaming(self.compile_lambda(&procedure)?);
+                            self.expansion_env.extend(sym.clone(), Denotation::Macro(transformer));
+                            Ok(())
+                        },
+                        "lowlevel-macro-transformer" => {
+                            let transformer = syntax::Transformer::LowLevel(self.compile_lambda(&procedure)?);
+                            self.expansion_env.extend(sym.clone(), Denotation::Macro(transformer));
+                            Ok(())
+                        },
+                        _ => Err(Error::expansion_error("Invalid macro transformer type. Must be one of (er-macro-transformer, lowlevel-macro-transformer)", datum))
+                    }
+                }
+                _ => Err(Error::expansion_error(
+                    "Transformer type must be a symbol",
+                    &datum,
+                )),
+            },
+            _ => Err(Error::expansion_error(
+                "Expected (define-syntax <id> (<transformer-type> <transformer-procedure>))",
+                &datum,
+            )),
+        }
+    }
+
+    fn compile_lambda(&mut self, lambda: &Datum) -> Result<value::procedure::Procedure> {
+        let code = self.expand(&lambda)?.expect("empty definition");
+        let ast = self.parser.parse(&code)?;
+
+        match ast {
+            Expression::Lambda(lambda_expr) => {
+                let compiled = self.compiler.compile_lambda(&lambda_expr);
+                match compiled {
+                    Ok(proc) => Ok(proc),
+                    _ => Err(Error::expansion_error(
+                        "couldn't compile transformer",
+                        &lambda,
+                    )),
+                }
+            }
+            _ => Err(Error::expansion_error(
+                "expected code to parse as lambda expression",
+                &lambda,
+            )),
         }
     }
 
@@ -209,11 +294,38 @@ pub mod tests {
         Ok(())
     }
 
+    #[test]
+    fn expand_lowlevel_macro() -> Result<()> {
+        assert_expands_all_equal(
+            r#"
+            (define-syntax my-cons (lowlevel-macro-transformer (lambda (form) `(cons 1 2)))) 
+            (my-cons)
+            "#,
+            "(cons 1 2)",
+            false,
+        )?;
+        Ok(())
+    }
+
+    pub fn assert_expands_all_equal(lhs: &str, rhs: &str, pedantic: bool) -> Result<()> {
+        let mut exp = Expander::new();
+        let actual_datum = parse_datum_all(lhs);
+        let expected_datum = parse_datum_all(rhs);
+        let expanded_datum = exp.expand_all(&actual_datum)?;
+
+        //println!("expected: {}", expected_datum);
+        //println!("expanded: {}", expanded_datum);
+        assert_vec_eq(&expanded_datum, &expected_datum, |l, r| {
+            assert_struct_eq(l, r, pedantic)
+        });
+        Ok(())
+    }
+
     pub fn assert_expands_equal(lhs: &str, rhs: &str, pedantic: bool) -> Result<()> {
         let mut exp = Expander::new();
         let actual_datum = parse_datum(lhs);
         let expected_datum = parse_datum(rhs);
-        let expanded_datum = exp.expand(&actual_datum)?;
+        let expanded_datum = exp.expand(&actual_datum)?.unwrap();
 
         //println!("expected: {}", expected_datum);
         //println!("expanded: {}", expanded_datum);
@@ -224,7 +336,7 @@ pub mod tests {
 
     pub fn expand_form(form: &str) -> Result<Datum> {
         let mut exp = Expander::new();
-        exp.expand(&parse_datum(form))
+        exp.expand(&parse_datum(form)).map(|e| e.unwrap())
     }
 
     pub fn assert_struct_eq(lhs: &Datum, rhs: &Datum, pedantic: bool) {

@@ -68,6 +68,12 @@ impl From<procedure::native::Procedure> for Closure {
     }
 }
 
+impl From<Closure> for procedure::Procedure {
+    fn from(cl: Closure) -> Self {
+        procedure::Procedure::Native(cl.proc.clone())
+    }
+}
+
 impl SchemeEqual<Closure> for Closure {
     fn is_eq(&self, other: &Closure) -> bool {
         Rc::ptr_eq(&self.proc, &other.proc)

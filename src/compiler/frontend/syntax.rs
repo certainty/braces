@@ -6,5 +6,6 @@ pub mod symbol;
 
 #[derive(Debug, Clone)]
 pub enum Transformer {
+    LowLevel(procedure::Procedure),
     ExplicitRenaming(procedure::Procedure),
 }

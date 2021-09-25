@@ -135,11 +135,11 @@ impl Expander {
                         "quasi-quote can't be nested",
                         &datum,
                     )),
-                    Denotation::Special(Special::Unquote) => {
-                        Ok(QuoteJoin::Cons(self.expand(operand)?))
-                    }
+                    Denotation::Special(Special::Unquote) => Ok(QuoteJoin::Cons(
+                        self.expand(operand)?.expect("non-empty expansion"),
+                    )),
                     Denotation::Special(Special::UnquoteSplicing) => {
-                        let expanded = self.expand(operand)?;
+                        let expanded = self.expand(operand)?.expect("non-empty expansion");
                         Ok(QuoteJoin::Append(expanded))
                     }
                     _ => Ok(QuoteJoin::Cons(datum.clone())),

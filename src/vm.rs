@@ -57,7 +57,9 @@ impl VM {
     }
 
     pub fn for_expansion() -> VM {
-        Self::new(255)
+        let mut vm = Self::new(255);
+        core::register(&mut vm);
+        vm
     }
 
     pub fn binding_names(&self) -> Vec<String> {
@@ -98,8 +100,7 @@ impl VM {
         &mut self,
         procedure: Procedure,
         datum: &Datum,
-        rename: Procedure,
-        compare: Procedure,
+        arguments: &[Value],
         _env: SyntaxEnvironment,
         location: Location,
     ) -> Result<Datum> {
@@ -107,8 +108,7 @@ impl VM {
             &Instance::interpret_expander(
                 procedure,
                 &Value::syntax(datum.clone()),
-                rename,
-                compare,
+                arguments,
                 &mut self.top_level,
                 &mut self.values,
             )?,
