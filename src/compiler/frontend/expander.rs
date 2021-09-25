@@ -216,7 +216,7 @@ impl Expander {
     fn create_renamer(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "rename",
-            |values| unary_procedure(&values).map(|v| Access::ByVal(v.clone())),
+            |_ctx, values| unary_procedure(&values).map(|v| Access::ByVal(v.clone())),
             Arity::Exactly(1),
         ))
     }
@@ -225,7 +225,9 @@ impl Expander {
     fn create_comparator(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "compare",
-            |values| binary_procedure(&values).map(|(l, r)| Access::from(Value::Bool(l == r))),
+            |_ctx, values| {
+                binary_procedure(&values).map(|(l, r)| Access::from(Value::Bool(l == r)))
+            },
             Arity::Exactly(2),
         ))
     }
@@ -327,8 +329,8 @@ pub mod tests {
         let expected_datum = parse_datum(rhs);
         let expanded_datum = exp.expand(&actual_datum)?.unwrap();
 
-        //println!("expected: {}", expected_datum);
-        //println!("expanded: {}", expanded_datum);
+        println!("expected: {}", expected_datum);
+        println!("expanded: {}", expanded_datum);
 
         assert_struct_eq(&expanded_datum, &expected_datum, pedantic);
         Ok(())

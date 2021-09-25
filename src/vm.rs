@@ -21,6 +21,7 @@ use crate::vm::value::procedure::Procedure;
 
 use self::value::procedure::foreign;
 use self::value::procedure::native;
+use crate::vm::scheme::ffi::VmContext;
 
 pub mod byte_code;
 pub mod debug;
@@ -38,6 +39,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct VM {
+    context: VmContext,
     stack_size: usize,
     pub values: value::Factory,
     pub top_level: TopLevel,
@@ -49,6 +51,7 @@ impl VM {
     pub fn new(stack_size: usize) -> VM {
         VM {
             stack_size,
+            context: VmContext::new(),
             values: value::Factory::default(),
             top_level: TopLevel::new(),
             writer: Writer::new(),
@@ -90,6 +93,7 @@ impl VM {
         Instance::interpret(
             unit.closure,
             self.stack_size,
+            &mut self.context,
             &mut self.top_level,
             &mut self.values,
             debug_mode,
@@ -109,6 +113,7 @@ impl VM {
                 procedure,
                 &Value::syntax(datum.clone()),
                 arguments,
+                &mut self.context,
                 &mut self.top_level,
                 &mut self.values,
             )?,

@@ -4,7 +4,7 @@ use crate::compiler::frontend::syntax::environment::Denotation;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::frontend::syntax::Transformer;
 use crate::compiler::source::{HasSourceLocation, Location};
-use crate::vm::scheme::ffi::{explicit_rename_transformer, FunctionResult};
+use crate::vm::scheme::ffi::{explicit_rename_transformer, FunctionResult, VmContext};
 use crate::vm::value::access::Access;
 use crate::vm::value::error;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
@@ -25,7 +25,7 @@ fn make_let_expander() -> Procedure {
     ))
 }
 
-fn expand_let(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+fn expand_let(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     explicit_rename_transformer(&args).and_then({
         |(datum, _rename, _compare)| match datum.list_slice() {
             // Named let

@@ -187,4 +187,13 @@ mod tests {
         assert!(expand_form("`(1 2 `3)").is_err(), "expected error");
         Ok(())
     }
+
+    #[test]
+    fn quasi_quote_edge_cases() -> Result<()> {
+        assert_expands_equal(
+            "`(begin (define ,x #t))",
+            "(cons 'begin (cons 'define (cons x (cons #t '()))))",
+            false,
+        )
+    }
 }

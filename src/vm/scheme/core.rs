@@ -39,67 +39,72 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "vector-ref", vector_ref, Arity::Exactly(2));
     register_core!(vm, "vector-cons", vector_cons, Arity::Exactly(2));
     register_core!(vm, "vector-append", vector_append, Arity::Exactly(2));
+    register_core!(vm, "gensym", gensym, Arity::Exactly(0));
 
     numbers::register(vm);
 }
 
+pub fn gensym(ctx: &mut VmContext, _args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    Ok(ctx.gen_sym().into())
+}
+
 //  R7RS 6.1
 //  (eqv? obj1 obj2
-pub fn eqv(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn eqv(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (lhs, rhs) => Ok(Value::Bool(lhs.is_eqv(rhs)).into()),
     }
 }
 
-pub fn eq(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn eq(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (lhs, rhs) => Ok(Value::Bool(lhs.is_eq(rhs)).into()),
     }
 }
 
-pub fn equal(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn equal(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (lhs, rhs) => Ok(Value::Bool(lhs.is_equal(rhs)).into()),
     }
 }
 
 // predicates
-pub fn string_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn string_p(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::String(_) => Ok(Value::Bool(true).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn symbol_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn symbol_p(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::Symbol(_) => Ok(Value::Bool(true).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn char_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn char_p(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::Char(_) => Ok(Value::Bool(true).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn list_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn list_p(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::ProperList(_) => Ok(Value::Bool(true).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn null_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn null_p(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::ProperList(ls) => Ok(Value::Bool(ls.is_null()).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn procedure_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn procedure_p(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::Procedure(_) => Ok(Value::Bool(true).into()),
         Value::Closure(_) => Ok(Value::Bool(true).into()),
@@ -107,24 +112,24 @@ pub fn procedure_p(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     }
 }
 
-pub fn bool_not(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn bool_not(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::Bool(v) => Ok(Value::Bool(!*v).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
 
-pub fn inspect(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn inspect(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     println!("Debug: {:?}", args.first().unwrap());
     Ok(Value::Unspecified.into())
 }
 
-pub fn list_make(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn list_make(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     let ls = args.into();
     Ok(Access::ByVal(Value::ProperList(ls)))
 }
 
-pub fn list_car(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn list_car(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     unary_procedure(&args).and_then(|v| match v {
         Value::ProperList(ls) => {
             if let Some(v) = ls.first() {
@@ -150,7 +155,7 @@ pub fn list_car(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     })
 }
 
-pub fn list_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn list_cons(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (v, Value::ProperList(elements)) => Ok(Value::ProperList(elements.cons(v.clone())).into()),
         (lhs, rhs) => Ok(Value::ImproperList(
@@ -161,7 +166,7 @@ pub fn list_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     }
 }
 
-pub fn list_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn list_append(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::ProperList(lhs), Value::ProperList(rhs)) => {
             Ok(Value::ProperList(List::append(lhs, rhs)).into())
@@ -178,7 +183,7 @@ pub fn list_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     }
 }
 
-pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn vector_ref(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::Vector(vector), Value::Number(index)) => {
             if let Some(idx) = index.to_usize() {
@@ -206,14 +211,14 @@ pub fn vector_ref(args: Vec<Value>) -> FunctionResult<Access<Value>> {
     }
 }
 
-pub fn vector_cons(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn vector_cons(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (v, Value::Vector(vector)) => Ok(Value::Vector(vector.cons(v.clone())).into()),
         (_, other) => Err(error::argument_error(other.clone(), "Expected vector")),
     }
 }
 
-pub fn vector_append(args: Vec<Value>) -> FunctionResult<Access<Value>> {
+pub fn vector_append(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match binary_procedure(&args)? {
         (Value::Vector(lhs), Value::Vector(rhs)) => {
             Ok(Value::Vector(Vector::append(lhs, rhs)).into())
