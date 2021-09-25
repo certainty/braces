@@ -29,15 +29,15 @@ impl Writer {
     }
 
     pub fn write(&self, v: &Value) -> String {
-        self.write_impl(v, true)
+        self.write_impl(v)
     }
 
-    fn write_impl(&self, v: &Value, quote: bool) -> String {
+    fn write_impl(&self, v: &Value) -> String {
         match v {
             Value::Syntax(datum) => self.write_string(format!("#<syntax {}>", datum).as_str()),
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
-            Value::Symbol(s) => self.write_symbol(s.as_str(), quote),
+            Value::Symbol(s) => self.write_symbol(s.as_str()),
             Value::Char(c) => self.write_char(*c),
             Value::Number(num) => self.write_number(num),
             Value::String(s) => self.write_string(s.as_ref()),
@@ -48,7 +48,7 @@ impl Writer {
             Value::Vector(elts) => {
                 let body: Vec<String> = elts
                     .iter()
-                    .map(|e| self.write_impl(&e.get_inner_ref(), false))
+                    .map(|e| self.write_impl(&e.get_inner_ref()))
                     .collect();
 
                 format!("#({})", body.join(" "))
@@ -61,19 +61,19 @@ impl Writer {
             Value::ProperList(elts) => {
                 let body: Vec<String> = elts
                     .iter()
-                    .map(|e| self.write_impl(&e.get_inner_ref(), quote))
+                    .map(|e| self.write_impl(&e.get_inner_ref()))
                     .collect();
 
-                format!("'({})", body.join(" "))
+                format!("({})", body.join(" "))
             }
             Value::ImproperList(head, tail) => {
                 let head_body: Vec<String> = head
                     .iter()
-                    .map(|e| self.write_impl(&e.get_inner_ref(), quote))
+                    .map(|e| self.write_impl(&e.get_inner_ref()))
                     .collect();
-                let tail_body = self.write_impl(&tail.get_inner_ref(), false);
+                let tail_body = self.write_impl(&tail.get_inner_ref());
 
-                format!("'({} . {})", head_body.join(" "), tail_body)
+                format!("({} . {})", head_body.join(" "), tail_body)
             }
             Value::Unspecified => "#<unspecified>".to_string(),
         }
@@ -100,9 +100,9 @@ impl Writer {
         format!("{}", num.as_inner())
     }
 
-    fn write_symbol(&self, sym: &str, quote: bool) -> String {
+    fn write_symbol(&self, sym: &str) -> String {
         if sym.len() == 0 {
-            return self.add_quote(String::from("||"), quote);
+            return String::from("||");
         }
 
         let mut requires_delimiter = false;
@@ -122,9 +122,9 @@ impl Writer {
         }
 
         if requires_delimiter {
-            self.add_quote(format!("|{}|", external), quote)
+            format!("|{}|", external)
         } else {
-            self.add_quote(external, quote)
+            external
         }
     }
 
@@ -192,15 +192,6 @@ impl Writer {
     }
 
     #[inline]
-    fn add_quote(&self, s: String, quote: bool) -> String {
-        if quote {
-            format!("'{}", s)
-        } else {
-            s
-        }
-    }
-
-    #[inline]
     fn escaped_string_char(&self, c: &char, buf: &mut String) {
         match c {
             '\n' => buf.push_str("\\n"),
@@ -264,32 +255,32 @@ mod tests {
         let writer = Writer::new();
 
         let v = values.symbol("...");
-        assert_eq!(writer.write(&v), "'|...|");
+        assert_eq!(writer.write(&v), "|...|");
 
         let v = values.symbol("foo bar");
-        assert_eq!(writer.write(&v), "'|foo bar|");
+        assert_eq!(writer.write(&v), "|foo bar|");
 
         let v = values.symbol("foo 💣 bar");
-        assert_eq!(writer.write(&v), "'|foo \\x1f4a3; bar|");
+        assert_eq!(writer.write(&v), "|foo \\x1f4a3; bar|");
 
         let v = values.symbol("");
-        assert_eq!(writer.write(&v), "'||");
+        assert_eq!(writer.write(&v), "||");
 
         let v = values.symbol("\t");
-        assert_eq!(writer.write(&v), "'|\\t|");
+        assert_eq!(writer.write(&v), "|\\t|");
 
         let v = values.symbol("test \\| foo");
-        assert_eq!(writer.write(&v), "'|test \\x5c;\\| foo|");
+        assert_eq!(writer.write(&v), "|test \\x5c;\\| foo|");
 
         let v = values.symbol("test2 | foo");
-        assert_eq!(writer.write(&v), "'|test2 \\| foo|");
+        assert_eq!(writer.write(&v), "|test2 \\| foo|");
 
         let v = values.symbol("test2 \\ foo");
-        assert_eq!(writer.write(&v), "'|test2 \\x5c; foo|");
+        assert_eq!(writer.write(&v), "|test2 \\x5c; foo|");
 
         // special initial or number as the first char
         let v = values.symbol("2foo");
-        assert_eq!(writer.write(&v), "'|2foo|");
+        assert_eq!(writer.write(&v), "|2foo|");
     }
 
     #[test]
@@ -299,7 +290,7 @@ mod tests {
         let elts = vec![values.bool_true().clone(), values.bool_false().clone()];
         let ls = values.proper_list(elts);
 
-        assert_eq!(writer.write(&ls), "'(#t #f)");
+        assert_eq!(writer.write(&ls), "(#t #f)");
     }
 
     #[test]
