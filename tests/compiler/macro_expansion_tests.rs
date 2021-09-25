@@ -11,7 +11,9 @@ fn lowlevel_macro_transformer() {
         (define-syntax my-cons 
           (lowlevel-macro-transformer 
             (lambda (form) 
-               `(cons ,(car form) ,(cadr form))))) 
+               (let ((args (cdr form)))
+                 `(cons ,(car args) ,(cadr args))))))
+                 
         (my-cons 1 2)
         "#,
     )

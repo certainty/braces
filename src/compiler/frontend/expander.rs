@@ -48,6 +48,7 @@ impl Expander {
         match datum.list_slice() {
             Some([operator, operands @ ..]) if operator.is_symbol() => {
                 let denotation = self.denotation_of(operator)?;
+                //println!("Denotation of {} is {:?}", operator, denotation);
                 log::trace!("denotation of {:?} is {:?}", datum, denotation);
                 match denotation {
                     Denotation::Special(special) => match special {
@@ -172,6 +173,7 @@ impl Expander {
                         },
                         "lowlevel-macro-transformer" => {
                             let transformer = syntax::Transformer::LowLevel(self.compile_lambda(&procedure)?);
+                            println!("Extending env with macro: {}", sym.as_str());
                             self.expansion_env.extend(sym.clone(), Denotation::Macro(transformer));
                             Ok(())
                         },

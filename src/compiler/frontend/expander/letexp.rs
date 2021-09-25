@@ -27,7 +27,7 @@ fn make_let_expander() -> Procedure {
 
 fn expand_let(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     explicit_rename_transformer(&args).and_then({
-        |(datum, _rename, _compare)| match datum.list_slice() {
+        |(form, _rename, _compare)| match form.list_slice() {
             // Named let
             // (let f ((v e) ...) b ...)
             Some([_let, f, bindings, _body @ ..]) if bindings.is_proper_list() && f.is_symbol() => {
@@ -46,7 +46,7 @@ fn expand_let(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<V
                 Ok(Value::syntax(Datum::list(application, datum.source_location().clone())).into())
             }
             _ => Err(error::argument_error(
-                Value::Syntax(datum.clone()),
+                form.clone(),
                 "expansion of let failed. Incorrect form given",
             )),
         }
