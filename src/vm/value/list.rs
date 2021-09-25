@@ -102,6 +102,13 @@ impl List {
         self.at(3)
     }
 
+    pub fn cdr(&self) -> Option<List> {
+        match self {
+            Self::Nil => None,
+            Self::Cons(elements) => Some(Self::from(elements.skip(1))),
+        }
+    }
+
     pub fn at(&self, i: usize) -> Option<&Reference<Value>> {
         match self {
             List::Nil => None,

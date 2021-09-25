@@ -5,11 +5,17 @@ use braces::vm::VM;
 fn lowlevel_macro_transformer() {
     let mut vm = VM::default();
 
-    // the parameter called `if` shadows the core if form
     let result = run_code(
         &mut vm,
-        "(define-syntax my-macro (lowlevel-macro-transformer (lambda (form) `(cons 1 2)))) (my-macro))"
-    ).unwrap();
+        r#"
+        (define-syntax my-cons 
+          (lowlevel-macro-transformer 
+            (lambda (form) 
+               `(cons ,(car form) ,(cadr form))))) 
+        (my-cons 1 2)
+        "#,
+    )
+    .unwrap();
 
     assert_eq!(
         result,

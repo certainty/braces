@@ -108,10 +108,12 @@ impl VM {
         _env: SyntaxEnvironment,
         location: Location,
     ) -> Result<Datum> {
+        let form_value = Value::from_datum(&datum, &mut self.values);
+
         if let Some(datum) = Datum::from_value(
             &Instance::interpret_expander(
                 procedure,
-                &Value::syntax(datum.clone()),
+                &form_value,
                 arguments,
                 &mut self.context,
                 &mut self.top_level,

@@ -33,6 +33,8 @@ pub fn register(vm: &mut VM) {
 
     register_core!(vm, "list", list_make, Arity::Many);
     register_core!(vm, "car", list_car, Arity::Exactly(1));
+    register_core!(vm, "cdr", list_cdr, Arity::Exactly(1));
+    register_core!(vm, "cadr", list_cadr, Arity::Exactly(1));
     register_core!(vm, "cons", list_cons, Arity::Exactly(2));
     register_core!(vm, "append", list_append, Arity::Exactly(2));
 
@@ -153,6 +155,28 @@ pub fn list_car(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access
         }
         _ => Err(error::argument_error(v.clone(), "Expected list")),
     })
+}
+
+pub fn list_cdr(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    unary_procedure(&args).and_then(|v| match v {
+        Value::ProperList(ls) => {
+            if let Some(v) = ls.cdr() {
+                Ok(Value::ProperList(v.clone()).into())
+            } else {
+                Err(error::argument_error(
+                    v.clone(),
+                    "can't take car of empty list",
+                ))
+            }
+        }
+        Value::ImproperList(_ls, tail) => Ok(Access::ByRef(tail.clone())),
+        _ => Err(error::argument_error(v.clone(), "Expected list")),
+    })
+}
+
+pub fn list_cadr(ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    let cdr = list_cdr(ctx, args)?;
+    list_car(ctx, vec![cdr.to_owned()])
 }
 
 pub fn list_cons(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
