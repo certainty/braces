@@ -38,6 +38,7 @@ impl Writer {
             Value::Bool(true) => "#t".to_string(),
             Value::Bool(false) => "#f".to_string(),
             Value::Symbol(s) => self.write_symbol(s.as_str()),
+            Value::UninternedSymbol(s) => self.write_symbol(s.as_str()),
             Value::Char(c) => self.write_char(*c),
             Value::Number(num) => self.write_number(num),
             Value::String(s) => self.write_string(s.as_ref()),

@@ -12,6 +12,7 @@ use crate::vm::scheme::writer::Writer;
 use crate::vm::value::number::real::RealNumber;
 
 use self::symbol::Symbol;
+use crate::compiler::frontend::syntax;
 use crate::vm::value::byte_vector::ByteVector;
 use crate::vm::value::vector::Vector;
 
@@ -41,6 +42,7 @@ pub enum Value {
     Syntax(Datum),
     Bool(bool),
     Symbol(Symbol),
+    UninternedSymbol(syntax::symbol::Symbol),
     Char(char),
     Number(number::Number),
     String(string::String),
@@ -68,7 +70,7 @@ impl Value {
     pub fn from_datum(v: &Datum, values: &mut Factory) -> Self {
         match v {
             Datum::Char(c, _) => Self::Char(c.clone()),
-            Datum::Symbol(s, _) => values.symbol(s.as_str()),
+            Datum::Symbol(s, _) => Value::UninternedSymbol(s.clone()),
             Datum::String(s, _) => values.string(s),
             Datum::Number(n, _) => Self::Number(n.clone()),
             Datum::Bool(v, _) => Self::Bool(v.clone()),

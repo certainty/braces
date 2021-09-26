@@ -15,13 +15,13 @@ impl Expander {
             [formals, body @ ..] => {
                 match self.parser.parse_formals(&formals) {
                     Ok(parsed_formals) => {
-                        self.expansion_env.push_scope();
+                        self.push_scope();
                         for identifier in parsed_formals.identifiers() {
                             let sym = identifier.symbol().clone();
-                            self.expansion_env.extend(sym.clone(), Denotation::Id);
+                            self.extend_scope(sym.clone(), Denotation::Id);
                         }
                         let expanded_body = self.expand_all(body)?;
-                        self.expansion_env.pop_scope();
+                        self.pop_scope();
 
                         Ok(self.build_lambda(
                             &formals,

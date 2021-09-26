@@ -127,13 +127,14 @@ impl Expander {
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         match transformer {
             syntax::Transformer::ExplicitRenaming(expander) => {
-                let renamer = self.create_renamer();
                 let cmp = self.create_comparator();
                 match self.vm.interpret_expander(
                     expander.clone(),
                     datum,
-                    &[Value::Procedure(renamer), Value::Procedure(cmp)],
-                    self.expansion_env.clone(),
+                    &[
+                        Value::Procedure(self.renaming_procedure.clone()),
+                        Value::Procedure(cmp),
+                    ],
                     datum.source_location().clone(),
                 ) {
                     Ok(expanded) => Ok(expanded),
@@ -153,7 +154,7 @@ impl Expander {
                     match transformer_type.as_str() {
                         "er-macro-transformer" => {
                             let transformer = syntax::Transformer::ExplicitRenaming(self.compile_lambda(&procedure)?);
-                            self.expansion_env.extend(sym.clone(), Denotation::Macro(transformer));
+                            self.extend_scope(sym.clone(), Denotation::Macro(transformer));
                             Ok(())
                         }
                         _ => Err(Error::expansion_error("Invalid macro transformer type. Must be one of (er-macro-transformer, lowlevel-macro-transformer)", datum))
@@ -246,9 +247,23 @@ impl Expander {
         Datum::list(lambda, loc.clone())
     }
 
+    // create a new lexical scope in the expansion env
+    pub fn push_scope(&mut self) {
+        self.expansion_env.lock().unwrap().push_scope();
+    }
+
+    // drop the current lexical scope in the expansion env
+    pub fn pop_scope(&mut self) {
+        self.expansion_env.lock().unwrap().pop_scope();
+    }
+
+    pub fn extend_scope(&mut self, id: Symbol, denotation: Denotation) {
+        self.expansion_env.lock().unwrap().extend(id, denotation);
+    }
+
     pub fn denotation_of(&mut self, datum: &Datum) -> Result<Denotation> {
         if let Datum::Symbol(sym, _) = datum {
-            Ok(self.expansion_env.get(&sym.clone().into()))
+            Ok(self.expansion_env.lock().unwrap().get(&sym.clone().into()))
         } else {
             Err(Error::bug("unexpected symbol to determine denotation"))
         }

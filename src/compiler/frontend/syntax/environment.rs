@@ -56,8 +56,6 @@ pub enum Special {
     LetrecSyntax,
 }
 
-type Renaming = (Symbol, Symbol); // from, to
-
 #[derive(Debug, Clone)]
 pub struct SyntaxEnvironment {
     scopes: Vec<FxHashMap<Symbol, Denotation>>,
@@ -174,29 +172,14 @@ impl SyntaxEnvironment {
         Denotation::Id
     }
 
-    // Given a syntactic environment env to be extended, an alist returned
-    // by rename-vars, and a syntactic environment env2, extends env by
-    // binding the fresh identifiers to the denotations of the original
-    // identifiers in env2.
-    pub fn alias(&mut self, source: SyntaxEnvironment, renamed_ids: Vec<Renaming>) {
-        for (old, new) in renamed_ids {
-            let denotation = source.get(&old);
-            self.extend(new, denotation.clone());
-        }
-    }
-
-    // Given a syntactic environment and an alist returned by rename-vars,
-    // extends the environment by binding the old identifiers to the fresh
-    // identifiers.
-    pub fn rename(&mut self, renamed_ids: Vec<Renaming>) {
-        for (old, new) in renamed_ids {
-            let denotation = Denotation::Id;
-            self.extend(old, denotation.clone());
-            self.extend(new, denotation);
-        }
+    /// Creates an alias, that binds the symbol to the denotation of the other symbol
+    pub fn alias(&mut self, id: Symbol, alias: Symbol) {
+        let denotation = self.get(&id);
+        self.extend(alias, denotation.clone())
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Renamer {
     counter: u64,
 }
@@ -206,8 +189,8 @@ impl Renamer {
         Renamer { counter: 0 }
     }
 
-    pub fn rename(&mut self, id: Symbol) -> Symbol {
+    pub fn rename(&mut self, id: &Symbol) -> Symbol {
         self.counter += 1;
-        Symbol::renamed(id.string().clone(), self.counter)
+        Symbol::renamed(id.clone().string(), self.counter)
     }
 }

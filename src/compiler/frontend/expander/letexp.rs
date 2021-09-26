@@ -11,7 +11,7 @@ use crate::vm::value::procedure::{foreign, Arity, Procedure};
 use crate::vm::value::Value;
 
 pub fn register_macros(expander: &mut Expander) {
-    expander.expansion_env.extend(
+    expander.extend_scope(
         Symbol::forged("let"),
         Denotation::Macro(Transformer::ExplicitRenaming(self::make_let_expander())),
     );

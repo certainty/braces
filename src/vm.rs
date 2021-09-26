@@ -11,7 +11,6 @@ pub use settings::{Setting, Settings};
 use value::Value;
 
 use crate::compiler::frontend::reader::datum::Datum;
-use crate::compiler::frontend::syntax::environment::SyntaxEnvironment;
 use crate::compiler::source::Location;
 use crate::compiler::CompilationUnit;
 use crate::compiler::Compiler;
@@ -105,7 +104,6 @@ impl VM {
         procedure: Procedure,
         datum: &Datum,
         arguments: &[Value],
-        _env: SyntaxEnvironment,
         location: Location,
     ) -> Result<Datum> {
         let form_value = Value::from_datum(&datum, &mut self.values);
