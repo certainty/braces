@@ -27,28 +27,36 @@ fn make_let_expander() -> Procedure {
 
 fn expand_let(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     explicit_rename_transformer(&args).and_then({
-        |(form, _rename, _compare)| match form.list_slice() {
-            // Named let
-            // (let f ((v e) ...) b ...)
-            Some([_let, f, bindings, _body @ ..]) if bindings.is_proper_list() && f.is_symbol() => {
-                // named let not yet supported. We first need a working implementation of letrec
-                todo!()
-            }
-            // let
-            // (let ((v e) ...) b ...)
-            Some([_let, bindings, body @ ..]) if body.len() >= 1 => {
-                let (lambda, values) =
-                    self::make_lambda(bindings, body, datum.source_location().clone())?;
+        |(form, _rename, _compare)| {
+            let datum = Datum::from_value(form, Location::for_syntax_transformer()).unwrap();
+            match datum.list_slice() {
+                // Named let
+                // (let f ((v e) ...) b ...)
+                Some([_let, f, bindings, _body @ ..])
+                    if bindings.is_proper_list() && f.is_symbol() =>
+                {
+                    // named let not yet supported. We first need a working implementation of letrec
+                    todo!()
+                }
+                // let
+                // (let ((v e) ...) b ...)
+                Some([_let, bindings, body @ ..]) if body.len() >= 1 => {
+                    let (lambda, values) =
+                        self::make_lambda(bindings, body, datum.source_location().clone())?;
 
-                let mut application = vec![lambda];
-                application.extend(values);
+                    let mut application = vec![lambda];
+                    application.extend(values);
 
-                Ok(Value::syntax(Datum::list(application, datum.source_location().clone())).into())
+                    Ok(
+                        Value::Syntax(Datum::list(application, datum.source_location().clone()))
+                            .into(),
+                    )
+                }
+                _ => Err(error::argument_error(
+                    form.clone(),
+                    "expansion of let failed. Incorrect form given",
+                )),
             }
-            _ => Err(error::argument_error(
-                form.clone(),
-                "expansion of let failed. Incorrect form given",
-            )),
         }
     })
 }

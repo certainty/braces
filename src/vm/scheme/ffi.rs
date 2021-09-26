@@ -1,4 +1,3 @@
-use crate::compiler::frontend::reader::datum::Datum;
 use crate::vm::value::{error, procedure::Arity};
 use crate::vm::value::{Factory, Value};
 use thiserror::Error;

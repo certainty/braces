@@ -15,15 +15,17 @@
 /// Examples:
 /// ```
 /// use braces::vm::instance::Instance;
-/// use braces::vm::{value, global::TopLevel};
+/// use braces::vm::{value, global::TopLevel, VM};
 /// use braces::compiler::{source::StringSource, Compiler};
+/// use braces::vm::scheme::ffi::VmContext;
 /// let mut source = StringSource::new("(define (id x) x) (id #t)");
 /// let mut compiler  = Compiler::new();
 /// let unit = compiler.compile(&mut source).unwrap();
 /// // Now interpret the unit
 /// let mut top_level = TopLevel::new();
 /// let mut values = value::Factory::default();
-/// let result = Instance::interpret(unit.closure, 256, &mut top_level, &mut values, false).unwrap();
+/// let mut ctx = VmContext::new();
+/// let result = Instance::interpret(unit.closure, 256, &mut ctx, &mut top_level, &mut values, false).unwrap();
 /// println!("{:#?}", result);
 /// ```
 ///
