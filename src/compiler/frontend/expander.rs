@@ -18,13 +18,14 @@ use crate::vm::value::access::Access;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
 use crate::vm::value::Value;
 use crate::vm::{value, VM};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct Expander {
     vm: VM,
     compiler: CoreCompiler,
     parser: CoreParser,
-    expansion_env: SyntaxEnvironment,
+    expansion_env: Arc<Mutex<SyntaxEnvironment>>,
 }
 
 impl Expander {
@@ -33,7 +34,7 @@ impl Expander {
             vm: VM::for_expansion(),
             compiler: CoreCompiler::new(),
             parser: CoreParser::new(),
-            expansion_env: SyntaxEnvironment::basic(),
+            expansion_env: Arc::new(Mutex::new(SyntaxEnvironment::basic())),
         };
 
         letexp::register_macros(&mut expander);
@@ -127,14 +128,12 @@ impl Expander {
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         match transformer {
             syntax::Transformer::ExplicitRenaming(expander) => {
+                let rename = self.create_renamer();
                 let cmp = self.create_comparator();
                 match self.vm.interpret_expander(
                     expander.clone(),
                     datum,
-                    &[
-                        Value::Procedure(self.renaming_procedure.clone()),
-                        Value::Procedure(cmp),
-                    ],
+                    &[Value::Procedure(rename), Value::Procedure(cmp)],
                     datum.source_location().clone(),
                 ) {
                     Ok(expanded) => Ok(expanded),

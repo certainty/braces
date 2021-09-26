@@ -121,6 +121,7 @@ impl Datum {
         match v {
             Value::Syntax(datum) => Some(datum.clone()),
             Value::Char(c) => Some(Self::character(c.clone(), location)),
+            Value::UninternedSymbol(s) => Some(Self::Symbol(s.clone(), location)),
             Value::Symbol(sym) => Some(Self::forged_symbol(sym.as_str(), location)),
             Value::String(s) => Some(Self::string(s.as_ref(), location)),
             Value::Number(n) => Some(Self::number(n.clone(), location)),
