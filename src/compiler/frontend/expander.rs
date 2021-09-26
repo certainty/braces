@@ -126,21 +126,6 @@ impl Expander {
 
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         match transformer {
-            syntax::Transformer::LowLevel(expander) => {
-                match self.vm.interpret_expander(
-                    expander.clone(),
-                    datum,
-                    &[],
-                    self.expansion_env.clone(),
-                    datum.source_location().clone(),
-                ) {
-                    Ok(expanded) => Ok(expanded),
-                    Err(e) => Err(Error::expansion_error(
-                        format!("Invocation of macro expander failed: {:?}", e),
-                        &datum,
-                    )),
-                }
-            }
             syntax::Transformer::ExplicitRenaming(expander) => {
                 let renamer = self.create_renamer();
                 let cmp = self.create_comparator();
@@ -170,13 +155,7 @@ impl Expander {
                             let transformer = syntax::Transformer::ExplicitRenaming(self.compile_lambda(&procedure)?);
                             self.expansion_env.extend(sym.clone(), Denotation::Macro(transformer));
                             Ok(())
-                        },
-                        "lowlevel-macro-transformer" => {
-                            let transformer = syntax::Transformer::LowLevel(self.compile_lambda(&procedure)?);
-                            println!("Extending env with macro: {}", sym.as_str());
-                            self.expansion_env.extend(sym.clone(), Denotation::Macro(transformer));
-                            Ok(())
-                        },
+                        }
                         _ => Err(Error::expansion_error("Invalid macro transformer type. Must be one of (er-macro-transformer, lowlevel-macro-transformer)", datum))
                     }
                 }
@@ -214,7 +193,6 @@ impl Expander {
         }
     }
 
-    // TODO: make this behave correctly
     fn create_renamer(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "rename",
@@ -223,7 +201,6 @@ impl Expander {
         ))
     }
 
-    // TODO: make this behave correctly
     fn create_comparator(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "compare",
@@ -302,7 +279,7 @@ pub mod tests {
     fn expand_lowlevel_macro() -> Result<()> {
         assert_expands_all_equal(
             r#"
-            (define-syntax my-cons (lowlevel-macro-transformer (lambda (form) `(cons 1 2)))) 
+            (define-syntax my-cons (er-macro-transformer (lambda (form rename compare) `(cons 1 2)))) 
             (my-cons)
             "#,
             "(cons 1 2)",

@@ -9,8 +9,8 @@ fn lowlevel_macro_transformer() {
         &mut vm,
         r#"
         (define-syntax my-cons 
-          (lowlevel-macro-transformer 
-            (lambda (form) 
+          (er-macro-transformer 
+            (lambda (form rename compare) 
                (let ((args (cdr form)))
                  `(cons ,(car args) ,(cadr args))))))
                  
