@@ -45,12 +45,6 @@ impl VmContext {
 }
 
 // Helpers
-pub fn explicit_rename_transformer(args: &Vec<Value>) -> FunctionResult<(&Value, &Value, &Value)> {
-    match &args[..] {
-        [first, second, third] => Ok((first, second, third)),
-        _ => Err(error::arity_mismatch(Arity::Exactly(3), args.len())),
-    }
-}
 
 pub fn ternary_procedure(args: &Vec<Value>) -> FunctionResult<(&Value, &Value, &Value)> {
     match &args[..] {

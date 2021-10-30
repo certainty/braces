@@ -4,7 +4,7 @@ use crate::compiler::frontend::syntax::environment::Denotation;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::frontend::syntax::Transformer;
 use crate::compiler::source::{HasSourceLocation, Location};
-use crate::vm::scheme::ffi::{explicit_rename_transformer, FunctionResult, VmContext};
+use crate::vm::scheme::ffi::{unary_procedure, FunctionResult, VmContext};
 use crate::vm::value::access::Access;
 use crate::vm::value::error;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
@@ -13,7 +13,7 @@ use crate::vm::value::Value;
 pub fn register_macros(expander: &mut Expander) {
     expander.extend_scope(
         Symbol::forged("let"),
-        Denotation::Macro(Transformer::ExplicitRenaming(self::make_let_expander())),
+        Denotation::Macro(Transformer::LowLevel(self::make_let_expander())),
     );
 }
 
@@ -21,13 +21,13 @@ fn make_let_expander() -> Procedure {
     Procedure::foreign(foreign::Procedure::new(
         "expand_let",
         self::expand_let,
-        Arity::Exactly(3),
+        Arity::Exactly(1),
     ))
 }
 
 fn expand_let(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
-    explicit_rename_transformer(&args).and_then({
-        |(form, _rename, _compare)| {
+    unary_procedure(&args).and_then({
+        |form| {
             let datum = Datum::from_value(form, Location::for_syntax_transformer()).unwrap();
             match datum.list_slice() {
                 // Named let

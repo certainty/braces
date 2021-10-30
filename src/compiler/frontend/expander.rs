@@ -13,10 +13,6 @@ use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::frontend::syntax;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::source::{HasSourceLocation, Location};
-use crate::vm::scheme::ffi::{binary_procedure, unary_procedure};
-use crate::vm::value::access::Access;
-use crate::vm::value::procedure::{foreign, Arity, Procedure};
-use crate::vm::value::Value;
 use crate::vm::{value, VM};
 use std::sync::{Arc, Mutex};
 
@@ -127,7 +123,29 @@ impl Expander {
 
     fn expand_macro(&mut self, datum: &Datum, transformer: &syntax::Transformer) -> Result<Datum> {
         match transformer {
-            syntax::Transformer::ExplicitRenaming(expander) => {
+            syntax::Transformer::LowLevel(expander) => {
+                match self.vm.interpret_expander(
+                    expander.clone(),
+                    datum,
+                    &[],
+                    datum.source_location().clone(),
+                ) {
+                    Ok(expanded) => Ok(expanded),
+                    Err(e) => Err(Error::expansion_error(
+                        format!("Invocation of macro expander failed: {:?}", e),
+                        &datum,
+                    )),
+                }
+            }
+
+            syntax::Transformer::ExplicitRenaming(_expander) => {
+                return Err(Error::NotImplemented(
+                    "Explicit renaming macros are not yet implemented".to_string(),
+                ));
+
+                // The following is a possible implementation of the invocation of explicit renaming
+                // macros, but we have no clear strategy yet how to implement the renaming.
+                /*
                 let rename = self.create_renamer();
                 let cmp = self.create_comparator();
                 match self.vm.interpret_expander(
@@ -141,7 +159,7 @@ impl Expander {
                         format!("Invocation of macro expander failed: {:?}", e),
                         &datum,
                     )),
-                }
+                } */
             }
         }
     }
@@ -151,6 +169,11 @@ impl Expander {
             Datum::Symbol(sym, _) => match operand.list_slice() {
                 Some([Datum::Symbol(transformer_type, _), procedure]) => {
                     match transformer_type.as_str() {
+                        "lowlevel-macro-transformer" => {
+                            let transformer = syntax::Transformer::LowLevel(self.compile_lambda(&procedure)?);
+                            self.extend_scope(sym.clone(), Denotation::Macro(transformer));
+                            Ok(())
+                        }
                         "er-macro-transformer" => {
                             let transformer = syntax::Transformer::ExplicitRenaming(self.compile_lambda(&procedure)?);
                             self.extend_scope(sym.clone(), Denotation::Macro(transformer));
@@ -193,6 +216,7 @@ impl Expander {
         }
     }
 
+    /*
     fn create_renamer(&mut self) -> Procedure {
         Procedure::foreign(foreign::Procedure::new(
             "rename",
@@ -209,7 +233,7 @@ impl Expander {
             },
             Arity::Exactly(2),
         ))
-    }
+    } */
 
     fn build_apply(&mut self, op: Symbol, args: Vec<Datum>, loc: Location) -> Datum {
         let mut inner = vec![Datum::symbol(op, loc.clone())];
@@ -293,7 +317,7 @@ pub mod tests {
     fn expand_lowlevel_macro() -> Result<()> {
         assert_expands_all_equal(
             r#"
-            (define-syntax my-cons (er-macro-transformer (lambda (form rename compare) `(cons 1 2)))) 
+            (define-syntax my-cons (lowlevel-macro-transformer (lambda (form) `(cons 1 2)))) 
             (my-cons)
             "#,
             "(cons 1 2)",
