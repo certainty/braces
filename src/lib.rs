@@ -1,6 +1,7 @@
 extern crate im_rc;
 extern crate thiserror;
 
+extern crate clap;
 extern crate lazy_static;
 extern crate nom;
 

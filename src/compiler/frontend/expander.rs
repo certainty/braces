@@ -346,8 +346,8 @@ pub mod tests {
         let expected_datum = parse_datum(rhs);
         let expanded_datum = exp.expand(&actual_datum)?.unwrap();
 
-        println!("expected: {}", expected_datum);
-        println!("expanded: {}", expanded_datum);
+        //println!("expected: {}", expected_datum);
+        //println!("expanded: {}", expanded_datum);
 
         assert_struct_eq(&expanded_datum, &expected_datum, pedantic);
         Ok(())

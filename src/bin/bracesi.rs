@@ -1,3 +1,4 @@
+extern crate clap;
 use braces::cmd::compile;
 use braces::cmd::repl;
 use braces::cmd::run;
