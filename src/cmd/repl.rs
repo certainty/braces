@@ -1,8 +1,8 @@
 use crate::repl;
 use crate::vm::VM;
-use clap::Clap;
+use clap::Parser;
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = "0.1", author = "David K.", about = "Start the REPL")]
 pub struct Opts {}
 

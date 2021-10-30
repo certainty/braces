@@ -1,6 +1,6 @@
-use clap::Clap;
+use clap::Parser;
 
-#[derive(Clap)]
+#[derive(Parser)]
 pub struct Opts {}
 
 pub fn execute(_opts: &Opts) -> anyhow::Result<()> {
