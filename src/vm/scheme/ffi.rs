@@ -1,6 +1,5 @@
-use crate::compiler::frontend::reader::datum::Datum;
-use crate::vm::value::Value;
 use crate::vm::value::{error, procedure::Arity};
+use crate::vm::value::{Factory, Value};
 use thiserror::Error;
 
 pub type FunctionResult<T> = std::result::Result<T, error::RuntimeError>;
@@ -24,19 +23,28 @@ impl ToScheme for bool {
     }
 }
 
-// Helpers
-pub fn explicit_rename_transformer(args: &Vec<Value>) -> FunctionResult<(&Datum, &Value, &Value)> {
-    match &args[..] {
-        [first, second, third] => match first {
-            Value::Syntax(datum) => Ok((datum, second, third)),
-            _ => Err(error::argument_error(
-                first.clone(),
-                "expected syntax object",
-            )),
-        },
-        _ => Err(error::arity_mismatch(Arity::Exactly(3), args.len())),
+#[derive(Debug)]
+pub struct VmContext {
+    symbol_counter: u64,
+    values: Factory,
+}
+
+impl VmContext {
+    pub fn new() -> Self {
+        Self {
+            values: Factory::default(),
+            symbol_counter: 180,
+        }
+    }
+    pub fn gen_sym(&mut self) -> Value {
+        let next_count = self.symbol_counter;
+        let sym = self.values.symbol(format!("#:G{}", next_count));
+        self.symbol_counter += 1;
+        sym
     }
 }
+
+// Helpers
 
 pub fn ternary_procedure(args: &Vec<Value>) -> FunctionResult<(&Value, &Value, &Value)> {
     match &args[..] {

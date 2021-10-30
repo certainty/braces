@@ -1,10 +1,10 @@
 use crate::compiler::source::FileSource;
 use crate::compiler::Compiler;
 use crate::vm::VM;
-use clap::Clap;
+use clap::Parser;
 use std::path::PathBuf;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(
     version = "0.1",
     author = "David K.",

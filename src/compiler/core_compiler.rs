@@ -1,7 +1,9 @@
 use crate::compiler;
+use crate::compiler::frontend::parser::lambda::LambdaExpression;
 use crate::compiler::representation::CoreAST;
 use crate::compiler::source::Registry;
 use crate::compiler::{backend, frontend, CompilationUnit};
+use crate::vm::value;
 
 /// The `CoreCompiler` is used to compile the `CoreAST`
 /// down to the byte code representation.
@@ -31,5 +33,13 @@ impl CoreCompiler {
         let unit = self.backend.pass(&ast, &registry)?;
         log::trace!("backend pass done: {:#?}", unit);
         Ok(unit)
+    }
+
+    pub fn compile_lambda(
+        &mut self,
+        lambda: &LambdaExpression,
+    ) -> compiler::Result<value::procedure::Procedure> {
+        let proc = self.backend.generate_lambda(&lambda)?;
+        Ok(value::procedure::Procedure::native(proc))
     }
 }

@@ -15,6 +15,10 @@ pub struct Location {
 }
 
 impl Location {
+    pub fn for_syntax_transformer() -> Self {
+        Self::new(SourceId::synthetic(), 0..0)
+    }
+
     pub fn new<S: Into<Span>, Id: Into<SourceId>>(id: Id, span: S) -> Self {
         Self {
             id: id.into(),

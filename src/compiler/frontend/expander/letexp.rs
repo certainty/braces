@@ -4,16 +4,16 @@ use crate::compiler::frontend::syntax::environment::Denotation;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::frontend::syntax::Transformer;
 use crate::compiler::source::{HasSourceLocation, Location};
-use crate::vm::scheme::ffi::{explicit_rename_transformer, FunctionResult};
+use crate::vm::scheme::ffi::{unary_procedure, FunctionResult, VmContext};
 use crate::vm::value::access::Access;
 use crate::vm::value::error;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
 use crate::vm::value::Value;
 
 pub fn register_macros(expander: &mut Expander) {
-    expander.expansion_env.extend(
+    expander.extend_scope(
         Symbol::forged("let"),
-        Denotation::Macro(Transformer::ExplicitRenaming(self::make_let_expander())),
+        Denotation::Macro(Transformer::LowLevel(self::make_let_expander())),
     );
 }
 
@@ -21,34 +21,42 @@ fn make_let_expander() -> Procedure {
     Procedure::foreign(foreign::Procedure::new(
         "expand_let",
         self::expand_let,
-        Arity::Exactly(3),
+        Arity::Exactly(1),
     ))
 }
 
-fn expand_let(args: Vec<Value>) -> FunctionResult<Access<Value>> {
-    explicit_rename_transformer(&args).and_then({
-        |(datum, _rename, _compare)| match datum.list_slice() {
-            // Named let
-            // (let f ((v e) ...) b ...)
-            Some([_let, f, bindings, _body @ ..]) if bindings.is_proper_list() && f.is_symbol() => {
-                // named let not yet supported. We first need a working implementation of letrec
-                todo!()
-            }
-            // let
-            // (let ((v e) ...) b ...)
-            Some([_let, bindings, body @ ..]) if body.len() >= 1 => {
-                let (lambda, values) =
-                    self::make_lambda(bindings, body, datum.source_location().clone())?;
+fn expand_let(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    unary_procedure(&args).and_then({
+        |form| {
+            let datum = Datum::from_value(form, Location::for_syntax_transformer()).unwrap();
+            match datum.list_slice() {
+                // Named let
+                // (let f ((v e) ...) b ...)
+                Some([_let, f, bindings, _body @ ..])
+                    if bindings.is_proper_list() && f.is_symbol() =>
+                {
+                    // named let not yet supported. We first need a working implementation of letrec
+                    todo!()
+                }
+                // let
+                // (let ((v e) ...) b ...)
+                Some([_let, bindings, body @ ..]) if body.len() >= 1 => {
+                    let (lambda, values) =
+                        self::make_lambda(bindings, body, datum.source_location().clone())?;
 
-                let mut application = vec![lambda];
-                application.extend(values);
+                    let mut application = vec![lambda];
+                    application.extend(values);
 
-                Ok(Value::syntax(Datum::list(application, datum.source_location().clone())).into())
+                    Ok(
+                        Value::Syntax(Datum::list(application, datum.source_location().clone()))
+                            .into(),
+                    )
+                }
+                _ => Err(error::argument_error(
+                    form.clone(),
+                    "expansion of let failed. Incorrect form given",
+                )),
             }
-            _ => Err(error::argument_error(
-                Value::Syntax(datum.clone()),
-                "expansion of let failed. Incorrect form given",
-            )),
         }
     })
 }

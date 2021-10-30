@@ -46,6 +46,12 @@ impl Chunk {
         self.lines.push((from, to, line));
     }
 
+    // TODO: deduplicate constants
+    // Since they're constant it's fine to have multiple references to the same constant
+    // The idea here is that we don't use the chunk in code generation directly.
+    // Instead we use a chunk-builder, that in the end creates the chunk.
+    // The chunk-builder, doesn't store the constants in a vector but rather in a map<value, offset>.
+    // When the chunk is created, the builder creates a vector with the correct data in it then.
     pub fn add_constant(&mut self, value: Value) -> ConstAddressType {
         self.constants.push(value);
         (self.constants.len() - 1) as ConstAddressType

@@ -105,6 +105,7 @@ impl<'a> ErrorReporter<'a> {
                     .with_labels(labels)
             }
             Bug(message) => Diagnostic::bug().with_message(message),
+            NotImplemented(message) => Diagnostic::error().with_code("E999").with_message(message),
         }
     }
 

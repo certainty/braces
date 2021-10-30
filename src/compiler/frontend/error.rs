@@ -12,6 +12,8 @@ pub enum Error {
     IncompleteInput(String, Option<Origin>),
     #[error("Bug")]
     Bug(String),
+    #[error("Not yet implemented")]
+    NotImplemented(String),
     #[error("ReadError")]
     ReadError(String, Detail, Vec<Detail>),
     #[error("ReadError")]

@@ -20,7 +20,9 @@ impl Expander {
                             exprs,
                             datum.source_location().clone(),
                         );
-                        let expanded_lambda = self.expand_macros(&lambda)?;
+                        let expanded_lambda = self
+                            .expand_macros(&lambda)?
+                            .expect("lambda body must expand correctly");
 
                         Ok(Datum::list(
                             vec![operator.clone(), identifier.clone(), expanded_lambda],
@@ -46,7 +48,7 @@ impl Expander {
                                 exprs,
                                 datum.source_location().clone()
                             );
-                            let expanded_lambda = self.expand_macros(&lambda)?;
+                            let expanded_lambda = self.expand_macros(&lambda)?.expect("expected lambda body to expand correctly");
 
                             Ok(Datum::list(vec![operator.clone(), identifier.clone(), expanded_lambda], datum.source_location().clone()))
                         }
@@ -61,7 +63,7 @@ impl Expander {
                                 exprs,
                                 datum.source_location().clone(),
                             );
-                            let expanded_lambda = self.expand_macros(&lambda)?;
+                            let expanded_lambda = self.expand_macros(&lambda)?.expect("expected lambda body to expand correctly");
 
                             Ok(Datum::list(vec![operator.clone(), identifier.clone(), expanded_lambda], datum.source_location().clone()))
                         }
@@ -77,8 +79,8 @@ impl Expander {
             }
             //(define <id> <expr>)
             [location, expr] => {
-                let expanded_location = self.expand_macros(location)?;
-                let expanded_expr = self.expand_macros(expr)?;
+                let expanded_location = self.expand_macros(location)?.expect("expected location");
+                let expanded_expr = self.expand_macros(expr)?.expect("expected expression");
                 Ok(Datum::list(
                     vec![
                         operator.clone(),

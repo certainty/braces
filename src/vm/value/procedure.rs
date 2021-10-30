@@ -86,7 +86,7 @@ impl SchemeEqual<Procedure> for Procedure {
 }
 
 impl HasArity for Procedure {
-    fn arity<'a>(&'a self) -> &'a Arity {
+    fn arity(&self) -> &Arity {
         match self {
             Procedure::Native(proc) => &proc.arity,
             Procedure::Foreign(proc) => &proc.arity,
@@ -95,7 +95,7 @@ impl HasArity for Procedure {
 }
 
 impl HasArity for std::rc::Rc<Procedure> {
-    fn arity<'a>(&'a self) -> &'a Arity {
+    fn arity(&self) -> &Arity {
         match &**self {
             Procedure::Native(proc) => &proc.arity,
             Procedure::Foreign(proc) => &proc.arity,

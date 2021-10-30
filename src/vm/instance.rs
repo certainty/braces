@@ -15,15 +15,17 @@
 /// Examples:
 /// ```
 /// use braces::vm::instance::Instance;
-/// use braces::vm::{value, global::TopLevel};
+/// use braces::vm::{value, global::TopLevel, VM};
 /// use braces::compiler::{source::StringSource, Compiler};
+/// use braces::vm::scheme::ffi::VmContext;
 /// let mut source = StringSource::new("(define (id x) x) (id #t)");
 /// let mut compiler  = Compiler::new();
 /// let unit = compiler.compile(&mut source).unwrap();
 /// // Now interpret the unit
 /// let mut top_level = TopLevel::new();
 /// let mut values = value::Factory::default();
-/// let result = Instance::interpret(unit.closure, 256, &mut top_level, &mut values, false).unwrap();
+/// let mut ctx = VmContext::new();
+/// let result = Instance::interpret(unit.closure, 256, &mut ctx, &mut top_level, &mut values, false).unwrap();
 /// println!("{:#?}", result);
 /// ```
 ///
@@ -47,6 +49,7 @@ use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
+use crate::vm::scheme::ffi::VmContext;
 use crate::vm::value::access::{Access, Reference};
 use call_frame::CallFrame;
 use std::rc::Rc;
@@ -57,10 +60,11 @@ type ValueStack = Stack<Access<Value>>;
 pub type CallStack = Stack<CallFrame>;
 
 pub struct Instance<'a> {
+    context: &'a mut VmContext,
     // The value factory which can be shared between individual instance runs.
     // The sharing is needed only in the `Repl` where we want to define bindings as we go
     // and remember them for the next run of the `VM`.
-    values: &'a mut value::Factory,
+    pub(crate) values: &'a mut value::Factory,
     // top level environment which can be shared between individual instance runs
     top_level: &'a mut TopLevel,
     // a simple stack to manage intermediate values and locals
@@ -81,11 +85,12 @@ impl<'a> Instance<'a> {
     pub fn new(
         initial_closure: value::closure::Closure,
         call_stack_size: usize,
+        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
         debug_mode: bool,
     ) -> Self {
-        let mut vm = Self::vanilla(call_stack_size, top_level, values, debug_mode);
+        let mut vm = Self::vanilla(call_stack_size, context, top_level, values, debug_mode);
         vm.push(Value::Closure(initial_closure.clone())).unwrap();
         vm.push_frame(initial_closure, 0).unwrap();
         vm
@@ -93,6 +98,7 @@ impl<'a> Instance<'a> {
 
     pub fn vanilla(
         call_stack_size: usize,
+        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
         debug_mode: bool,
@@ -102,6 +108,7 @@ impl<'a> Instance<'a> {
         let open_up_values = FxHashMap::<AddressType, Reference<Value>>::default();
 
         Self {
+            context,
             values,
             stack,
             call_stack,
@@ -115,31 +122,46 @@ impl<'a> Instance<'a> {
     pub fn interpret(
         initial_closure: value::closure::Closure,
         stack_size: usize,
+        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
         // enables debug mode, which will print stack and instruction information for each cycle
         debug_mode: bool,
     ) -> Result<Value> {
-        let mut instance = Self::new(initial_closure, stack_size, top_level, values, debug_mode);
+        let mut instance = Self::new(
+            initial_closure,
+            stack_size,
+            context,
+            top_level,
+            values,
+            debug_mode,
+        );
         instance.run()
     }
 
     pub fn interpret_expander(
         expander: procedure::Procedure,
         syntax: &Value,
-        rename: procedure::Procedure,
-        compare: procedure::Procedure,
+        arguments: &[Value],
+        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Result<Value> {
-        let mut vm = Self::vanilla(255, top_level, values, false);
+        let mut vm = Self::vanilla(255, context, top_level, values, false);
+        let is_native = expander.is_native();
 
         vm.push(Value::Procedure(expander))?;
         vm.push(syntax.clone())?;
-        vm.push(Value::Procedure(rename))?;
-        vm.push(Value::Procedure(compare))?;
-        vm.apply_tail_call(3)?;
-        Ok(vm.stack.pop().into_inner())
+        for arg in arguments {
+            vm.push(arg.clone())?
+        }
+        vm.apply_tail_call(arguments.len() + 1)?;
+
+        if is_native {
+            vm.run()
+        } else {
+            Ok(vm.stack.pop().into_inner())
+        }
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -323,11 +345,15 @@ impl<'a> Instance<'a> {
         closure: value::closure::Closure,
         arg_count: usize,
     ) -> Result<()> {
-        //re-use the current frame for tail calls
-        let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
-        self.active_mut_frame().stack_base = base;
-        self.active_mut_frame().closure = closure;
-        self.active_mut_frame().set_ip(0);
+        if self.has_active_frame() {
+            //re-use the current frame for tail calls
+            let base = std::cmp::max(self.stack.len() - arg_count - 1, 0);
+            self.active_mut_frame().stack_base = base;
+            self.active_mut_frame().closure = closure;
+            self.active_mut_frame().set_ip(0);
+        } else {
+            self.push_frame(closure, arg_count)?;
+        }
         Ok(())
     }
 
@@ -667,7 +693,7 @@ impl<'a> Instance<'a> {
             .collect();
         // also pop the procedure itself
         self.pop();
-        match proc.call(arguments) {
+        match proc.call(&mut self.context, arguments) {
             Ok(v) => {
                 self.push(v)?;
                 Ok(())
@@ -768,7 +794,6 @@ impl<'a> Instance<'a> {
         proc: Rc<procedure::native::Procedure>,
         arg_count: usize,
     ) -> Result<()> {
-        println!("Arg count for {:?} is {}", proc.name.clone(), arg_count);
         self.check_arity(&proc.arity, arg_count)?;
         let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let closure = proc.into();
@@ -1053,6 +1078,7 @@ impl<'a> Instance<'a> {
 mod tests {
     use crate::vm::global::TopLevel;
     use crate::vm::instance::Instance;
+    use crate::vm::scheme::ffi::VmContext;
     use crate::vm::value::access::{Access, Reference};
     use crate::vm::value::procedure::Arity;
     use crate::vm::value::{Factory, Value};
@@ -1061,7 +1087,8 @@ mod tests {
     fn test_bind_arguments_exactly_n() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
-        let mut instance = Instance::vanilla(255, &mut top_level, &mut values, false);
+        let mut context = VmContext::new();
+        let mut instance = Instance::vanilla(255, &mut context, &mut top_level, &mut values, false);
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;
@@ -1083,8 +1110,9 @@ mod tests {
     fn test_bind_arguments_rest_args() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
+        let mut context = VmContext::new();
         let expected_rest_args = values.proper_list(vec![Value::Bool(false), Value::Bool(false)]);
-        let mut instance = Instance::vanilla(255, &mut top_level, &mut values, false);
+        let mut instance = Instance::vanilla(255, &mut context, &mut top_level, &mut values, false);
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;

@@ -31,6 +31,10 @@ pub mod tests {
     use super::Reader;
 
     pub fn parse_datum(inp: &str) -> Datum {
+        parse_datum_all(inp)[0].clone()
+    }
+
+    pub fn parse_datum_all(inp: &str) -> Vec<Datum> {
         let mut registry = Registry::new();
         let source = registry
             .add(&mut BufferSource::new(inp, "datum-parser-test"))
@@ -38,7 +42,7 @@ pub mod tests {
         let reader = Reader::new();
         let datum = reader.parse(&source).unwrap();
 
-        datum.to_vec()[0].clone()
+        datum.to_vec().clone()
     }
 
     // test helpers to use in the datum parser

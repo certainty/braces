@@ -1,16 +1,16 @@
+extern crate clap;
 use braces::cmd::compile;
 use braces::cmd::repl;
 use braces::cmd::run;
-use clap::{AppSettings, Clap};
+use clap::Parser;
 
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
+#[derive(Parser)]
 struct Opts {
     #[clap(subcommand)]
     subcmd: SubCommand,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 enum SubCommand {
     #[clap(version = "0.1", author = "David K.")]
     Repl(repl::Opts),

@@ -88,17 +88,20 @@ impl Parser {
     /// parser.parse(&data).unwrap();
     /// ```
     pub fn parse(&mut self, ast: &DatumAST) -> Result<CoreAST> {
-        let expressions: Result<Vec<Expression>> =
+        let expressions: Result<Vec<Option<_>>> =
             ast.to_vec().iter().map(|d| self.do_parse(d)).collect();
 
-        Ok(CoreAST::new(expressions?))
+        Ok(CoreAST::new(expressions?.into_iter().flatten().collect()))
     }
 
-    fn do_parse(&mut self, datum: &Datum) -> Result<Expression> {
+    fn do_parse(&mut self, datum: &Datum) -> Result<Option<Expression>> {
         log::trace!("parsing: {}", datum.to_string());
-        let expanded = self.expander.expand(datum)?;
-        log::trace!("expanded: {}", expanded.to_string());
-        self.core_parser.parse(&expanded)
+        if let Some(expanded) = self.expander.expand(datum)? {
+            log::trace!("expanded: {}", expanded.to_string());
+            Ok(Some(self.core_parser.parse(&expanded)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
