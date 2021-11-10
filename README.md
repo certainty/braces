@@ -35,8 +35,8 @@ make repl
 - [ ] CPS conversion
 
 #### Macros
-- [ ] add macro expansion phase
-- [ ] add procedural closure macro system (explicit renaming?)
+- [x] add macro expansion phase
+- [x] add procedural closure macro system (explicit renaming?)
 
 #### Errors
 - [ ] fix backtraces 
