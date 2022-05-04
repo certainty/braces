@@ -71,7 +71,6 @@ There are plenty :D
 * Runtime representation of values isn't at all optimised. It likely uses way too many allocations and holds the types wrong
 * The parser bails after the first error (you'd want to collect all)
 * I'm not sure if the custom ParseResult I use is really needed? (I will have to figure that out)
-* No proper macro expander yet. (There is an expansion phase which expands using rust code but that's very limited for now)
 * No support for internal defines (we might get away by adding an expansion to letrec*)
 * I'm not sure the location tracking works all the time
 
