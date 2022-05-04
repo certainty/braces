@@ -1,31 +1,42 @@
 use crate::compiler::source::FileSource;
 use crate::compiler::Compiler;
 use crate::vm::VM;
-use clap::Parser;
+use clap::arg;
 use std::path::PathBuf;
 
-#[derive(Parser, Debug)]
-#[clap(
-    version = "0.1",
-    author = "David K.",
-    about = "Run the file specified by <input>"
-)]
-pub struct Opts {
-    input: String,
+pub struct Command {
+    input: PathBuf,
 }
 
-pub fn execute(opts: &Opts) -> anyhow::Result<()> {
-    let mut vm = VM::default();
-    let mut source = FileSource::new(PathBuf::from(opts.input.clone()));
-    let mut compiler = Compiler::new();
+impl Command {
+    pub fn new(opts: &clap::ArgMatches) -> Self {
+        let path = opts.value_of("input").unwrap();
 
-    match compiler.compile(&mut source) {
-        Ok(unit) => match vm.interpret(unit) {
-            Ok(_) => (),
-            Err(e) => vm.print_error(&e, &compiler),
-        },
-        Err(e) => compiler.print_error(&e),
+        Self {
+            input: PathBuf::from(path),
+        }
     }
 
-    Ok(())
+    pub fn options<'a>() -> clap::Command<'a> {
+        clap::Command::new("run")
+            .alias("r")
+            .about("run the specified file")
+            .arg(arg!([INPUT]))
+    }
+
+    pub fn run(&self) -> anyhow::Result<()> {
+        let mut vm = VM::default();
+        let mut source = FileSource::new(self.input.clone());
+        let mut compiler = Compiler::new();
+
+        match compiler.compile(&mut source) {
+            Ok(unit) => match vm.interpret(unit) {
+                Ok(_) => (),
+                Err(e) => vm.print_error(&e, &compiler),
+            },
+            Err(e) => compiler.print_error(&e),
+        }
+
+        Ok(())
+    }
 }

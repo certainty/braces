@@ -1,62 +1,61 @@
 [package]
-name = "braces"
-version = "0.1.0"
 authors = ["certainty <david.krentzlin@gmail.com>"]
 edition = "2018"
+name = "braces"
+version = "0.1.0"
 
 [lib]
-name="braces"
-path="src/lib.rs"
+name = "braces"
+path = "src/lib.rs"
 
 [[bench]]
-name="compiler_benchmark"
-harness=false
+harness = false
+name = "compiler_benchmark"
 
 [[bench]]
-name="vm_benchmark"
-harness=false
+harness = false
+name = "vm_benchmark"
 
 [[bench]]
-name="scheme_values_benchmark"
-harness=false
+harness = false
+name = "scheme_values_benchmark"
 
 [features]
-debug_vm = []
 debug_code = []
+debug_vm = []
 
 [dependencies]
 # utils
-log="0.4"
+anyhow = "1.0"
 env_logger = "0.8"
+lazy_static = "1.4"
+log = "0.4"
 pretty_env_logger = "0.4"
 thiserror = "1.0"
-anyhow = "1.0"
-lazy_static = "1.4"
 
 # values
+az = "1.1.1"
 im-rc = "15.0"
 rug = "1.12"
-az = "1.1.1"
 
 # compiler / interpreter
-clap = "3.0.0-beta.5"
-rustyline = "8.0.0"
-hashbrown = "0.11"
-fasthash = "0.4.0"
-rustc-hash = "1.1.0"
 arrayvec = "0.7.0"
+clap = "3.0.10"
 codespan-reporting = "0.11"
+hashbrown = "0.11"
+rustc-hash = "1.1.0"
+rustyline = "8.0.0"
 
 #parser
-nom_locate = "3.0"
 nom = "6.1"
+nom_locate = "3.0"
 
 directories = "3.0"
 rand = "0.8.4"
 
 [dev-dependencies]
-matches = "0.1"
-criterion = "0.3.4"
 cargo-criterion = "1.1.0"
+criterion = "0.3.4"
+matches = "0.1"
 quickcheck = "1"
 quickcheck_macros = "1.0"

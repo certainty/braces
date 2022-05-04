@@ -1,8 +1,14 @@
-use clap::Parser;
+pub struct Command {}
 
-#[derive(Parser)]
-pub struct Opts {}
+impl Command {
+    pub fn new(_opts: &clap::ArgMatches) -> Self {
+        Self {}
+    }
 
-pub fn execute(_opts: &Opts) -> anyhow::Result<()> {
-    Ok(())
+    pub fn options<'a>() -> clap::Command<'a> {
+        clap::Command::new("compile").about("compile files")
+    }
+    pub fn run(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
