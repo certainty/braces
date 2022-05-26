@@ -20,6 +20,7 @@ use crate::compiler::frontend::parser::{
     define::DefinitionExpression,
     identifier::Identifier,
     lambda::{Formals, LambdaExpression},
+    library::LibraryExpression,
     sequence::BeginExpression,
     Expression,
 };
@@ -224,6 +225,7 @@ impl<'a> CodeGenerator<'a> {
             Expression::Lambda(expr) => self.emit_lambda(expr)?,
             Expression::Begin(expr) => self.emit_begin(expr, context)?,
             Expression::Apply(expr) => self.emit_apply(expr, context)?,
+            Expression::Library(expr) => self.emit_library(expr)?,
         }
         Ok(())
     }
@@ -440,6 +442,10 @@ impl<'a> CodeGenerator<'a> {
             }
         }
 
+        Ok(())
+    }
+
+    fn emit_library(&mut self, _library: &LibraryExpression) -> Result<()> {
         Ok(())
     }
 

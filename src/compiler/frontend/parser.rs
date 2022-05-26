@@ -17,6 +17,7 @@ pub mod core_parser;
 pub mod define;
 pub mod identifier;
 pub mod lambda;
+pub mod library;
 pub mod literal;
 pub mod quotation;
 pub mod result;
@@ -41,6 +42,8 @@ pub enum Expression {
     Apply(apply::ApplicationExpression),
     /// A begin expression to sequence other expressions
     Begin(sequence::BeginExpression),
+    /// A library declaration
+    Library(library::LibraryExpression),
 }
 
 impl HasSourceLocation for Expression {
@@ -54,6 +57,7 @@ impl HasSourceLocation for Expression {
             Self::Lambda(proc) => proc.source_location(),
             Self::Apply(exp) => exp.source_location(),
             Self::Begin(exp) => exp.source_location(),
+            Self::Library(exp) => exp.source_location(),
         }
     }
 }
