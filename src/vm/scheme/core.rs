@@ -42,12 +42,31 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "vector-cons", vector_cons, Arity::Exactly(2));
     register_core!(vm, "vector-append", vector_append, Arity::Exactly(2));
     register_core!(vm, "gensym", gensym, Arity::Exactly(0));
+    register_core!(vm, "load", load, Arity::AtLeast(1));
 
     numbers::register(vm);
 }
 
 pub fn gensym(ctx: &mut VmContext, _args: Vec<Value>) -> FunctionResult<Access<Value>> {
     Ok(ctx.gen_sym().into())
+}
+
+// The return value of load is whatever is the value of the last expression in the loaded code
+pub fn load(ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    if args.len() == 0 {
+        return Err(error::arity_mismatch(Arity::AtLeast(1), args.len()));
+    }
+    if args.len() > 1 {
+        return Err(error::not_implemented(
+            "loading code in an environment is not yet supported",
+        ));
+    }
+
+    if let Value::String(path) = &args[0] {
+        Ok(ctx.load_scheme_file(path.as_ref())?)
+    } else {
+        Err(error::argument_error(args[0].clone(), "Expected a string"))
+    }
 }
 
 //  R7RS 6.1

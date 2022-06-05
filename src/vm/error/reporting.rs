@@ -58,6 +58,10 @@ impl<'a> ErrorReporter<'a> {
             RuntimeError::SyntaxError(msg) => {
                 format!("Error during macro expansion: {}", msg)
             }
+
+            RuntimeError::NotImplemented(msg) => {
+                format!("NotSupported: {}", msg)
+            }
         }
     }
 }

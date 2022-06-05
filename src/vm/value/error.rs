@@ -18,6 +18,8 @@ pub enum RuntimeError {
     ArithmeticError(String),
     #[error("SyntaxError")]
     SyntaxError(String),
+    #[error("NotSupported")]
+    NotImplemented(String),
 }
 
 pub fn syntax_error<T: Into<String>>(msg: T) -> RuntimeError {
@@ -49,4 +51,8 @@ pub fn undefined_variable(id: Symbol) -> RuntimeError {
 
 pub fn argument_error<I: Into<String>>(v: Value, message: I) -> RuntimeError {
     RuntimeError::ArgumentError(v, message.into())
+}
+
+pub fn not_implemented<I: Into<String>>(message: I) -> RuntimeError {
+    RuntimeError::NotImplemented(message.into())
 }

@@ -1,3 +1,4 @@
+use crate::vm::value::access::Access;
 use crate::vm::value::{error, procedure::Arity};
 use crate::vm::value::{Factory, Value};
 use thiserror::Error;
@@ -36,6 +37,11 @@ impl VmContext {
             symbol_counter: 180,
         }
     }
+
+    pub fn load_scheme_file(&mut self, path: &str) -> FunctionResult<Access<Value>> {
+        Ok(self.values.bool_true().into())
+    }
+
     pub fn gen_sym(&mut self) -> Value {
         let next_count = self.symbol_counter;
         let sym = self.values.symbol(format!("#:G{}", next_count));
