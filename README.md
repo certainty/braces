@@ -27,10 +27,14 @@ make repl
 - [x] basic code generator 
 - [x] identify tail calls
 - [x] quasi quote
+- [ ] make quasi quoting bullet proof (it might have edge cases at the moment)
 - [ ] collect all errors in reader
 - [ ] collect all errors in parser 
 - [ ] bytecode serialization (ahead of time compilation)
-- [ ] libraries  
+- [ ] library support 
+- [ ] include / include-ci
+- [ ] cond-expand 
+- [ ] prepare code for evolution (next rNrs and extensions)
 - [ ] optimization pass 
 - [ ] CPS conversion
 
