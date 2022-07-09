@@ -32,6 +32,8 @@
 ///
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 pub mod call_frame;
+use crate::compiler::source::FileSource;
+use crate::compiler::Compiler;
 use crate::vm::byte_code::chunk::AddressType;
 use rustc_hash::FxHashMap;
 
@@ -173,8 +175,14 @@ impl<'a> Instance<'a> {
         sym
     }
 
-    pub fn load_file(&mut self, _path: &std::path::Path) -> Result<Value> {
-        todo!()
+    pub fn load_file(&mut self, path: &std::path::Path) -> Result<Value> {
+        let mut source = FileSource::new(path.to_owned());
+        let mut compiler = Compiler::new();
+        let loaded_file_closure = compiler.compile(&mut source)?.closure;
+
+        self.push(Value::Closure(loaded_file_closure.clone()))?;
+        self.push_frame(loaded_file_closure, 0)?;
+        self.run()
     }
 
     fn run(&mut self) -> Result<Value> {
