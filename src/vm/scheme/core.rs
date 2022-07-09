@@ -19,6 +19,8 @@ macro_rules! register_core {
 
 pub(crate) use register_core;
 pub fn register(vm: &mut VM) {
+    register_core!(vm, "load", load_file, Arity::Exactly(1));
+
     register_core!(vm, "eqv?", eqv, Arity::Exactly(2));
     register_core!(vm, "eq?", eq, Arity::Exactly(2));
     register_core!(vm, "equal?", equal, Arity::Exactly(2));
@@ -45,6 +47,19 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "gensym", gensym, Arity::Exactly(0));
 
     numbers::register(vm);
+}
+
+pub fn load_file(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    match unary_procedure(&args)? {
+        Value::String(path_str) => {
+            let path = std::path::PathBuf::from(path_str.as_ref());
+            match vm.load_file(path.as_path()) {
+                Ok(value) => Ok(value.into()),
+                Err(e) => Err(error::load_error(path.clone(), e)),
+            }
+        }
+        v => Err(error::argument_error(v.clone(), "expected String")),
+    }
 }
 
 pub fn gensym(vm: &mut Instance, _args: Vec<Value>) -> FunctionResult<Access<Value>> {

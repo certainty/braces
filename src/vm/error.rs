@@ -8,6 +8,7 @@ use thiserror::Error;
 pub enum Error {
     #[error("compiler error")]
     CompilerError(compiler::error::Error),
+
     #[error("RuntimeError at {1}: {0}")]
     RuntimeError(
         error::RuntimeError,

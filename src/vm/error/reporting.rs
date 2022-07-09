@@ -43,6 +43,10 @@ impl<'a> ErrorReporter<'a> {
 
     pub fn runtime_error_message(&self, e: &RuntimeError) -> String {
         match e {
+            RuntimeError::LoadError(path, wrapped_error) => {
+                // TODO: format all errors properly
+                format!("LoadError: {:?} {:?}", path, wrapped_error)
+            }
             RuntimeError::ArgumentError(value, message) => {
                 format!("ArgumentError: {:?} {}", value, message)
             }

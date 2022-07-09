@@ -173,6 +173,10 @@ impl<'a> Instance<'a> {
         sym
     }
 
+    pub fn load_file(&mut self, _path: &std::path::Path) -> Result<Value> {
+        todo!()
+    }
+
     fn run(&mut self) -> Result<Value> {
         self.disassemble_frame();
 

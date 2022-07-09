@@ -18,6 +18,12 @@ pub enum RuntimeError {
     ArithmeticError(String),
     #[error("SyntaxError")]
     SyntaxError(String),
+    #[error("LoadError")]
+    LoadError(std::path::PathBuf, Box<crate::vm::Error>),
+}
+
+pub fn load_error(file: std::path::PathBuf, e: crate::vm::Error) -> RuntimeError {
+    RuntimeError::LoadError(file, Box::new(e))
 }
 
 pub fn syntax_error<T: Into<String>>(msg: T) -> RuntimeError {
