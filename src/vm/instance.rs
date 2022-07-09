@@ -49,7 +49,6 @@ use super::value::symbol::Symbol;
 use super::value::Value;
 use super::Error;
 use crate::vm::byte_code::chunk::ConstAddressType;
-use crate::vm::scheme::ffi::VmContext;
 use crate::vm::value::access::{Access, Reference};
 use call_frame::CallFrame;
 use std::rc::Rc;
@@ -74,7 +73,6 @@ impl Default for Options {
 }
 
 pub struct Instance<'a> {
-    context: &'a mut VmContext,
     // The value factory which can be shared between individual instance runs.
     // The sharing is needed only in the `Repl` where we want to define bindings as we go
     // and remember them for the next run of the `VM`.
@@ -91,26 +89,29 @@ pub struct Instance<'a> {
     open_up_values: FxHashMap<AddressType, Reference<Value>>,
     // enable cycle debugging
     settings: Options,
+
+    symbol_counter: u64,
 }
+
+// symbols beneath are reserved
+const SYMBOL_COUNTER_START: u64 = 180;
 
 // TODO: Optimize for performance
 // Likely candidates for optimizations are the stack(s)
 impl<'a> Instance<'a> {
     pub fn new(
         initial_closure: value::closure::Closure,
-        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
         options: Options,
     ) -> Self {
-        let mut vm = Self::vanilla(context, top_level, values, options);
+        let mut vm = Self::vanilla(top_level, values, options);
         vm.push(Value::Closure(initial_closure.clone())).unwrap();
         vm.push_frame(initial_closure, 0).unwrap();
         vm
     }
 
     pub fn vanilla(
-        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
         settings: Options,
@@ -120,7 +121,6 @@ impl<'a> Instance<'a> {
         let open_up_values = FxHashMap::<AddressType, Reference<Value>>::default();
 
         Self {
-            context,
             values,
             stack,
             call_stack,
@@ -128,17 +128,17 @@ impl<'a> Instance<'a> {
             active_frame: std::ptr::null_mut(),
             open_up_values,
             settings,
+            symbol_counter: SYMBOL_COUNTER_START,
         }
     }
 
     pub fn interpret(
         initial_closure: value::closure::Closure,
-        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
         options: Options,
     ) -> Result<Value> {
-        let mut instance = Self::new(initial_closure, context, top_level, values, options);
+        let mut instance = Self::new(initial_closure, top_level, values, options);
         instance.run()
     }
 
@@ -146,11 +146,10 @@ impl<'a> Instance<'a> {
         expander: procedure::Procedure,
         syntax: &Value,
         arguments: &[Value],
-        context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Result<Value> {
-        let mut vm = Self::vanilla(context, top_level, values, Options::default());
+        let mut vm = Self::vanilla(top_level, values, Options::default());
         let is_native = expander.is_native();
 
         vm.push(Value::Procedure(expander))?;
@@ -168,7 +167,10 @@ impl<'a> Instance<'a> {
     }
 
     pub fn gen_sym(&mut self) -> Value {
-        self.context.gen_sym()
+        let next_count = self.symbol_counter;
+        let sym = self.values.symbol(format!("#:G{}", next_count));
+        self.symbol_counter += 1;
+        sym
     }
 
     fn run(&mut self) -> Result<Value> {

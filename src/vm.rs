@@ -10,6 +10,8 @@ use scheme::writer::Writer;
 pub use settings::{Setting, Settings};
 use value::Value;
 
+use self::value::procedure::foreign;
+use self::value::procedure::native;
 use crate::compiler::frontend::reader::datum::Datum;
 use crate::compiler::source::Location;
 use crate::compiler::CompilationUnit;
@@ -17,10 +19,6 @@ use crate::compiler::Compiler;
 use crate::vm::disassembler::Disassembler;
 use crate::vm::error::reporting::ErrorReporter;
 use crate::vm::value::procedure::Procedure;
-
-use self::scheme::ffi::VmContext;
-use self::value::procedure::foreign;
-use self::value::procedure::native;
 
 pub mod byte_code;
 pub mod debug;
@@ -38,7 +36,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct VM {
-    context: VmContext,
     stack_size: usize,
     pub values: value::Factory,
     pub top_level: TopLevel,
@@ -50,7 +47,6 @@ impl VM {
     pub fn new(stack_size: usize) -> VM {
         VM {
             stack_size,
-            context: VmContext::new(),
             values: value::Factory::default(),
             top_level: TopLevel::new(),
             writer: Writer::new(),
@@ -92,13 +88,7 @@ impl VM {
             debug_mode: self.settings.is_enabled(&Setting::Debug),
         };
 
-        Instance::interpret(
-            unit.closure,
-            &mut self.context,
-            &mut self.top_level,
-            &mut self.values,
-            options,
-        )
+        Instance::interpret(unit.closure, &mut self.top_level, &mut self.values, options)
     }
 
     pub fn interpret_expander(
@@ -115,7 +105,6 @@ impl VM {
                 procedure,
                 &form_value,
                 arguments,
-                &mut self.context,
                 &mut self.top_level,
                 &mut self.values,
             )?,

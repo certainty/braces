@@ -23,28 +23,6 @@ impl ToScheme for bool {
     }
 }
 
-// TODO: can this go away and be inlined in the Instance?
-#[derive(Debug)]
-pub struct VmContext {
-    symbol_counter: u64,
-    values: Factory,
-}
-
-impl VmContext {
-    pub fn new() -> Self {
-        Self {
-            values: Factory::default(),
-            symbol_counter: 180,
-        }
-    }
-    pub fn gen_sym(&mut self) -> Value {
-        let next_count = self.symbol_counter;
-        let sym = self.values.symbol(format!("#:G{}", next_count));
-        self.symbol_counter += 1;
-        sym
-    }
-}
-
 // Helpers
 
 pub fn ternary_procedure(args: &Vec<Value>) -> FunctionResult<(&Value, &Value, &Value)> {
