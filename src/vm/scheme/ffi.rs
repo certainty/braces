@@ -23,6 +23,7 @@ impl ToScheme for bool {
     }
 }
 
+// TODO: can this go away and be inlined in the Instance?
 #[derive(Debug)]
 pub struct VmContext {
     symbol_counter: u64,

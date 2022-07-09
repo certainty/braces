@@ -4,7 +4,9 @@ use crate::compiler::frontend::syntax::environment::Denotation;
 use crate::compiler::frontend::syntax::symbol::Symbol;
 use crate::compiler::frontend::syntax::Transformer;
 use crate::compiler::source::{HasSourceLocation, Location};
-use crate::vm::scheme::ffi::{unary_procedure, FunctionResult, VmContext};
+use crate::vm::instance::Instance;
+use crate::vm::scheme::ffi::unary_procedure;
+use crate::vm::scheme::ffi::FunctionResult;
 use crate::vm::value::access::Access;
 use crate::vm::value::error;
 use crate::vm::value::procedure::{foreign, Arity, Procedure};
@@ -25,7 +27,7 @@ fn make_let_expander() -> Procedure {
     ))
 }
 
-fn expand_let(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+fn expand_let(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     unary_procedure(&args).and_then({
         |form| {
             let datum = Datum::from_value(form, Location::for_syntax_transformer()).unwrap();

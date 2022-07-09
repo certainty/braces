@@ -14,7 +14,7 @@
 ///
 /// Examples:
 /// ```
-/// use braces::vm::instance::Instance;
+/// use braces::vm::instance::{Instance, Options};
 /// use braces::vm::{value, global::TopLevel, VM};
 /// use braces::compiler::{source::StringSource, Compiler};
 /// use braces::vm::scheme::ffi::VmContext;
@@ -25,7 +25,7 @@
 /// let mut top_level = TopLevel::new();
 /// let mut values = value::Factory::default();
 /// let mut ctx = VmContext::new();
-/// let result = Instance::interpret(unit.closure, 256, &mut ctx, &mut top_level, &mut values, false).unwrap();
+/// let result = Instance::interpret(unit.closure, &mut ctx, &mut top_level, &mut values, Options::default()).unwrap();
 /// println!("{:#?}", result);
 /// ```
 ///
@@ -59,6 +59,20 @@ type Result<T> = std::result::Result<T, Error>;
 type ValueStack = Stack<Access<Value>>;
 pub type CallStack = Stack<CallFrame>;
 
+pub struct Options {
+    pub stack_size: usize,
+    pub debug_mode: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            stack_size: 64,
+            debug_mode: false,
+        }
+    }
+}
+
 pub struct Instance<'a> {
     context: &'a mut VmContext,
     // The value factory which can be shared between individual instance runs.
@@ -76,7 +90,7 @@ pub struct Instance<'a> {
     // open up-values are indexed by absolute stack address
     open_up_values: FxHashMap<AddressType, Reference<Value>>,
     // enable cycle debugging
-    debug_mode: bool,
+    settings: Options,
 }
 
 // TODO: Optimize for performance
@@ -84,27 +98,25 @@ pub struct Instance<'a> {
 impl<'a> Instance<'a> {
     pub fn new(
         initial_closure: value::closure::Closure,
-        call_stack_size: usize,
         context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
-        debug_mode: bool,
+        options: Options,
     ) -> Self {
-        let mut vm = Self::vanilla(call_stack_size, context, top_level, values, debug_mode);
+        let mut vm = Self::vanilla(context, top_level, values, options);
         vm.push(Value::Closure(initial_closure.clone())).unwrap();
         vm.push_frame(initial_closure, 0).unwrap();
         vm
     }
 
     pub fn vanilla(
-        call_stack_size: usize,
         context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
-        debug_mode: bool,
+        settings: Options,
     ) -> Self {
-        let stack = ValueStack::new(call_stack_size * 255);
-        let call_stack = CallStack::new(call_stack_size);
+        let stack = ValueStack::new(settings.stack_size * 255);
+        let call_stack = CallStack::new(settings.stack_size);
         let open_up_values = FxHashMap::<AddressType, Reference<Value>>::default();
 
         Self {
@@ -115,27 +127,18 @@ impl<'a> Instance<'a> {
             top_level,
             active_frame: std::ptr::null_mut(),
             open_up_values,
-            debug_mode,
+            settings,
         }
     }
 
     pub fn interpret(
         initial_closure: value::closure::Closure,
-        stack_size: usize,
         context: &'a mut VmContext,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
-        // enables debug mode, which will print stack and instruction information for each cycle
-        debug_mode: bool,
+        options: Options,
     ) -> Result<Value> {
-        let mut instance = Self::new(
-            initial_closure,
-            stack_size,
-            context,
-            top_level,
-            values,
-            debug_mode,
-        );
+        let mut instance = Self::new(initial_closure, context, top_level, values, options);
         instance.run()
     }
 
@@ -147,7 +150,7 @@ impl<'a> Instance<'a> {
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
     ) -> Result<Value> {
-        let mut vm = Self::vanilla(255, context, top_level, values, false);
+        let mut vm = Self::vanilla(context, top_level, values, Options::default());
         let is_native = expander.is_native();
 
         vm.push(Value::Procedure(expander))?;
@@ -162,6 +165,10 @@ impl<'a> Instance<'a> {
         } else {
             Ok(vm.stack.pop().into_inner())
         }
+    }
+
+    pub fn gen_sym(&mut self) -> Value {
+        self.context.gen_sym()
     }
 
     fn run(&mut self) -> Result<Value> {
@@ -693,7 +700,7 @@ impl<'a> Instance<'a> {
             .collect();
         // also pop the procedure itself
         self.pop();
-        match proc.call(&mut self.context, arguments) {
+        match proc.call(self, arguments) {
             Ok(v) => {
                 self.push(v)?;
                 Ok(())
@@ -1029,7 +1036,7 @@ impl<'a> Instance<'a> {
 
     // Debug the VM
     fn debug_cycle(&mut self) {
-        if !self.debug_mode {
+        if !self.settings.debug_mode {
             return;
         }
 
@@ -1044,7 +1051,7 @@ impl<'a> Instance<'a> {
     }
 
     fn debug_stack(&mut self) {
-        if !self.debug_mode {
+        if !self.settings.debug_mode {
             return;
         }
 
@@ -1055,7 +1062,7 @@ impl<'a> Instance<'a> {
     }
 
     fn disassemble_frame(&mut self) {
-        if !self.debug_mode {
+        if !self.settings.debug_mode {
             return;
         }
 
@@ -1077,7 +1084,7 @@ impl<'a> Instance<'a> {
 #[cfg(test)]
 mod tests {
     use crate::vm::global::TopLevel;
-    use crate::vm::instance::Instance;
+    use crate::vm::instance::{Instance, Options};
     use crate::vm::scheme::ffi::VmContext;
     use crate::vm::value::access::{Access, Reference};
     use crate::vm::value::procedure::Arity;
@@ -1088,7 +1095,8 @@ mod tests {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
         let mut context = VmContext::new();
-        let mut instance = Instance::vanilla(255, &mut context, &mut top_level, &mut values, false);
+        let settings = Options::default();
+        let mut instance = Instance::vanilla(&mut context, &mut top_level, &mut values, settings);
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;
@@ -1112,7 +1120,13 @@ mod tests {
         let mut values = Factory::default();
         let mut context = VmContext::new();
         let expected_rest_args = values.proper_list(vec![Value::Bool(false), Value::Bool(false)]);
-        let mut instance = Instance::vanilla(255, &mut context, &mut top_level, &mut values, false);
+
+        let mut instance = Instance::vanilla(
+            &mut context,
+            &mut top_level,
+            &mut values,
+            Options::default(),
+        );
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;

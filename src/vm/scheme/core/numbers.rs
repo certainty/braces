@@ -4,12 +4,13 @@ use crate::vm::value::number::SchemeNumber;
 use crate::vm::value::procedure::foreign;
 use crate::vm::value::procedure::Arity;
 use crate::vm::value::{error, number, Value};
+use crate::vm::Instance;
 use crate::vm::VM;
 use std::ops::{Add, Div, Mul, Sub};
 
 macro_rules! define_predicate {
     ($name:ident, $number:ident, $pred:expr) => {
-        fn $name(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+        fn $name(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
             match unary_procedure(&args)? {
                 Value::Number($number) => Ok(Value::Bool($pred).into()),
                 _ => Ok(Value::Bool(false).into()),
@@ -41,14 +42,14 @@ pub fn register(vm: &mut VM) {
 }
 
 // R7RS 6.2.6 Numerical operations
-fn number_p(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+fn number_p(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match unary_procedure(&args)? {
         Value::Number(_) => Ok(Value::Bool(true).into()),
         _ => Ok(Value::Bool(false).into()),
     }
 }
 
-fn as_number<'a>(_ctx: &mut VmContext, v: &'a Value) -> FunctionResult<&'a number::Number> {
+fn as_number<'a>(_vm: &mut Instance, v: &'a Value) -> FunctionResult<&'a number::Number> {
     match v {
         Value::Number(n) => Ok(n),
         v => return Err(error::argument_error(v.clone(), "is not a number")),
@@ -67,7 +68,7 @@ define_predicate!(inexact_p, n, n.is_inexact());
 
 macro_rules! define_fold {
     ($func:ident, $identity:expr, $op:ident) => {
-        pub fn $func(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+        pub fn $func(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
             let mut result = number::Number::fixnum($identity);
 
             for n in args {
@@ -87,7 +88,7 @@ define_fold!(mul, 1, mul);
 
 macro_rules! define_reduction {
     ($func:ident, $op:ident) => {
-        pub fn $func(_ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+        pub fn $func(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
             if let Value::Number(mut result) = args[0].clone() {
                 for n in args[1..].iter().cloned() {
                     match n {
@@ -109,14 +110,14 @@ define_reduction!(div, div);
 
 macro_rules! define_ordering {
     ($func:ident, $op:tt) => {
-        fn $func(ctx: &mut VmContext, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+        fn $func(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
             let mut result = true;
 
             for n in 0..args.len() {
                 if n == 0 {
                     result = true;
                 } else {
-                    result = as_number(ctx, &args[n - 1])? $op as_number(ctx, &args[n])?;
+                    result = as_number(vm, &args[n - 1])? $op as_number(vm, &args[n])?;
                 }
             }
 

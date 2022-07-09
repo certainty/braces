@@ -1,10 +1,11 @@
 use super::{Arity, HasArity};
-use crate::vm::scheme::ffi::{FunctionResult, VmContext};
+use crate::vm::instance::Instance;
+use crate::vm::scheme::ffi::FunctionResult;
 use crate::vm::value::access::Access;
 use crate::vm::value::equality::SchemeEqual;
 use crate::vm::value::Value;
 
-pub type ProcedureImpl = dyn Fn(&mut VmContext, Vec<Value>) -> FunctionResult<Access<Value>>;
+pub type ProcedureImpl = dyn Fn(&mut Instance, Vec<Value>) -> FunctionResult<Access<Value>>;
 
 pub struct Procedure {
     pub name: String,
@@ -16,7 +17,7 @@ impl Procedure {
     pub fn new<S, I>(name: S, op: I, arity: Arity) -> Self
     where
         S: Into<String>,
-        I: 'static + Fn(&mut VmContext, Vec<Value>) -> FunctionResult<Access<Value>>,
+        I: 'static + Fn(&mut Instance, Vec<Value>) -> FunctionResult<Access<Value>>,
     {
         Self {
             name: name.into(),
@@ -25,12 +26,8 @@ impl Procedure {
         }
     }
 
-    pub fn call(
-        &self,
-        ctx: &mut VmContext,
-        arguments: Vec<Value>,
-    ) -> FunctionResult<Access<Value>> {
-        (self.proc)(ctx, arguments)
+    pub fn call(&self, vm: &mut Instance, arguments: Vec<Value>) -> FunctionResult<Access<Value>> {
+        (self.proc)(vm, arguments)
     }
 }
 

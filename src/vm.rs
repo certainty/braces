@@ -18,9 +18,9 @@ use crate::vm::disassembler::Disassembler;
 use crate::vm::error::reporting::ErrorReporter;
 use crate::vm::value::procedure::Procedure;
 
+use self::scheme::ffi::VmContext;
 use self::value::procedure::foreign;
 use self::value::procedure::native;
-use crate::vm::scheme::ffi::VmContext;
 
 pub mod byte_code;
 pub mod debug;
@@ -87,15 +87,17 @@ impl VM {
     }
 
     pub fn interpret(&mut self, unit: CompilationUnit) -> Result<Value> {
-        let debug_mode = self.settings.is_enabled(&Setting::Debug);
+        let options = instance::Options {
+            stack_size: self.stack_size,
+            debug_mode: self.settings.is_enabled(&Setting::Debug),
+        };
 
         Instance::interpret(
             unit.closure,
-            self.stack_size,
             &mut self.context,
             &mut self.top_level,
             &mut self.values,
-            debug_mode,
+            options,
         )
     }
 
