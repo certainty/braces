@@ -182,6 +182,7 @@ impl<'a> Instance<'a> {
 
         self.push(Value::Closure(loaded_file_closure.clone()))?;
         self.push_frame(loaded_file_closure, 0)?;
+        self.apply_tail_call(0)?;
         self.run()
     }
 
