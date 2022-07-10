@@ -27,6 +27,7 @@ impl Registry {
     }
 
     pub fn add<T: HasOrigin + Read>(&mut self, s: &mut T) -> Result<Source> {
+        println!("Adding source :D ");
         let mut out = String::new();
         s.read_to_string(&mut out)?;
         let handle = SourceId::from(self.files.add(s.origin(), out));

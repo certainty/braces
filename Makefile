@@ -29,12 +29,14 @@ install: build
 run: 
 	$(CARGO) run --bin bracesi
 
+compile:
+	$(CARGO) run --bin bracesi compile $(FILE)
+
 debug_run: 
 	$(CARGO) run --features debug_vm --features debug_code --bin bracesi -- run $(RUN_FILE)
 
 repl:
 	$(CARGO) run --bin bracesi -- repl
-
 
 test: build
 	$(CARGO) test -- --nocapture

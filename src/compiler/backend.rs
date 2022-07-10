@@ -1,4 +1,5 @@
 pub mod error;
+pub mod rust;
 pub mod variables;
 pub mod vm;
 
@@ -28,6 +29,15 @@ impl Backend {
     ) -> std::result::Result<CompilationUnit, error::Error> {
         let unit = CodeGenerator::generate(registry, ast)?;
         Ok(unit)
+    }
+
+    pub fn rust_pass(
+        &self,
+        ast: &CoreAST,
+        registry: &Registry,
+    ) -> std::result::Result<String, error::Error> {
+        let source = rust::code_generator::CodeGenerator::generate(registry, ast)?;
+        Ok(source)
     }
 
     /// Generate a native procedure from a lambda expression

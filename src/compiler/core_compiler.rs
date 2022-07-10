@@ -35,6 +35,12 @@ impl CoreCompiler {
         Ok(unit)
     }
 
+    pub fn compile_rust(&mut self, ast: &CoreAST, registry: &Registry) -> compiler::Result<String> {
+        let source = self.backend.rust_pass(ast, registry)?;
+        log::trace!("rust backend pass done");
+        Ok(source)
+    }
+
     pub fn compile_lambda(
         &mut self,
         lambda: &LambdaExpression,
