@@ -1,8 +1,11 @@
-use super::code_generator;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
 pub enum Error {
-    #[error(transparent)]
-    CodeGenerator(#[from] code_generator::Error),
+    #[error("Too many locals defined")]
+    TooManyLocals,
+    #[error("Too many up values defined")]
+    TooManyUpValues,
+    #[error("CompilerBug: {}", 0)]
+    CompilerBug(String),
 }

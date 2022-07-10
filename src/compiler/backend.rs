@@ -1,14 +1,16 @@
-pub mod code_generator;
 pub mod error;
 pub mod variables;
-use super::representation::CoreAST;
+pub mod vm;
 
+use super::representation::CoreAST;
 use super::CompilationUnit;
-use crate::compiler::backend::code_generator::Target;
+use crate::compiler::backend::vm::code_generator::Target;
 use crate::compiler::frontend::parser::lambda::LambdaExpression;
 use crate::compiler::source::Registry;
 use crate::vm::value;
-use code_generator::CodeGenerator;
+use vm::code_generator::CodeGenerator;
+
+pub type Result<T> = std::result::Result<T, error::Error>;
 
 #[derive(Debug)]
 pub struct Backend {}

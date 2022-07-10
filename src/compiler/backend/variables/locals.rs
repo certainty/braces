@@ -1,4 +1,4 @@
-use crate::compiler::backend::code_generator::{Error, Result};
+use crate::compiler::backend::{error::Error, Result};
 use crate::compiler::frontend::parser::identifier::Identifier;
 
 #[derive(Debug, Clone, PartialEq)]

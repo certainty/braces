@@ -92,8 +92,9 @@
 pub mod locals;
 pub mod up_values;
 
-use crate::compiler::backend::code_generator::{Error, Result};
+use crate::compiler::backend::error::Error;
 use crate::compiler::backend::variables::up_values::UpValue;
+use crate::compiler::backend::Result;
 use crate::compiler::frontend::parser::identifier::Identifier;
 use locals::Locals;
 use std::{cell::RefCell, rc::Rc};

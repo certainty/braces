@@ -9,9 +9,9 @@
 /// and will thus be accessible by the VM. This compilation model gives rather clear semantics in terms
 /// of execution since it allows to easily activate individual procedures without having to do extensive
 /// computation of addresses.
-use thiserror::Error;
-
-use super::variables::{Variables, VariablesRef};
+use crate::compiler::backend::error::Error;
+use crate::compiler::backend::variables::{Variables, VariablesRef};
+use crate::compiler::backend::Result;
 use crate::compiler::frontend::parser::{
     apply::ApplicationExpression,
     assignment::SetExpression,
@@ -36,18 +36,6 @@ use crate::vm::value;
 use crate::vm::value::closure::Closure;
 use crate::vm::value::procedure::Arity;
 use crate::vm::value::Value;
-
-#[derive(Error, Debug, Clone)]
-pub enum Error {
-    #[error("Too many locals defined")]
-    TooManyLocals,
-    #[error("Too many up values defined")]
-    TooManyUpValues,
-    #[error("CompilerBug: {}", 0)]
-    CompilerBug(String),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 pub enum Target {
