@@ -175,7 +175,7 @@ impl<'a> Instance<'a> {
         sym
     }
 
-    pub fn load_file(&mut self, path: &std::path::Path) -> Result<Value> {
+    pub fn load_file(&mut self, path: &std::path::Path) -> Result<Access<Value>> {
         let mut source = FileSource::new(path.to_owned());
         let mut compiler = Compiler::new();
         let loaded_file_closure = compiler.compile(&mut source)?.closure;
@@ -183,7 +183,7 @@ impl<'a> Instance<'a> {
         self.push(Value::Closure(loaded_file_closure.clone()))?;
         self.push_frame(loaded_file_closure, 0)?;
         self.apply_tail_call(0)?;
-        self.run()
+        Ok(self.stack.pop())
     }
 
     fn run(&mut self) -> Result<Value> {

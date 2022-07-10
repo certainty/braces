@@ -54,7 +54,7 @@ pub fn load_file(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<V
         Value::String(path_str) => {
             let path = std::path::PathBuf::from(path_str.as_ref());
             match vm.load_file(path.as_path()) {
-                Ok(value) => Ok(value.into()),
+                Ok(value) => Ok(value),
                 Err(e) => Err(error::load_error(path.clone(), e)),
             }
         }
