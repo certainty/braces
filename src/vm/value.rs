@@ -213,6 +213,7 @@ impl Factory {
     }
 
     pub fn gensym(&mut self, prefix: Option<&str>) -> Value {
+        self.symbol_counter += 1;
         let s = format!("#:G{}{}", prefix.unwrap_or(""), self.symbol_counter);
 
         self.symbol(s)
@@ -322,5 +323,17 @@ mod tests {
         let v = values.proper_list(vec![values.bool_true(), values.bool_false()]);
 
         assert_eq!(format!("{}", v), "(&#t &#f)")
+    }
+
+    #[test]
+    fn test_gensym() {
+        let mut values = Factory::default();
+
+        let s1 = values.gensym(None);
+        let s2 = values.gensym(None);
+        let s3 = values.gensym(None);
+
+        assert_ne!(s1, s2);
+        assert_ne!(s2, s3);
     }
 }
