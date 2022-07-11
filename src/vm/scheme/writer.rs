@@ -77,6 +77,12 @@ impl Writer {
                 format!("({} . {})", head_body.join(" "), tail_body)
             }
             Value::Unspecified => "#<unspecified>".to_string(),
+            Value::Port(p) if p.is_input_port() && p.is_output_port() => {
+                "#<port mode=rw>".to_string()
+            }
+            Value::Port(p) if p.is_input_port() => "#<port mode=r>".to_string(),
+            Value::Port(_p) => "#<port mode=w>".to_string(),
+            Value::EofObject => "#<eof>".to_string(),
         }
     }
 
