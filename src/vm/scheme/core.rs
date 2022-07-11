@@ -63,7 +63,7 @@ pub fn load_file(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<V
 }
 
 pub fn gensym(vm: &mut Instance, _args: Vec<Value>) -> FunctionResult<Access<Value>> {
-    Ok(vm.gen_sym().into())
+    Ok(vm.gensym().into())
 }
 
 //  R7RS 6.1

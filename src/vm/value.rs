@@ -157,6 +157,8 @@ impl SchemeEqual<Value> for Value {
     }
 }
 
+const SYMBOL_COUNTER_START: u64 = 180;
+
 #[derive(Debug, Clone)]
 pub struct Factory {
     strings: StringTable,
@@ -164,6 +166,7 @@ pub struct Factory {
     false_value: Value,
     nil_value: Value,
     unspecified: Value,
+    symbol_counter: u64,
 }
 
 impl Default for Factory {
@@ -174,6 +177,7 @@ impl Default for Factory {
             false_value: Value::Bool(false),
             nil_value: Value::ProperList(list::List::Nil),
             unspecified: Value::Unspecified,
+            symbol_counter: SYMBOL_COUNTER_START,
         }
     }
 }
@@ -206,6 +210,12 @@ impl Factory {
     pub fn sym<T: Into<std::string::String>>(&mut self, v: T) -> Symbol {
         let k = self.strings.get_or_intern(v.into());
         Symbol(k)
+    }
+
+    pub fn gensym(&mut self, prefix: Option<&str>) -> Value {
+        let s = format!("#:G{}{}", prefix.unwrap_or(""), self.symbol_counter);
+
+        self.symbol(s)
     }
 
     pub fn symbol<T: Into<std::string::String>>(&mut self, v: T) -> Value {
