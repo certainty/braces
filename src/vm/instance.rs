@@ -89,12 +89,7 @@ pub struct Instance<'a> {
     open_up_values: FxHashMap<AddressType, Reference<Value>>,
     // enable cycle debugging
     settings: Options,
-
-    symbol_counter: u64,
 }
-
-// symbols beneath are reserved
-const SYMBOL_COUNTER_START: u64 = 180;
 
 // TODO: Optimize for performance
 // Likely candidates for optimizations are the stack(s)
@@ -128,7 +123,6 @@ impl<'a> Instance<'a> {
             active_frame: std::ptr::null_mut(),
             open_up_values,
             settings,
-            symbol_counter: SYMBOL_COUNTER_START,
         }
     }
 
@@ -166,11 +160,8 @@ impl<'a> Instance<'a> {
         }
     }
 
-    pub fn gen_sym(&mut self) -> Value {
-        let next_count = self.symbol_counter;
-        let sym = self.values.symbol(format!("#:G{}", next_count));
-        self.symbol_counter += 1;
-        sym
+    pub fn gensym(&mut self) -> Value {
+        self.values.gensym(None)
     }
 
     pub fn load_file(&mut self, path: &std::path::Path) -> Result<Access<Value>> {
