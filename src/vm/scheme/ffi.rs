@@ -1,5 +1,5 @@
+use crate::vm::value::Value;
 use crate::vm::value::{error, procedure::Arity};
-use crate::vm::value::{Factory, Value};
 use thiserror::Error;
 
 pub type FunctionResult<T> = std::result::Result<T, error::RuntimeError>;
@@ -20,27 +20,6 @@ trait ToScheme {
 impl ToScheme for bool {
     fn to_scheme(&self) -> Value {
         Value::Bool(self.clone())
-    }
-}
-
-#[derive(Debug)]
-pub struct VmContext {
-    symbol_counter: u64,
-    values: Factory,
-}
-
-impl VmContext {
-    pub fn new() -> Self {
-        Self {
-            values: Factory::default(),
-            symbol_counter: 180,
-        }
-    }
-    pub fn gen_sym(&mut self) -> Value {
-        let next_count = self.symbol_counter;
-        let sym = self.values.symbol(format!("#:G{}", next_count));
-        self.symbol_counter += 1;
-        sym
     }
 }
 

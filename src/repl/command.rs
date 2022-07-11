@@ -34,7 +34,7 @@ impl Commands {
     fn handle_help(&self) -> anyhow::Result<()> {
         println!("Available commands: ");
         self.display_help(":help", "Show help on the available commands");
-        self.display_help(":set (+|-)setting", "Enable or disable a setting");
+        self.display_help(":set (+|-)flag | key=value", "Update settings");
         self.display_help(":settings", "Show the values of all settings");
         self.display_help(
             ":disass binding",

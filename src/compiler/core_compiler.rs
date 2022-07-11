@@ -2,7 +2,7 @@ use crate::compiler;
 use crate::compiler::frontend::parser::lambda::LambdaExpression;
 use crate::compiler::representation::CoreAST;
 use crate::compiler::source::Registry;
-use crate::compiler::{backend, frontend, CompilationUnit};
+use crate::compiler::{backend, CompilationUnit};
 use crate::vm::value;
 
 /// The `CoreCompiler` is used to compile the `CoreAST`
@@ -13,14 +13,12 @@ use crate::vm::value;
 ///
 #[derive(Debug)]
 pub struct CoreCompiler {
-    parser: frontend::parser::CoreParser,
     backend: backend::Backend,
 }
 
 impl CoreCompiler {
     pub fn new() -> Self {
         Self {
-            parser: frontend::parser::CoreParser::new(),
             backend: backend::Backend::new(),
         }
     }
