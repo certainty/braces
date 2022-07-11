@@ -17,15 +17,13 @@
 /// use braces::vm::instance::{Instance, Options};
 /// use braces::vm::{value, global::TopLevel, VM};
 /// use braces::compiler::{source::StringSource, Compiler};
-/// use braces::vm::scheme::ffi::VmContext;
 /// let mut source = StringSource::new("(define (id x) x) (id #t)");
 /// let mut compiler  = Compiler::new();
 /// let unit = compiler.compile(&mut source).unwrap();
 /// // Now interpret the unit
 /// let mut top_level = TopLevel::new();
 /// let mut values = value::Factory::default();
-/// let mut ctx = VmContext::new();
-/// let result = Instance::interpret(unit.closure, &mut ctx, &mut top_level, &mut values, Options::default()).unwrap();
+/// let result = Instance::interpret(unit.closure, &mut top_level, &mut values, Options::default()).unwrap();
 /// println!("{:#?}", result);
 /// ```
 ///
@@ -1100,7 +1098,6 @@ impl<'a> Instance<'a> {
 mod tests {
     use crate::vm::global::TopLevel;
     use crate::vm::instance::{Instance, Options};
-    use crate::vm::scheme::ffi::VmContext;
     use crate::vm::value::access::{Access, Reference};
     use crate::vm::value::procedure::Arity;
     use crate::vm::value::{Factory, Value};
@@ -1109,9 +1106,8 @@ mod tests {
     fn test_bind_arguments_exactly_n() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
-        let mut context = VmContext::new();
         let settings = Options::default();
-        let mut instance = Instance::vanilla(&mut context, &mut top_level, &mut values, settings);
+        let mut instance = Instance::vanilla(&mut top_level, &mut values, settings);
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;
@@ -1133,15 +1129,9 @@ mod tests {
     fn test_bind_arguments_rest_args() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
-        let mut context = VmContext::new();
         let expected_rest_args = values.proper_list(vec![Value::Bool(false), Value::Bool(false)]);
 
-        let mut instance = Instance::vanilla(
-            &mut context,
-            &mut top_level,
-            &mut values,
-            Options::default(),
-        );
+        let mut instance = Instance::vanilla(&mut top_level, &mut values, Options::default());
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;
