@@ -54,6 +54,7 @@ pub enum Value {
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
     Port(port::Port),
+    EofObject,
     Unspecified,
 }
 

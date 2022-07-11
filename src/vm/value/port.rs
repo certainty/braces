@@ -1,4 +1,4 @@
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Cursor, Read, Write};
 
 pub type Result<T> = std::result::Result<T, super::error::RuntimeError>;
 
@@ -12,12 +12,11 @@ pub trait SchemePort {
     fn is_binary_port() -> bool;
     fn is_textual_port() -> bool;
     fn is_input_port() -> bool;
+    fn is_output_port() -> bool;
 }
 
-pub trait BinaryOutputPort {
-    fn write_u8(&mut self, byte: u8) -> Result<usize>;
-    fn flush(&mut self) -> Result<()>;
-    fn close(&self) -> Result<()>;
+pub trait BinaryPort {
+    fn u8_write<O: Write<u8>>(&mut self) -> &mut O;
 }
 
 pub trait BinaryInputPort {
@@ -41,3 +40,11 @@ pub trait TextualInputPort {
     fn is_ready(&self) -> bool;
     fn close(&self) -> Result<()>;
 }
+
+pub enum Port {
+    FilePort(std::fs::File),
+    StringInputPort(String),
+    StringOutputPort(Cursor<char>),
+}
+
+std::io::stdout()
