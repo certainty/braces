@@ -45,7 +45,7 @@ fn current_input_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Ac
         return Err(error::arity_mismatch(Arity::Exactly(0), args.len()));
     }
 
-    todo!()
+    Ok(Value::Port(Port::stdin()).into())
 }
 
 fn current_output_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
@@ -53,7 +53,7 @@ fn current_output_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<A
         return Err(error::arity_mismatch(Arity::Exactly(0), args.len()));
     }
 
-    todo!()
+    Ok(Value::Port(Port::stdout()).into())
 }
 
 fn current_error_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {

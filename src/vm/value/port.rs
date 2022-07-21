@@ -58,13 +58,21 @@ impl Port {
     pub fn write_char(&mut self, c: &char) -> Result<usize> {
         todo!()
     }
+
+    pub fn stdin() -> Self {
+        Self(IOKey::Stdin)
+    }
+
+    pub fn stdout() -> Self {
+        Self(IOKey::Stdout)
+    }
 }
 
 impl std::fmt::Debug for Port {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let struct_name = match &self.0 {
-            IOKey::Stdin => "StdinPort".to_string(),
-            IOKey::Stdout => "StdoutPort".to_string(),
+            IOKey::Stdin => "stdin".to_string(),
+            IOKey::Stdout => "stdout".to_string(),
             IOKey::Uri(uri) => format!("{}", uri),
         };
 
