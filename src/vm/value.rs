@@ -25,6 +25,7 @@ pub mod equality;
 pub mod error;
 pub mod list;
 pub mod number;
+pub mod port;
 pub mod procedure;
 pub mod string;
 pub mod symbol;
@@ -52,6 +53,8 @@ pub enum Value {
     ImproperList(list::List, Reference<Value>),
     Procedure(procedure::Procedure),
     Closure(closure::Closure),
+    Port(port::Port),
+    EofObject,
     Unspecified,
 }
 

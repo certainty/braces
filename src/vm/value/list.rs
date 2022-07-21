@@ -33,6 +33,13 @@ impl List {
         }
     }
 
+    pub fn to_vector(&self) -> Vec<Reference<Value>> {
+        match self {
+            Self::Nil => Vec::new(),
+            Self::Cons(inner) => inner.iter().cloned().collect(),
+        }
+    }
+
     // create a fresh list by concateneting the two supplied lists
     pub fn append(lhs: &List, rhs: &List) -> List {
         match (lhs, rhs) {

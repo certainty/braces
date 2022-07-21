@@ -20,6 +20,8 @@ pub enum RuntimeError {
     SyntaxError(String),
     #[error("LoadError")]
     LoadError(std::path::PathBuf, Box<crate::vm::Error>),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
 }
 
 pub fn load_error(file: std::path::PathBuf, e: crate::vm::Error) -> RuntimeError {
