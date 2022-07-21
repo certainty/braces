@@ -49,10 +49,14 @@ pub fn unary_procedure(args: &Vec<Value>) -> FunctionResult<&Value> {
 
 pub fn positional_and_rest_procedure1(
     args: &Vec<Value>,
-) -> FunctionResult<(&Value, &[Reference<Value>])> {
+) -> FunctionResult<(&Value, Vec<Reference<Value>>)> {
     match &args[..] {
-        [first, Value::Vector(rest)] => Ok((first, &rest.slice())),
-        _ => Err(error::arity_mismatch(Arity::AtLeast(1), args.len())),
+        [first, Value::ProperList(rest)] => Ok((first, rest.to_vector())),
+
+        other => {
+            println!("other: {:?}", other);
+            Err(error::arity_mismatch(Arity::AtLeast(1), args.len()))
+        }
     }
 }
 

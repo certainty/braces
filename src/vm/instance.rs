@@ -81,7 +81,7 @@ pub struct Instance<'a> {
     // top level environment which can be shared between individual instance runs
     top_level: &'a mut TopLevel,
 
-    io_resources: &'a mut IORegistry,
+    pub(crate) io_resources: &'a mut IORegistry,
     // a simple stack to manage intermediate values and locals
     stack: ValueStack,
     // manage all live functions
@@ -705,6 +705,7 @@ impl<'a> Instance<'a> {
         arg_count: usize,
     ) -> Result<()> {
         self.check_arity(&proc.arity, arg_count)?;
+        let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let arguments = self
             .pop_n(arg_count)
             .iter()

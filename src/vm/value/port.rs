@@ -4,7 +4,7 @@ use super::{equality::SchemeEqual, error};
 use std::{
     cell::RefCell,
     io::Read,
-    io::{Stdin, Stdout, Write},
+    io::{Stderr, Stdin, Stdout, Write},
     rc::Rc,
 };
 
@@ -34,19 +34,48 @@ pub struct IORegistry(FxHashMap<IOKey, IOEntry>);
 
 impl IORegistry {
     pub fn new() -> Self {
-        Self(FxHashMap::default())
+        let mut map = FxHashMap::default();
+
+        map.insert(IOKey::Stdin, IOEntry::stdin());
+        map.insert(IOKey::Stdout, IOEntry::stdout());
+        map.insert(IOKey::Stderr, IOEntry::stderr());
+
+        Self(map)
+    }
+
+    pub fn stdout(&mut self) -> &mut Rc<RefCell<Stdout>> {
+        match self.0.get_mut(&IOKey::Stdout).unwrap() {
+            IOEntry::Stdout(inner) => inner,
+            _ => unreachable!(),
+        }
     }
 }
 
 pub enum IOEntry {
     Stdout(Rc<RefCell<Stdout>>),
     Stdin(Rc<RefCell<Stdin>>),
+    Stderr(Rc<RefCell<Stderr>>),
+}
+
+impl IOEntry {
+    pub fn stdin() -> Self {
+        Self::Stdin(Rc::new(RefCell::new(std::io::stdin())))
+    }
+
+    pub fn stdout() -> Self {
+        Self::Stdout(Rc::new(RefCell::new(std::io::stdout())))
+    }
+
+    pub fn stderr() -> Self {
+        Self::Stderr(Rc::new(RefCell::new(std::io::stderr())))
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum IOKey {
     Stdin,
     Stdout,
+    Stderr,
     Uri(String),
 }
 
@@ -73,6 +102,7 @@ impl std::fmt::Debug for Port {
         let struct_name = match &self.0 {
             IOKey::Stdin => "stdin".to_string(),
             IOKey::Stdout => "stdout".to_string(),
+            IOKey::Stderr => "stderr".to_string(),
             IOKey::Uri(uri) => format!("{}", uri),
         };
 
