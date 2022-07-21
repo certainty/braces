@@ -21,12 +21,15 @@ pub fn register(vm: &mut VM) {
         current_output_port,
         Arity::Exactly(0)
     );
+
     super::register_core!(
         vm,
         "current-error-port",
         current_error_port,
         Arity::Exactly(0)
     );
+
+    //super::register_core!(vm, "write-char", write_char, Arity::AtLeast(1))
 }
 
 fn port_p(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
@@ -42,7 +45,7 @@ fn current_input_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Ac
         return Err(error::arity_mismatch(Arity::Exactly(0), args.len()));
     }
 
-    Ok(Value::Port(Port::stdin()).into())
+    todo!()
 }
 
 fn current_output_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
@@ -50,7 +53,7 @@ fn current_output_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<A
         return Err(error::arity_mismatch(Arity::Exactly(0), args.len()));
     }
 
-    Ok(Value::Port(Port::stdout()).into())
+    todo!()
 }
 
 fn current_error_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
@@ -58,5 +61,5 @@ fn current_error_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Ac
         return Err(error::arity_mismatch(Arity::Exactly(0), args.len()));
     }
 
-    Ok(Value::Port(Port::stderr()).into())
+    todo!()
 }

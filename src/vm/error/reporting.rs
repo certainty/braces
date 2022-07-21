@@ -59,6 +59,9 @@ impl<'a> ErrorReporter<'a> {
             RuntimeError::OutOfBoundError(idx, accepted) => {
                 format!("OutOfBoudError: can't access element at index `{}`. The allowed ranged is ({}..{})", idx, accepted.start, accepted.end)
             }
+            RuntimeError::IOError(e) => {
+                format!("IOError: {}", e)
+            }
             RuntimeError::SyntaxError(msg) => {
                 format!("Error during macro expansion: {}", msg)
             }

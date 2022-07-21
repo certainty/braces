@@ -44,6 +44,7 @@ use super::stack_trace::StackTrace;
 use super::value;
 use super::value::closure::Closure;
 use super::value::error;
+use super::value::port::IORegistry;
 use super::value::procedure::{self, Arity};
 use super::value::symbol::Symbol;
 use super::value::Value;
@@ -79,6 +80,8 @@ pub struct Instance<'a> {
     pub(crate) values: &'a mut value::Factory,
     // top level environment which can be shared between individual instance runs
     top_level: &'a mut TopLevel,
+
+    io_resources: &'a mut IORegistry,
     // a simple stack to manage intermediate values and locals
     stack: ValueStack,
     // manage all live functions
@@ -98,9 +101,10 @@ impl<'a> Instance<'a> {
         initial_closure: value::closure::Closure,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        io_resources: &'a mut IORegistry,
         options: Options,
     ) -> Self {
-        let mut vm = Self::vanilla(top_level, values, options);
+        let mut vm = Self::vanilla(top_level, values, io_resources, options);
         vm.push(Value::Closure(initial_closure.clone())).unwrap();
         vm.push_frame(initial_closure, 0).unwrap();
         vm
@@ -109,6 +113,7 @@ impl<'a> Instance<'a> {
     pub fn vanilla(
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        io_resources: &'a mut IORegistry,
         settings: Options,
     ) -> Self {
         let stack = ValueStack::new(settings.stack_size * 255);
@@ -121,6 +126,7 @@ impl<'a> Instance<'a> {
             call_stack,
             top_level,
             active_frame: std::ptr::null_mut(),
+            io_resources,
             open_up_values,
             settings,
         }
@@ -130,9 +136,10 @@ impl<'a> Instance<'a> {
         initial_closure: value::closure::Closure,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        io_resources: &'a mut IORegistry,
         options: Options,
     ) -> Result<Value> {
-        let mut instance = Self::new(initial_closure, top_level, values, options);
+        let mut instance = Self::new(initial_closure, top_level, values, io_resources, options);
         instance.run()
     }
 
@@ -141,9 +148,10 @@ impl<'a> Instance<'a> {
         syntax: &Value,
         arguments: &[Value],
         top_level: &'a mut TopLevel,
+        io_resources: &'a mut IORegistry,
         values: &'a mut value::Factory,
     ) -> Result<Value> {
-        let mut vm = Self::vanilla(top_level, values, Options::default());
+        let mut vm = Self::vanilla(top_level, values, io_resources, Options::default());
         let is_native = expander.is_native();
 
         vm.push(Value::Procedure(expander))?;

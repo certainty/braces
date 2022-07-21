@@ -10,6 +10,7 @@ use scheme::writer::Writer;
 pub use settings::{Setting, Settings};
 use value::Value;
 
+use self::value::port::IORegistry;
 use self::value::procedure::foreign;
 use self::value::procedure::native;
 use crate::compiler::frontend::reader::datum::Datum;
@@ -34,13 +35,22 @@ pub mod value;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
 pub struct VM {
     stack_size: usize,
     pub values: value::Factory,
     pub top_level: TopLevel,
+    pub io_resources: IORegistry,
     writer: Writer,
     pub settings: Settings,
+}
+
+impl std::fmt::Debug for VM {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VM")
+            .field("settings", &self.settings)
+            .field("stack_size", &self.stack_size)
+            .finish()
+    }
 }
 
 impl VM {
@@ -49,6 +59,7 @@ impl VM {
             stack_size,
             values: value::Factory::default(),
             top_level: TopLevel::new(),
+            io_resources: IORegistry::new(),
             writer: Writer::new(),
             settings: Settings::default(),
         }
@@ -88,7 +99,13 @@ impl VM {
             debug_mode: self.settings.is_enabled(&Setting::Debug),
         };
 
-        Instance::interpret(unit.closure, &mut self.top_level, &mut self.values, options)
+        Instance::interpret(
+            unit.closure,
+            &mut self.top_level,
+            &mut self.values,
+            &mut self.io_resources,
+            options,
+        )
     }
 
     pub fn interpret_expander(
@@ -106,6 +123,7 @@ impl VM {
                 &form_value,
                 arguments,
                 &mut self.top_level,
+                &mut self.io_resources,
                 &mut self.values,
             )?,
             location,
