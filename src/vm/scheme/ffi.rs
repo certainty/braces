@@ -1,4 +1,4 @@
-use crate::vm::value::access::{Access, Reference};
+use crate::vm::value::access::Reference;
 use crate::vm::value::Value;
 use crate::vm::value::{error, procedure::Arity};
 use thiserror::Error;

@@ -74,7 +74,7 @@ fn write_char(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Valu
             stdout.write_all(c.encode_utf8(&mut [0; 4]).as_bytes())?;
             Ok(Value::Unspecified.into())
         }
-        (c, r) => todo!(),
+        (Value::Char(c), r) => todo!(),
         other => {
             println!("other: {:?}", other);
             Err(error::arity_mismatch(Arity::AtLeast(1), args.len()))
@@ -89,11 +89,8 @@ fn write_string(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Va
             stdout.write_all((&s.as_ref()).as_bytes())?;
             Ok(Value::Unspecified.into())
         }
-        (c, r) => todo!(),
-        other => {
-            println!("other: {:?}", other);
-            Err(error::arity_mismatch(Arity::AtLeast(1), args.len()))
-        }
+        (Value::String(_s), _r) => todo!(),
+        (other, _) => Err(error::argument_error(other.clone(), "Expected String")),
     }
 }
 
@@ -103,7 +100,6 @@ fn flush_port(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Valu
             vm.io_resources.stdout().borrow_mut().flush()?;
             Ok(Value::Unspecified.into())
         }
-        Some(v) => todo!(),
-        _ => todo!(),
+        Some(_v) => todo!(),
     }
 }

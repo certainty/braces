@@ -3,8 +3,7 @@ use rustc_hash::FxHashMap;
 use super::{equality::SchemeEqual, error};
 use std::{
     cell::RefCell,
-    io::Read,
-    io::{Stderr, Stdin, Stdout, Write},
+    io::{Stderr, Stdin, Stdout},
     rc::Rc,
 };
 
@@ -16,19 +15,6 @@ pub enum PortType {
     Textual,
 }
 
-pub trait ReadWrite: Read + Write {}
-
-#[derive(Debug)]
-pub struct OutputPort<T: Write> {
-    underlying: Rc<RefCell<T>>,
-}
-
-#[derive(Debug)]
-pub struct InputPort<T: Read> {
-    underlying: Rc<RefCell<T>>,
-}
-
-// holds references to input and output facilitys
 #[repr(transparent)]
 pub struct IORegistry(FxHashMap<IOKey, IOEntry>);
 
@@ -46,6 +32,20 @@ impl IORegistry {
     pub fn stdout(&mut self) -> &mut Rc<RefCell<Stdout>> {
         match self.0.get_mut(&IOKey::Stdout).unwrap() {
             IOEntry::Stdout(inner) => inner,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn stderr(&mut self) -> &mut Rc<RefCell<Stderr>> {
+        match self.0.get_mut(&IOKey::Stderr).unwrap() {
+            IOEntry::Stderr(inner) => inner,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn stdin(&mut self) -> &mut Rc<RefCell<Stdin>> {
+        match self.0.get_mut(&IOKey::Stdin).unwrap() {
+            IOEntry::Stdin(inner) => inner,
             _ => unreachable!(),
         }
     }
@@ -84,16 +84,16 @@ pub enum IOKey {
 pub struct Port(IOKey);
 
 impl Port {
-    pub fn write_char(&mut self, c: &char) -> Result<usize> {
-        todo!()
-    }
-
     pub fn stdin() -> Self {
         Self(IOKey::Stdin)
     }
 
     pub fn stdout() -> Self {
         Self(IOKey::Stdout)
+    }
+
+    pub fn stderr() -> Self {
+        Self(IOKey::Stderr)
     }
 }
 
