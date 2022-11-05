@@ -1,1 +1,1 @@
- (begin (write-char #) (write-char #) (write-char #
+ (write-string "Hello world")
