@@ -16,6 +16,7 @@
 /// ```
 /// use braces::vm::instance::{Instance, Options};
 /// use braces::vm::{value, global::TopLevel, VM};
+/// use braces::vm::value::port::IORegistry;
 /// use braces::compiler::{source::StringSource, Compiler};
 /// let mut source = StringSource::new("(define (id x) x) (id #t)");
 /// let mut compiler  = Compiler::new();
@@ -23,7 +24,8 @@
 /// // Now interpret the unit
 /// let mut top_level = TopLevel::new();
 /// let mut values = value::Factory::default();
-/// let result = Instance::interpret(unit.closure, &mut top_level, &mut values, Options::default()).unwrap();
+/// let mut io_resources = IORegistry::new();
+/// let result = Instance::interpret(unit.closure, &mut top_level, &mut values, &mut io_resources, Options::default()).unwrap();
 /// println!("{:#?}", result);
 /// ```
 ///

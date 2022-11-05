@@ -70,20 +70,9 @@ pub fn positional_and_rest_procedure1(
     }
 }
 
-pub fn positional_and_rest_procedure2(
-    args: &Vec<Value>,
-) -> FunctionResult<(&Value, &Value, &[Reference<Value>])> {
+pub fn rest_procedure(args: &Vec<Value>) -> FunctionResult<Vec<Reference<Value>>> {
     match &args[..] {
-        [first, second, Value::Vector(rest)] => Ok((first, second, &rest.slice())),
-        _ => Err(error::arity_mismatch(Arity::AtLeast(2), args.len())),
-    }
-}
-
-pub fn positional_and_rest_procedure3(
-    args: &Vec<Value>,
-) -> FunctionResult<(&Value, &Value, &Value, &[Reference<Value>])> {
-    match &args[..] {
-        [first, second, third, Value::Vector(rest)] => Ok((first, second, third, &rest.slice())),
-        _ => Err(error::arity_mismatch(Arity::AtLeast(3), args.len())),
+        [Value::ProperList(rest_args)] => Ok(rest_args.to_vector()),
+        _ => Err(error::arity_mismatch(Arity::Many, args.len())),
     }
 }
