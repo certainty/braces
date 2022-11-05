@@ -1096,6 +1096,7 @@ impl<'a> Instance<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::value::port::IORegistry;
     use crate::vm::global::TopLevel;
     use crate::vm::instance::{Instance, Options};
     use crate::vm::value::access::{Access, Reference};
@@ -1106,8 +1107,10 @@ mod tests {
     fn test_bind_arguments_exactly_n() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
+        let mut io_resources = IORegistry::new();
         let settings = Options::default();
-        let mut instance = Instance::vanilla(&mut top_level, &mut values, settings);
+        let mut instance =
+            Instance::vanilla(&mut top_level, &mut values, &mut io_resources, settings);
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;
@@ -1129,9 +1132,15 @@ mod tests {
     fn test_bind_arguments_rest_args() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
+        let mut io_resources = IORegistry::new();
         let expected_rest_args = values.proper_list(vec![Value::Bool(false), Value::Bool(false)]);
 
-        let mut instance = Instance::vanilla(&mut top_level, &mut values, Options::default());
+        let mut instance = Instance::vanilla(
+            &mut top_level,
+            &mut values,
+            &mut io_resources,
+            Options::default(),
+        );
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;

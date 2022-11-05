@@ -30,7 +30,9 @@ pub fn register(vm: &mut VM) {
         Arity::Exactly(0)
     );
 
-    super::register_core!(vm, "write-char", write_char, Arity::AtLeast(1))
+    super::register_core!(vm, "write-char", write_char, Arity::AtLeast(1));
+    super::register_core!(vm, "write-string", write_string, Arity::AtLeast(1));
+    super::register_core!(vm, "flush-output-port", flush_port, Arity::AtLeast(0));
 }
 
 fn port_p(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
@@ -68,10 +70,8 @@ fn current_error_port(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Ac
 fn write_char(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
     match positional_and_rest_procedure1(&args)? {
         (Value::Char(c), r) if r.is_empty() => {
-            vm.io_resources
-                .stdout()
-                .borrow_mut()
-                .write(c.encode_utf8(&mut [0; 4]).as_bytes())?;
+            let mut stdout = vm.io_resources.stdout().borrow_mut();
+            stdout.write_all(c.encode_utf8(&mut [0; 4]).as_bytes())?;
             Ok(Value::Unspecified.into())
         }
         (c, r) => todo!(),
@@ -79,5 +79,31 @@ fn write_char(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Valu
             println!("other: {:?}", other);
             Err(error::arity_mismatch(Arity::AtLeast(1), args.len()))
         }
+    }
+}
+
+fn write_string(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    match positional_and_rest_procedure1(&args)? {
+        (Value::String(s), r) if r.is_empty() => {
+            let mut stdout = vm.io_resources.stdout().borrow_mut();
+            stdout.write_all((&s.as_ref()).as_bytes())?;
+            Ok(Value::Unspecified.into())
+        }
+        (c, r) => todo!(),
+        other => {
+            println!("other: {:?}", other);
+            Err(error::arity_mismatch(Arity::AtLeast(1), args.len()))
+        }
+    }
+}
+
+fn flush_port(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
+    match optional_unary_procedure(&args)? {
+        None => {
+            vm.io_resources.stdout().borrow_mut().flush()?;
+            Ok(Value::Unspecified.into())
+        }
+        Some(v) => todo!(),
+        _ => todo!(),
     }
 }
