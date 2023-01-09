@@ -40,7 +40,7 @@ make repl
 
 #### Macros
 - [x] add macro expansion phase
-- [x] add procedural closure macro system (explicit renaming?)
+- [x] add procedural macro system (explicit renaming?)
 
 #### Errors
 - [ ] fix backtraces 
