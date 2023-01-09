@@ -55,9 +55,12 @@ make repl
 
 ## Scheme
 
+- [x] basic types
 - [x] numeric tower
 - [x] ports (basic version)
 - [x] load 
+- [ ] records
+- [ ] srfi parameters 
 
 ### Debugger 
 - [ ] generate DWARF debug information 
