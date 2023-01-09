@@ -53,6 +53,12 @@ make repl
 - [x] closures 
 - [ ] continuations 
 
+## Scheme
+
+- [x] numeric tower
+- [x] ports (basic version)
+- [x] load 
+
 ### Debugger 
 - [ ] generate DWARF debug information 
 
