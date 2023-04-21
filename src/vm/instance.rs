@@ -16,6 +16,7 @@
 /// ```
 /// use braces::vm::instance::{Instance, Options};
 /// use braces::vm::{value, global::TopLevel, VM};
+/// use braces::vm::value::port::IORegistry;
 /// use braces::compiler::{source::StringSource, Compiler};
 /// let mut source = StringSource::new("(define (id x) x) (id #t)");
 /// let mut compiler  = Compiler::new();
@@ -23,7 +24,8 @@
 /// // Now interpret the unit
 /// let mut top_level = TopLevel::new();
 /// let mut values = value::Factory::default();
-/// let result = Instance::interpret(unit.closure, &mut top_level, &mut values, Options::default()).unwrap();
+/// let mut io_resources = IORegistry::new();
+/// let result = Instance::interpret(unit.closure, &mut top_level, &mut values, &mut io_resources, Options::default()).unwrap();
 /// println!("{:#?}", result);
 /// ```
 ///
@@ -44,6 +46,7 @@ use super::stack_trace::StackTrace;
 use super::value;
 use super::value::closure::Closure;
 use super::value::error;
+use super::value::port::IORegistry;
 use super::value::procedure::{self, Arity};
 use super::value::symbol::Symbol;
 use super::value::Value;
@@ -79,6 +82,8 @@ pub struct Instance<'a> {
     pub(crate) values: &'a mut value::Factory,
     // top level environment which can be shared between individual instance runs
     top_level: &'a mut TopLevel,
+
+    pub(crate) io_resources: &'a mut IORegistry,
     // a simple stack to manage intermediate values and locals
     stack: ValueStack,
     // manage all live functions
@@ -98,9 +103,10 @@ impl<'a> Instance<'a> {
         initial_closure: value::closure::Closure,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        io_resources: &'a mut IORegistry,
         options: Options,
     ) -> Self {
-        let mut vm = Self::vanilla(top_level, values, options);
+        let mut vm = Self::vanilla(top_level, values, io_resources, options);
         vm.push(Value::Closure(initial_closure.clone())).unwrap();
         vm.push_frame(initial_closure, 0).unwrap();
         vm
@@ -109,6 +115,7 @@ impl<'a> Instance<'a> {
     pub fn vanilla(
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        io_resources: &'a mut IORegistry,
         settings: Options,
     ) -> Self {
         let stack = ValueStack::new(settings.stack_size * 255);
@@ -121,6 +128,7 @@ impl<'a> Instance<'a> {
             call_stack,
             top_level,
             active_frame: std::ptr::null_mut(),
+            io_resources,
             open_up_values,
             settings,
         }
@@ -130,9 +138,10 @@ impl<'a> Instance<'a> {
         initial_closure: value::closure::Closure,
         top_level: &'a mut TopLevel,
         values: &'a mut value::Factory,
+        io_resources: &'a mut IORegistry,
         options: Options,
     ) -> Result<Value> {
-        let mut instance = Self::new(initial_closure, top_level, values, options);
+        let mut instance = Self::new(initial_closure, top_level, values, io_resources, options);
         instance.run()
     }
 
@@ -141,9 +150,10 @@ impl<'a> Instance<'a> {
         syntax: &Value,
         arguments: &[Value],
         top_level: &'a mut TopLevel,
+        io_resources: &'a mut IORegistry,
         values: &'a mut value::Factory,
     ) -> Result<Value> {
-        let mut vm = Self::vanilla(top_level, values, Options::default());
+        let mut vm = Self::vanilla(top_level, values, io_resources, Options::default());
         let is_native = expander.is_native();
 
         vm.push(Value::Procedure(expander))?;
@@ -697,6 +707,7 @@ impl<'a> Instance<'a> {
         arg_count: usize,
     ) -> Result<()> {
         self.check_arity(&proc.arity, arg_count)?;
+        let arg_count = self.bind_arguments(&proc.arity, arg_count)?;
         let arguments = self
             .pop_n(arg_count)
             .iter()
@@ -1087,6 +1098,7 @@ impl<'a> Instance<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::value::port::IORegistry;
     use crate::vm::global::TopLevel;
     use crate::vm::instance::{Instance, Options};
     use crate::vm::value::access::{Access, Reference};
@@ -1097,8 +1109,10 @@ mod tests {
     fn test_bind_arguments_exactly_n() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
+        let mut io_resources = IORegistry::new();
         let settings = Options::default();
-        let mut instance = Instance::vanilla(&mut top_level, &mut values, settings);
+        let mut instance =
+            Instance::vanilla(&mut top_level, &mut values, &mut io_resources, settings);
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;
@@ -1120,9 +1134,15 @@ mod tests {
     fn test_bind_arguments_rest_args() -> super::Result<()> {
         let mut top_level = TopLevel::new();
         let mut values = Factory::default();
+        let mut io_resources = IORegistry::new();
         let expected_rest_args = values.proper_list(vec![Value::Bool(false), Value::Bool(false)]);
 
-        let mut instance = Instance::vanilla(&mut top_level, &mut values, Options::default());
+        let mut instance = Instance::vanilla(
+            &mut top_level,
+            &mut values,
+            &mut io_resources,
+            Options::default(),
+        );
 
         instance.push(Access::ByVal(Value::Bool(true)))?;
         instance.push(Access::ByVal(Value::Bool(false)))?;

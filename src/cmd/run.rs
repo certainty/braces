@@ -21,7 +21,7 @@ impl Command {
         clap::Command::new("run")
             .alias("r")
             .about("run the specified file")
-            .arg(arg!([INPUT]))
+            .arg(arg!(input: [INPUT]))
     }
 
     pub fn run(&self) -> anyhow::Result<()> {

@@ -1,4 +1,5 @@
 pub mod numbers;
+pub mod ports;
 use super::ffi::*;
 use crate::vm::instance::Instance;
 use crate::vm::value::access::{Access, Reference};
@@ -47,6 +48,7 @@ pub fn register(vm: &mut VM) {
     register_core!(vm, "gensym", gensym, Arity::Exactly(0));
 
     numbers::register(vm);
+    ports::register(vm);
 }
 
 pub fn load_file(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {

@@ -177,11 +177,14 @@ impl Repl {
         self.command_counter += 1;
 
         match compiler.compile(&mut source) {
-            Ok(unit) => match self.vm.interpret(unit) {
-                Ok(Value::Unspecified) => (),
-                Ok(v) => println!("{}", self.vm.write(&v)),
-                Err(e) => self.vm.print_error(&e, &compiler),
-            },
+            Ok(unit) => {
+                match self.vm.interpret(unit) {
+                    Ok(Value::Unspecified) => (),
+                    Ok(v) => println!("{}", self.vm.write(&v)),
+                    Err(e) => self.vm.print_error(&e, &compiler),
+                };
+            }
+
             Err(e) => compiler.print_error(&e),
         }
 

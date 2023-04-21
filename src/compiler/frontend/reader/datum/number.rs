@@ -197,7 +197,7 @@ fn parse_decimal_short(input: Input) -> ParseResult<f64> {
 fn apply_exponent(num: f64, exp: Option<i32>) -> f64 {
     match exp {
         Some(e) => (num as f64) * (f64::powi(10.0, e) as f64),
-        _ => (num as f64),
+        _ => num as f64,
     }
 }
 

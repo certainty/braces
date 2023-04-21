@@ -27,7 +27,7 @@ install: build
 	$(CARGO) install
 
 run: 
-	$(CARGO) run --bin bracesi
+	$(CARGO) run --bin bracesi -- run $(RUN_FILE)
 
 debug_run: 
 	$(CARGO) run --features debug_vm --features debug_code --bin bracesi -- run $(RUN_FILE)

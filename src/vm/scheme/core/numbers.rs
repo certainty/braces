@@ -71,10 +71,14 @@ macro_rules! define_fold {
         pub fn $func(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
             let mut result = number::Number::fixnum($identity);
 
-            for n in args {
-                match n {
-                    Value::Number(n) => result = result.$op(n)?,
-                    v => return Err(error::argument_error(v.clone(), "is not a number")),
+            match rest_procedure(&args)? {
+                numbers => {
+                    for n in numbers {
+                        match n.to_owned() {
+                            Value::Number(n) => result = result.$op(n)?,
+                            v => return Err(error::argument_error(v, "is not a number")),
+                        }
+                    }
                 }
             }
 
@@ -89,17 +93,22 @@ define_fold!(mul, 1, mul);
 macro_rules! define_reduction {
     ($func:ident, $op:ident) => {
         pub fn $func(_vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
-            if let Value::Number(mut result) = args[0].clone() {
-                for n in args[1..].iter().cloned() {
-                    match n {
-                        Value::Number(n) => result = result.$op(n)?,
-                        v => return Err(error::argument_error(v.clone(), "is not a number")),
-                    }
-                }
+            match positional_and_rest_procedure1(&args)? {
+                (num @ Value::Number(_), rest) if rest.is_empty() => Ok(num.clone().into()),
 
-                Ok(Value::Number(result).into())
-            } else {
-                return Err(error::argument_error(args[0].clone(), "is not a number"));
+                (Value::Number(init), rest) => {
+                    let mut result = init.clone();
+
+                    for n in rest {
+                        match n.to_owned() {
+                            Value::Number(n) => result = result.$op(n)?,
+                            v => return Err(error::argument_error(v.clone(), "is not a number")),
+                        }
+                    }
+
+                    Ok(Value::Number(result).into())
+                }
+                (other, _) => Err(error::argument_error(other.clone(), "Expected number")),
             }
         }
     };
@@ -113,13 +122,18 @@ macro_rules! define_ordering {
         fn $func(vm: &mut Instance, args: Vec<Value>) -> FunctionResult<Access<Value>> {
             let mut result = true;
 
-            for n in 0..args.len() {
-                if n == 0 {
-                    result = true;
-                } else {
-                    result = as_number(vm, &args[n - 1])? $op as_number(vm, &args[n])?;
+            match rest_procedure(&args)? {
+                rest => {
+                   for n in 0..rest.len() {
+                     if n == 0 {
+                       result = true;
+                     } else {
+                       result = as_number(vm, &rest[n - 1].get_inner_ref())? $op as_number(vm, &rest[n].get_inner_ref())?;
+                    }
+                  }
                 }
-            }
+            };
+
 
             Ok(Value::Bool(result).into())
         }

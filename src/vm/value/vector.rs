@@ -27,6 +27,10 @@ impl Vector {
         Vector::from(new_vec)
     }
 
+    pub fn slice(&self) -> &[Reference<Value>] {
+        &self.0
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         self.0.len()

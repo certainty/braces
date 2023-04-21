@@ -77,6 +77,8 @@ impl Writer {
                 format!("({} . {})", head_body.join(" "), tail_body)
             }
             Value::Unspecified => "#<unspecified>".to_string(),
+            Value::Port(p) => format!("#<port {:?}>", p),
+            Value::EofObject => "#<eof>".to_string(),
         }
     }
 
