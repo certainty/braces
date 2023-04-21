@@ -40,7 +40,7 @@ make repl
 
 #### Macros
 - [x] add macro expansion phase
-- [x] add procedural closure macro system (explicit renaming?)
+- [x] add procedural macro system (explicit renaming?)
 
 #### Errors
 - [ ] fix backtraces 
@@ -52,6 +52,15 @@ make repl
 - [x] optimise tail calls
 - [x] closures 
 - [ ] continuations 
+
+## Scheme
+
+- [x] basic types
+- [x] numeric tower
+- [x] ports (basic version)
+- [x] load 
+- [ ] records
+- [ ] srfi parameters 
 
 ### Debugger 
 - [ ] generate DWARF debug information 
